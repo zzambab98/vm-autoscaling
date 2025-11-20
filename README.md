@@ -28,27 +28,142 @@
 
 PLG Stack(Prometheus, Loki, Grafana) 기반 모니터링과 Jenkins를 연동하여 VM 자동 스케일아웃을 완전 자동화하는 시스템을 구축합니다.
 
+### 전제 조건 (Prerequisites)
+
+⚠️ **중요**: 이 시스템을 사용하기 전에 다음 조건들이 충족되어야 합니다.
+
+#### 1. 기존 서버 배포 완료
+- **최소 2대 이상의 VM이 이미 배포되어 있어야 함**
+- 서버에 웹/API 서비스가 구성되어 정상 동작 중이어야 함
+- 각 서버는 고정 IP를 사용하고 있어야 함
+
+#### 2. F5 L4 Pool 구성 완료
+- **F5 L4 Pool이 이미 생성되어 있어야 함**
+- 기존 서버들이 F5 Pool Member로 등록되어 있어야 함
+- Virtual Server (VIP)가 구성되어 있어야 함
+- Health Check가 정상 동작 중이어야 함
+
+#### 3. PLG Stack 모니터링 설정
+- **Prometheus가 기존 서버들을 모니터링 중이어야 함**
+- Node Exporter 또는 vCenter Exporter가 설치되어 있어야 함
+- 기본적인 Alert Rule이 설정되어 있어야 함
+
+#### 4. 템플릿 준비
+- **배포된 서버 중 하나를 템플릿으로 변환할 수 있어야 함**
+- 템플릿은 동일한 서비스 구성을 가지고 있어야 함
+
+### 시스템 동작 시나리오
+
+```
+[사전 조건]
+1. 기존 서버 2대 이상 배포 완료 (예: Web-Server-01, Web-Server-02)
+2. F5 L4 Pool 구성 완료
+   - Pool 이름: web-server-pool
+   - VIP: 10.255.1.100:80
+   - 기존 Member: 10.255.1.101:80, 10.255.1.102:80
+3. PLG Stack이 기존 서버들을 모니터링 중
+
+[오토스케일링 설정]
+4. 운영자가 웹 UI에서 오토스케일링 설정 생성
+   - 서비스: Web-Server-Service
+   - 템플릿: Web-Server-Template (기존 서버 중 하나를 템플릿으로 변환)
+   - F5 Pool: web-server-pool (기존 Pool 사용)
+   - IP Pool: 10.255.1.200 ~ 10.255.1.250
+
+[자동 스케일아웃]
+5. 부하 증가 → Prometheus Alert 발생
+6. Alertmanager → Jenkins Webhook
+7. Jenkins가 템플릿에서 새 VM 생성 (예: Web-Server-03)
+8. 새 VM IP 할당 (예: 10.255.1.201)
+9. F5 Pool에 새 Member 추가 (10.255.1.201:80)
+10. 서비스 확장 완료 (총 3대)
+```
+
 ### 핵심 기능
 
 1. **템플릿 관리**: 배포된 VM을 템플릿으로 변환하여 저장
 2. **모니터링 설정**: PLG Stack을 통한 VM 리소스 모니터링 및 알림 규칙 설정
 3. **자동 스케일아웃**: 임계치 도달 시 Jenkins를 통해 자동으로 VM 추가
-4. **F5 자동 연동**: 새로 생성된 VM을 F5 L4 Pool에 자동 추가
+4. **F5 자동 연동**: 새로 생성된 VM을 **기존 F5 L4 Pool에 자동 추가**
 5. **IP 관리**: IP Pool에서 할당된 IP를 ping 테스트 후 사용
 
-### 사용 시나리오
+### 사용 시나리오 (상세)
+
+#### Phase 0: 사전 준비 (오토스케일링 설정 전)
 
 ```
-1. 운영자가 템플릿으로 VM을 배포
-2. 사용자가 해당 VM에 웹/API 서비스를 구성
-3. 사용자가 "오토스케일링 설정" 요청
-4. 운영자가 웹 UI에서 템플릿 생성 및 오토스케일링 설정
-5. PLG Stack이 모니터링 시작
-6. 부하 증가 → Alertmanager → Jenkins Webhook
-7. Jenkins가 템플릿으로 새 VM 생성
-8. IP 할당 및 ping 테스트
-9. F5 L4 Pool에 자동 추가
+1. 운영자가 VM을 배포 (최소 2대 이상)
+   - 예: Web-Server-01 (10.255.1.101)
+   - 예: Web-Server-02 (10.255.1.102)
+
+2. 사용자가 각 VM에 웹/API 서비스를 구성
+   - 애플리케이션 배포
+   - 설정 완료
+   - 서비스 정상 동작 확인
+
+3. 운영자가 F5 L4 Pool 구성
+   - Pool 이름: web-server-pool
+   - VIP: 10.255.1.100:80
+   - 기존 Member 추가: 10.255.1.101:80, 10.255.1.102:80
+   - Health Check 설정
+   - 서비스 정상 동작 확인
+
+4. PLG Stack 모니터링 설정
+   - Prometheus가 기존 서버들을 모니터링 중
+   - Node Exporter 설치 및 설정
+```
+
+#### Phase 1: 오토스케일링 설정
+
+```
+5. 사용자가 "오토스케일링 설정" 요청
+
+6. 운영자가 웹 UI에서 작업:
+   a. 템플릿 생성
+      - 기존 서버 중 하나 선택 (예: Web-Server-01)
+      - 템플릿 이름: Web-Server-Template
+      - vCenter에서 VM → Template 변환
+   
+   b. 오토스케일링 설정 생성
+      - 서비스 이름: Web-Server-Service
+      - 템플릿 선택: Web-Server-Template
+      - F5 Pool 정보 입력: web-server-pool (기존 Pool)
+      - VIP 정보: 10.255.1.100:80
+      - IP Pool 설정: 10.255.1.200 ~ 10.255.1.250
+      - 모니터링 임계값 설정 (CPU 80%, Memory 80%)
+   
+   c. 설정 저장
+      - Jenkins Job 자동 생성: autoscale-web-server-service
+      - Prometheus Alert Rule 자동 생성
+      - Alertmanager 라우팅 규칙 자동 추가
+```
+
+#### Phase 2: 자동 스케일아웃 (운영 중)
+
+```
+7. PLG Stack이 모니터링 시작
+   - Prometheus가 기존 서버들의 리소스 수집
+   - Alert Rule 평가
+
+8. 부하 증가 시나리오:
+   - CPU/Memory 사용률이 임계치 도달
+   - Alert 생성 (firing 상태)
+   - Alertmanager가 Alert 수신
+
+9. 자동 스케일아웃 실행:
+   - Alertmanager → Jenkins Webhook 호출
+   - Jenkins Job 실행: autoscale-web-server-service
+   - IP Pool에서 사용 가능한 IP 조회 (예: 10.255.1.201)
+   - Ping 테스트 (사용 가능 확인)
+   - 템플릿에서 새 VM 생성 (Web-Server-03)
+   - VM 부팅 대기
+   - Health Check 수행
+   - F5 Pool에 새 Member 추가 (10.255.1.201:80)
+
 10. 서비스 확장 완료
+    - 총 3대의 서버 운영 (기존 2대 + 신규 1대)
+    - F5 Pool Member: 3개
+    - 부하 분산으로 서비스 안정성 향상
 ```
 
 ---
@@ -879,6 +994,14 @@ Jenkins Webhook 수신 (Alertmanager에서 호출)
 
 ## 참고 문서
 
+### 프로젝트 문서
+- [작업 계획서](./docs/작업-계획서.md) - 상세 작업 계획 및 체크리스트
+- [전제 조건 및 준비사항](./docs/전제-조건-및-준비사항.md) - **시작 전 필수 확인 사항**
+- [멀티 서비스 파이프라인 아키텍처](./docs/멀티-서비스-파이프라인-아키텍처.md) - 서비스별 독립 파이프라인 설계
+- [구현 가이드](./구현-가이드.md) - 상세 구현 가이드
+- [프로젝트 구조](./프로젝트-구조.md) - 폴더 구조 및 파일 설명
+
+### 관련 문서
 - [F5 DSR 구조 설명](../Local-Infra-Code/참고문서/F5-DSR-구조-설명.md)
 - [Jenkins 워크플로우](../Local-Infra-Code/Dana-Cloud-Auto/docs/jenkins-workflow.md)
 - [Kubernetes 오토스케일링 가이드](../Local-Infra-Code/Dana-Cloud-Auto/docs/kubernetes-autoscaling-guide.md)
