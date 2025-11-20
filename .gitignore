@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Data files (실제 운영 데이터는 제외)
+data/*.json
+!data/.gitkeep
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build outputs
+dist/
+build/
+*.tar.gz
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Credentials
+*.pem
+*.key
+*.crt
+credentials.json
+
