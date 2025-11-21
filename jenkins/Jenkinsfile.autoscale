@@ -1,0 +1,310 @@
+pipeline {
+    agent any
+    
+    parameters {
+        string(name: 'AUTOSCALE_CONFIG_ID', defaultValue: '', description: '오토스케일링 설정 ID')
+        string(name: 'SERVICE_NAME', defaultValue: '', description: '서비스 이름')
+        string(name: 'TEMPLATE_NAME', defaultValue: '', description: '템플릿 이름')
+        string(name: 'F5_POOL_NAME', defaultValue: '', description: 'F5 Pool 이름')
+        string(name: 'VIP', defaultValue: '', description: 'VIP 주소')
+        string(name: 'VIP_PORT', defaultValue: '80', description: 'VIP 포트')
+        string(name: 'HEALTH_CHECK_PATH', defaultValue: '/', description: 'Health Check 경로')
+        string(name: 'IP_POOL_START', defaultValue: '', description: 'IP Pool 시작 주소')
+        string(name: 'IP_POOL_END', defaultValue: '', description: 'IP Pool 종료 주소')
+        string(name: 'SUBNET', defaultValue: '255.255.255.0', description: '서브넷 마스크')
+        string(name: 'GATEWAY', defaultValue: '', description: '게이트웨이')
+        string(name: 'VLAN', defaultValue: '', description: 'VLAN 이름')
+    }
+    
+    environment {
+        GOVC_URL = credentials('vcenter-url')
+        GOVC_USERNAME = credentials('vcenter-username')
+        GOVC_PASSWORD = credentials('vcenter-password')
+        F5_SERVER = credentials('f5-server')
+        F5_USERNAME = credentials('f5-username')
+        F5_PASSWORD = credentials('f5-password')
+    }
+    
+    stages {
+        stage('Parse Webhook Parameters') {
+            steps {
+                script {
+                    echo "=== Webhook 파라미터 파싱 ==="
+                    echo "AUTOSCALE_CONFIG_ID: ${params.AUTOSCALE_CONFIG_ID}"
+                    echo "SERVICE_NAME: ${params.SERVICE_NAME}"
+                    
+                    // Webhook에서 전달된 파라미터 확인
+                    if (!params.AUTOSCALE_CONFIG_ID || !params.SERVICE_NAME) {
+                        error("필수 파라미터가 누락되었습니다: AUTOSCALE_CONFIG_ID, SERVICE_NAME")
+                    }
+                    
+                    // 설정 정보는 백엔드 API에서 조회 필요
+                    // 여기서는 파라미터로 전달받은 값 사용
+                }
+            }
+        }
+        
+        stage('Get Available IP') {
+            steps {
+                script {
+                    echo "=== IP Pool에서 사용 가능한 IP 조회 ==="
+                    
+                    if (!params.IP_POOL_START || !params.IP_POOL_END) {
+                        error("IP Pool 범위가 설정되지 않았습니다.")
+                    }
+                    
+                    // Python 스크립트로 사용 가능한 IP 조회
+                    def availableIp = sh(
+                        script: """
+                            python3 scripts/get-available-ip.py \
+                                --start ${params.IP_POOL_START} \
+                                --end ${params.IP_POOL_END} \
+                                --subnet ${params.SUBNET}
+                        """,
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (!availableIp) {
+                        error("사용 가능한 IP를 찾을 수 없습니다.")
+                    }
+                    
+                    env.VM_IP = availableIp
+                    echo "할당된 IP: ${env.VM_IP}"
+                }
+            }
+        }
+        
+        stage('Ping Test') {
+            steps {
+                script {
+                    echo "=== IP Ping 테스트 ==="
+                    
+                    def pingResult = sh(
+                        script: """
+                            ping -c 3 -W 2 ${env.VM_IP} || exit 1
+                        """,
+                        returnStatus: true
+                    )
+                    
+                    if (pingResult == 0) {
+                        error("IP ${env.VM_IP}가 이미 사용 중입니다. 다른 IP를 선택하세요.")
+                    }
+                    
+                    echo "IP ${env.VM_IP} 사용 가능 확인"
+                }
+            }
+        }
+        
+        stage('Create VM from Template') {
+            steps {
+                script {
+                    echo "=== 템플릿에서 VM 생성 ==="
+                    
+                    if (!params.TEMPLATE_NAME) {
+                        error("템플릿 이름이 설정되지 않았습니다.")
+                    }
+                    
+                    def vmName = "${params.SERVICE_NAME}-${BUILD_NUMBER}-${System.currentTimeMillis()}"
+                    vmName = vmName.toLowerCase().replaceAll(/[^a-z0-9-]/, '-')
+                    
+                    echo "VM 생성 시작: ${vmName}"
+                    echo "템플릿: ${params.TEMPLATE_NAME}"
+                    echo "IP: ${env.VM_IP}"
+                    
+                    // govc를 사용하여 VM 클론
+                    sh """
+                        export GOVC_URL="${GOVC_URL}"
+                        export GOVC_USERNAME="${GOVC_USERNAME}"
+                        export GOVC_PASSWORD="${GOVC_PASSWORD}"
+                        
+                        govc vm.clone \
+                            -vm="${params.TEMPLATE_NAME}" \
+                            -name="${vmName}" \
+                            -on=false
+                    """
+                    
+                    // VM 네트워크 설정 (고정 IP)
+                    if (params.VLAN) {
+                        sh """
+                            export GOVC_URL="${GOVC_URL}"
+                            export GOVC_USERNAME="${GOVC_USERNAME}"
+                            export GOVC_PASSWORD="${GOVC_PASSWORD}"
+                            
+                            govc vm.network.change \
+                                -vm="${vmName}" \
+                                -net="${params.VLAN}"
+                        """
+                    }
+                    
+                    env.VM_NAME = vmName
+                    echo "VM 생성 완료: ${env.VM_NAME}"
+                }
+            }
+        }
+        
+        stage('Configure VM IP') {
+            steps {
+                script {
+                    echo "=== VM IP 설정 ==="
+                    
+                    // VM에 고정 IP 설정 (cloud-init 또는 vCenter 설정)
+                    // 실제 구현은 환경에 따라 다를 수 있음
+                    echo "VM IP 설정: ${env.VM_IP}"
+                    echo "서브넷: ${params.SUBNET}"
+                    echo "게이트웨이: ${params.GATEWAY}"
+                }
+            }
+        }
+        
+        stage('Start VM') {
+            steps {
+                script {
+                    echo "=== VM 시작 ==="
+                    
+                    sh """
+                        export GOVC_URL="${GOVC_URL}"
+                        export GOVC_USERNAME="${GOVC_USERNAME}"
+                        export GOVC_PASSWORD="${GOVC_PASSWORD}"
+                        
+                        govc vm.power -on "${env.VM_NAME}"
+                    """
+                    
+                    echo "VM 시작 완료: ${env.VM_NAME}"
+                }
+            }
+        }
+        
+        stage('Wait for VM Boot') {
+            steps {
+                script {
+                    echo "=== VM 부팅 대기 ==="
+                    
+                    def maxRetries = 30
+                    def retryCount = 0
+                    def vmReady = false
+                    
+                    while (retryCount < maxRetries && !vmReady) {
+                        sleep(time: 10, unit: 'SECONDS')
+                        
+                        def pingResult = sh(
+                            script: "ping -c 1 -W 2 ${env.VM_IP}",
+                            returnStatus: true
+                        )
+                        
+                        if (pingResult == 0) {
+                            vmReady = true
+                            echo "VM 부팅 완료: ${env.VM_IP}"
+                        } else {
+                            retryCount++
+                            echo "VM 부팅 대기 중... (${retryCount}/${maxRetries})"
+                        }
+                    }
+                    
+                    if (!vmReady) {
+                        error("VM 부팅 실패: ${env.VM_IP} (${maxRetries}회 시도 후 타임아웃)")
+                    }
+                }
+            }
+        }
+        
+        stage('Health Check') {
+            steps {
+                script {
+                    echo "=== Health Check ==="
+                    
+                    def healthCheckPath = params.HEALTH_CHECK_PATH ?: '/'
+                    def healthCheckPort = params.VIP_PORT ?: '80'
+                    
+                    def maxRetries = 10
+                    def retryCount = 0
+                    def healthCheckPassed = false
+                    
+                    while (retryCount < maxRetries && !healthCheckPassed) {
+                        sleep(time: 5, unit: 'SECONDS')
+                        
+                        def curlResult = sh(
+                            script: """
+                                curl -f -s -o /dev/null -w "%{http_code}" \
+                                    --max-time 5 \
+                                    http://${env.VM_IP}:${healthCheckPort}${healthCheckPath} || echo "000"
+                            """,
+                            returnStdout: true
+                        ).trim()
+                        
+                        if (curlResult == "200" || curlResult == "301" || curlResult == "302") {
+                            healthCheckPassed = true
+                            echo "Health Check 통과: ${env.VM_IP}:${healthCheckPort}${healthCheckPath}"
+                        } else {
+                            retryCount++
+                            echo "Health Check 대기 중... (${retryCount}/${maxRetries}) - HTTP ${curlResult}"
+                        }
+                    }
+                    
+                    if (!healthCheckPassed) {
+                        error("Health Check 실패: ${env.VM_IP}:${healthCheckPort}${healthCheckPath}")
+                    }
+                }
+            }
+        }
+        
+        stage('Add to F5 Pool') {
+            steps {
+                script {
+                    echo "=== F5 Pool에 Member 추가 ==="
+                    
+                    if (!params.F5_POOL_NAME) {
+                        error("F5 Pool 이름이 설정되지 않았습니다.")
+                    }
+                    
+                    def memberPort = params.VIP_PORT ?: '80'
+                    
+                    sh """
+                        python3 scripts/add-f5-pool-member.py \
+                            --pool ${params.F5_POOL_NAME} \
+                            --member ${env.VM_IP}:${memberPort} \
+                            --vip ${params.VIP} \
+                            --server ${F5_SERVER} \
+                            --username ${F5_USERNAME} \
+                            --password ${F5_PASSWORD}
+                    """
+                    
+                    echo "F5 Pool에 Member 추가 완료: ${env.VM_IP}:${memberPort}"
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo "=== 스케일아웃 성공 ==="
+            echo "VM 이름: ${env.VM_NAME}"
+            echo "VM IP: ${env.VM_IP}"
+            echo "F5 Pool: ${params.F5_POOL_NAME}"
+            // 성공 알림 (Slack, Email 등)
+        }
+        failure {
+            echo "=== 스케일아웃 실패 ==="
+            echo "에러 발생 시 롤백 처리 필요"
+            // 실패 알림 및 롤백
+            script {
+                // VM이 생성되었지만 F5 추가 실패한 경우 VM 삭제
+                if (env.VM_NAME) {
+                    try {
+                        sh """
+                            export GOVC_URL="${GOVC_URL}"
+                            export GOVC_USERNAME="${GOVC_USERNAME}"
+                            export GOVC_PASSWORD="${GOVC_PASSWORD}"
+                            
+                            govc vm.power -off "${env.VM_NAME}" || true
+                            govc object.destroy "${env.VM_NAME}" || true
+                        """
+                        echo "롤백 완료: VM ${env.VM_NAME} 삭제"
+                    } catch (error) {
+                        echo "롤백 실패: ${error.message}"
+                    }
+                }
+            }
+        }
+    }
+}
+

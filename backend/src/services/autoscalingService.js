@@ -210,8 +210,25 @@ async function deleteConfig(configId) {
       throw new Error(`설정을 찾을 수 없습니다: ${configId}`);
     }
 
-    // 관련 리소스 정리 (향후 Jenkins Job 삭제 등)
-    // TODO: Jenkins Job 삭제 로직 추가
+    // 관련 리소스 정리
+    try {
+      const { deleteAlertRule } = require('./prometheusAlertService');
+      const { deleteRoutingRule } = require('./alertmanagerService');
+      const { deleteJenkinsJob } = require('./jenkinsService');
+
+      // Alert Rule 삭제
+      await deleteAlertRule(config.serviceName);
+
+      // 라우팅 규칙 삭제
+      await deleteRoutingRule(config.serviceName);
+
+      // Jenkins Job 삭제
+      const jobName = `autoscale-${config.serviceName.toLowerCase().replace(/\s+/g, '-')}`;
+      await deleteJenkinsJob(jobName);
+    } catch (error) {
+      console.error(`[Autoscaling Service] 리소스 정리 실패:`, error);
+      // 정리 실패해도 설정은 삭제됨
+    }
 
     // 메타데이터에서 삭제
     const filtered = configs.filter(c => c.id !== configId);
@@ -246,12 +263,13 @@ async function setConfigEnabled(configId, enabled) {
     throw new Error(`설정을 찾을 수 없습니다: ${configId}`);
   }
 
-  // 설정 활성화 시 PLG Stack 연동
+  // 설정 활성화 시 PLG Stack 및 Jenkins 연동
   if (enabled && !config.enabled) {
     try {
       const { createAlertRule } = require('./prometheusAlertService');
       const { addRoutingRule } = require('./alertmanagerService');
       const { addPrometheusJob } = require('./prometheusMonitoringService');
+      const { createJenkinsJob } = require('./jenkinsService');
 
       // Prometheus Job 추가 (이미 추가되어 있을 수 있음)
       if (config.monitoring && config.monitoring.prometheusJobName) {
@@ -265,18 +283,22 @@ async function setConfigEnabled(configId, enabled) {
       // Alertmanager 라우팅 규칙 추가
       await addRoutingRule(config);
 
-      console.log(`[Autoscaling Service] PLG Stack 연동 완료: ${config.serviceName}`);
+      // Jenkins Job 생성
+      await createJenkinsJob(config);
+
+      console.log(`[Autoscaling Service] PLG Stack 및 Jenkins 연동 완료: ${config.serviceName}`);
     } catch (error) {
-      console.error(`[Autoscaling Service] PLG Stack 연동 실패:`, error);
+      console.error(`[Autoscaling Service] 연동 실패:`, error);
       // 연동 실패해도 설정은 활성화됨 (경고만)
     }
   }
 
-  // 설정 비활성화 시 PLG Stack 리소스 정리
+  // 설정 비활성화 시 PLG Stack 및 Jenkins 리소스 정리
   if (!enabled && config.enabled) {
     try {
       const { deleteAlertRule } = require('./prometheusAlertService');
       const { deleteRoutingRule } = require('./alertmanagerService');
+      const { deleteJenkinsJob } = require('./jenkinsService');
 
       // Alert Rule 삭제
       await deleteAlertRule(config.serviceName);
@@ -284,9 +306,13 @@ async function setConfigEnabled(configId, enabled) {
       // 라우팅 규칙 삭제
       await deleteRoutingRule(config.serviceName);
 
-      console.log(`[Autoscaling Service] PLG Stack 리소스 정리 완료: ${config.serviceName}`);
+      // Jenkins Job 삭제
+      const jobName = `autoscale-${config.serviceName.toLowerCase().replace(/\s+/g, '-')}`;
+      await deleteJenkinsJob(jobName);
+
+      console.log(`[Autoscaling Service] 리소스 정리 완료: ${config.serviceName}`);
     } catch (error) {
-      console.error(`[Autoscaling Service] PLG Stack 리소스 정리 실패:`, error);
+      console.error(`[Autoscaling Service] 리소스 정리 실패:`, error);
       // 정리 실패해도 설정은 비활성화됨
     }
   }

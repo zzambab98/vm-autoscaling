@@ -6,6 +6,7 @@ const { getTemplates, getTemplateById, convertVmToTemplate, deleteTemplate, getV
 const { saveConfig, getConfigs, getConfigById, updateConfig, deleteConfig, setConfigEnabled } = require('./services/autoscalingService');
 const { createAlertRule, deleteAlertRule, getAlertRules } = require('./services/prometheusAlertService');
 const { addRoutingRule, deleteRoutingRule, getRoutingRules } = require('./services/alertmanagerService');
+const { createJenkinsJob, deleteJenkinsJob, getJenkinsJobStatus, getJenkinsJobs, triggerJenkinsJob } = require('./services/jenkinsService');
 
 const PORT = process.env.PORT || 4000;
 
@@ -421,6 +422,81 @@ const server = http.createServer((req, res) => {
         sendJSONResponse(res, 500, { error: error.message });
       }
     })();
+    return;
+  }
+
+  // Jenkins Job 생성 API
+  if (req.method === 'POST' && parsedUrl.pathname === '/api/jenkins/jobs') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body);
+        const result = await createJenkinsJob(payload);
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    });
+    return;
+  }
+
+  // Jenkins Job 목록 조회 API
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/jenkins/jobs') {
+    (async () => {
+      try {
+        const result = await getJenkinsJobs();
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // Jenkins Job 상태 조회 API
+  if (req.method === 'GET' && parsedUrl.pathname.startsWith('/api/jenkins/jobs/')) {
+    const jobName = decodeURIComponent(parsedUrl.pathname.split('/').pop());
+    (async () => {
+      try {
+        const result = await getJenkinsJobStatus(jobName);
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // Jenkins Job 삭제 API
+  if (req.method === 'DELETE' && parsedUrl.pathname.startsWith('/api/jenkins/jobs/')) {
+    const jobName = decodeURIComponent(parsedUrl.pathname.split('/').pop());
+    (async () => {
+      try {
+        const result = await deleteJenkinsJob(jobName);
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // Jenkins Job 빌드 실행 API
+  if (req.method === 'POST' && parsedUrl.pathname.startsWith('/api/jenkins/jobs/') && parsedUrl.pathname.endsWith('/build')) {
+    const jobName = decodeURIComponent(parsedUrl.pathname.split('/').slice(-2, -1)[0]);
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const parameters = payload.parameters || {};
+        const result = await triggerJenkinsJob(jobName, parameters);
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    });
     return;
   }
 
