@@ -241,6 +241,56 @@ async function deleteConfig(configId) {
  * @returns {Promise<object>} 업데이트된 설정
  */
 async function setConfigEnabled(configId, enabled) {
+  const config = await getConfigById(configId);
+  if (!config) {
+    throw new Error(`설정을 찾을 수 없습니다: ${configId}`);
+  }
+
+  // 설정 활성화 시 PLG Stack 연동
+  if (enabled && !config.enabled) {
+    try {
+      const { createAlertRule } = require('./prometheusAlertService');
+      const { addRoutingRule } = require('./alertmanagerService');
+      const { addPrometheusJob } = require('./prometheusMonitoringService');
+
+      // Prometheus Job 추가 (이미 추가되어 있을 수 있음)
+      if (config.monitoring && config.monitoring.prometheusJobName) {
+        // Job 추가는 이미 완료되었다고 가정 (수동으로 추가했을 수 있음)
+        // 필요시 여기서 추가할 수 있음
+      }
+
+      // Alert Rule 생성
+      await createAlertRule(config);
+
+      // Alertmanager 라우팅 규칙 추가
+      await addRoutingRule(config);
+
+      console.log(`[Autoscaling Service] PLG Stack 연동 완료: ${config.serviceName}`);
+    } catch (error) {
+      console.error(`[Autoscaling Service] PLG Stack 연동 실패:`, error);
+      // 연동 실패해도 설정은 활성화됨 (경고만)
+    }
+  }
+
+  // 설정 비활성화 시 PLG Stack 리소스 정리
+  if (!enabled && config.enabled) {
+    try {
+      const { deleteAlertRule } = require('./prometheusAlertService');
+      const { deleteRoutingRule } = require('./alertmanagerService');
+
+      // Alert Rule 삭제
+      await deleteAlertRule(config.serviceName);
+
+      // 라우팅 규칙 삭제
+      await deleteRoutingRule(config.serviceName);
+
+      console.log(`[Autoscaling Service] PLG Stack 리소스 정리 완료: ${config.serviceName}`);
+    } catch (error) {
+      console.error(`[Autoscaling Service] PLG Stack 리소스 정리 실패:`, error);
+      // 정리 실패해도 설정은 비활성화됨
+    }
+  }
+
   return await updateConfig(configId, { enabled });
 }
 

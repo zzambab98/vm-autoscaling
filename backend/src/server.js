@@ -4,6 +4,8 @@ const { installNodeExporter, checkNodeExporterStatus, installNodeExporterOnMulti
 const { addPrometheusJob, getPrometheusJobs, getPrometheusTargets } = require('./services/prometheusMonitoringService');
 const { getTemplates, getTemplateById, convertVmToTemplate, deleteTemplate, getVmList } = require('./services/templateService');
 const { saveConfig, getConfigs, getConfigById, updateConfig, deleteConfig, setConfigEnabled } = require('./services/autoscalingService');
+const { createAlertRule, deleteAlertRule, getAlertRules } = require('./services/prometheusAlertService');
+const { addRoutingRule, deleteRoutingRule, getRoutingRules } = require('./services/alertmanagerService');
 
 const PORT = process.env.PORT || 4000;
 
@@ -329,6 +331,92 @@ const server = http.createServer((req, res) => {
         const enabled = action === 'enable';
         const config = await setConfigEnabled(configId, enabled);
         sendJSONResponse(res, 200, { success: true, config, message: `설정이 ${enabled ? '활성화' : '비활성화'}되었습니다.` });
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // Prometheus Alert Rule 생성 API
+  if (req.method === 'POST' && parsedUrl.pathname === '/api/prometheus/alert-rules') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body);
+        const result = await createAlertRule(payload);
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    });
+    return;
+  }
+
+  // Prometheus Alert Rule 목록 조회 API
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/prometheus/alert-rules') {
+    (async () => {
+      try {
+        const result = await getAlertRules();
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // Prometheus Alert Rule 삭제 API
+  if (req.method === 'DELETE' && parsedUrl.pathname.startsWith('/api/prometheus/alert-rules/')) {
+    const serviceName = decodeURIComponent(parsedUrl.pathname.split('/').pop());
+    (async () => {
+      try {
+        const result = await deleteAlertRule(serviceName);
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // Alertmanager 라우팅 규칙 추가 API
+  if (req.method === 'POST' && parsedUrl.pathname === '/api/alertmanager/routing-rules') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body);
+        const result = await addRoutingRule(payload);
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    });
+    return;
+  }
+
+  // Alertmanager 라우팅 규칙 목록 조회 API
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/alertmanager/routing-rules') {
+    (async () => {
+      try {
+        const result = await getRoutingRules();
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // Alertmanager 라우팅 규칙 삭제 API
+  if (req.method === 'DELETE' && parsedUrl.pathname.startsWith('/api/alertmanager/routing-rules/')) {
+    const serviceName = decodeURIComponent(parsedUrl.pathname.split('/').pop());
+    (async () => {
+      try {
+        const result = await deleteRoutingRule(serviceName);
+        sendJSONResponse(res, 200, result);
       } catch (error) {
         sendJSONResponse(res, 500, { error: error.message });
       }
