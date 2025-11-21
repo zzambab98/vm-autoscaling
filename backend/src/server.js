@@ -3,6 +3,7 @@ const url = require('url');
 const { installNodeExporter, checkNodeExporterStatus, installNodeExporterOnMultipleServers } = require('./services/nodeExporterService');
 const { addPrometheusJob, getPrometheusJobs, getPrometheusTargets } = require('./services/prometheusMonitoringService');
 const { getTemplates, getTemplateById, convertVmToTemplate, deleteTemplate, getVmList } = require('./services/templateService');
+const { saveConfig, getConfigs, getConfigById, updateConfig, deleteConfig, setConfigEnabled } = require('./services/autoscalingService');
 
 const PORT = process.env.PORT || 4000;
 
@@ -228,6 +229,106 @@ const server = http.createServer((req, res) => {
       try {
         const vms = await getVmList();
         sendJSONResponse(res, 200, { success: true, vms });
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // 오토스케일링 설정 생성 API
+  if (req.method === 'POST' && parsedUrl.pathname === '/api/autoscaling/configs') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body);
+        const config = await saveConfig(payload);
+        sendJSONResponse(res, 200, { success: true, config });
+      } catch (error) {
+        sendJSONResponse(res, 400, { error: error.message });
+      }
+    });
+    return;
+  }
+
+  // 오토스케일링 설정 목록 조회 API
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/autoscaling/configs') {
+    const { enabled, serviceName } = parsedUrl.query;
+    (async () => {
+      try {
+        const filters = {};
+        if (enabled !== undefined) filters.enabled = enabled === 'true';
+        if (serviceName) filters.serviceName = serviceName;
+        const configs = await getConfigs(filters);
+        sendJSONResponse(res, 200, { success: true, configs });
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // 오토스케일링 설정 상세 조회 API
+  if (req.method === 'GET' && parsedUrl.pathname.startsWith('/api/autoscaling/configs/')) {
+    const configId = parsedUrl.pathname.split('/').pop();
+    (async () => {
+      try {
+        const config = await getConfigById(configId);
+        if (config) {
+          sendJSONResponse(res, 200, { success: true, config });
+        } else {
+          sendJSONResponse(res, 404, { error: '설정을 찾을 수 없습니다.' });
+        }
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // 오토스케일링 설정 수정 API
+  if (req.method === 'PUT' && parsedUrl.pathname.startsWith('/api/autoscaling/configs/')) {
+    const configId = parsedUrl.pathname.split('/').pop();
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body);
+        const config = await updateConfig(configId, payload);
+        sendJSONResponse(res, 200, { success: true, config });
+      } catch (error) {
+        sendJSONResponse(res, 400, { error: error.message });
+      }
+    });
+    return;
+  }
+
+  // 오토스케일링 설정 삭제 API
+  if (req.method === 'DELETE' && parsedUrl.pathname.startsWith('/api/autoscaling/configs/')) {
+    const configId = parsedUrl.pathname.split('/').pop();
+    (async () => {
+      try {
+        const result = await deleteConfig(configId);
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // 오토스케일링 설정 활성화/비활성화 API
+  if (req.method === 'POST' && parsedUrl.pathname.includes('/api/autoscaling/configs/') && 
+      (parsedUrl.pathname.endsWith('/enable') || parsedUrl.pathname.endsWith('/disable'))) {
+    const pathParts = parsedUrl.pathname.split('/');
+    const configId = pathParts[pathParts.length - 2];
+    const action = pathParts[pathParts.length - 1];
+    (async () => {
+      try {
+        const enabled = action === 'enable';
+        const config = await setConfigEnabled(configId, enabled);
+        sendJSONResponse(res, 200, { success: true, config, message: `설정이 ${enabled ? '활성화' : '비활성화'}되었습니다.` });
       } catch (error) {
         sendJSONResponse(res, 500, { error: error.message });
       }
