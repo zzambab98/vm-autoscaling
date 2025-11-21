@@ -5,6 +5,8 @@ import TemplateList from './components/TemplateList';
 import TemplateForm from './components/TemplateForm';
 import AutoscalingConfigList from './components/AutoscalingConfigList';
 import AutoscalingConfigForm from './components/AutoscalingConfigForm';
+import MonitoringDashboard from './components/MonitoringDashboard';
+import ScaleOutEventList from './components/ScaleOutEventList';
 import './App.css';
 
 function App() {
@@ -72,6 +74,18 @@ function App() {
         >
           PLG Stack 모니터링 등록
         </button>
+        <button
+          className={`tab-button ${activeTab === 'monitoring' ? 'active' : ''}`}
+          onClick={() => setActiveTab('monitoring')}
+        >
+          모니터링 대시보드
+        </button>
+        <button
+          className={`tab-button ${activeTab === 'events' ? 'active' : ''}`}
+          onClick={() => setActiveTab('events')}
+        >
+          스케일아웃 이벤트
+        </button>
       </div>
 
       {activeTab === 'templates' && (
@@ -118,6 +132,8 @@ function App() {
 
       {activeTab === 'node-exporter' && <NodeExporterInstall />}
       {activeTab === 'prometheus' && <PrometheusMonitoring />}
+      {activeTab === 'monitoring' && <MonitoringDashboard />}
+      {activeTab === 'events' && <ScaleOutEventList />}
     </div>
   );
 }
