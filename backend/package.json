@@ -1,0 +1,21 @@
+{
+  "name": "vm-autoscaling-backend",
+  "version": "1.0.0",
+  "description": "VM 오토스케일링 자동화 시스템 백엔드",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.0",
+    "js-yaml": "^4.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  }
+}
