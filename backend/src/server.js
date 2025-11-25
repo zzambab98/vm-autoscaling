@@ -558,6 +558,7 @@ const server = http.createServer((req, res) => {
         
         // Jenkins에 전달할 payload 구성 (설정 정보 포함)
         const jenkinsPayload = {
+          status: alertmanagerPayload.status || 'unknown',
           alerts: alertmanagerPayload.alerts || [],
           config: {
             templateName: templateName,
