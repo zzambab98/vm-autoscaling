@@ -75,12 +75,76 @@ async function createDashboard(jobName, dashboardTitle, auth) {
       version: 0,
       refresh: '10s',
       panels: [
-        // CPU 사용률 패널
+        // CPU 사용률 현재 값 (Stat)
         {
           id: 1,
-          gridPos: { x: 0, y: 0, w: 12, h: 8 },
+          gridPos: { x: 0, y: 0, w: 6, h: 4 },
+          title: 'CPU 사용률 (현재)',
+          type: 'stat',
+          targets: [
+            {
+              expr: `100 - (avg(rate(node_cpu_seconds_total{mode="idle",job="${jobName}"}[5m])) * 100)`,
+              refId: 'A'
+            }
+          ],
+          fieldConfig: {
+            defaults: {
+              unit: 'percent',
+              min: 0,
+              max: 100,
+              thresholds: {
+                mode: 'absolute',
+                steps: [
+                  { value: 0, color: 'green' },
+                  { value: 70, color: 'yellow' },
+                  { value: 85, color: 'red' }
+                ]
+              }
+            }
+          },
+          options: {
+            graphMode: 'none',
+            textMode: 'value'
+          }
+        },
+        // Memory 사용률 현재 값 (Stat)
+        {
+          id: 2,
+          gridPos: { x: 6, y: 0, w: 6, h: 4 },
+          title: 'Memory 사용률 (현재)',
+          type: 'stat',
+          targets: [
+            {
+              expr: `(1 - (avg(node_memory_MemAvailable_bytes{job="${jobName}"}) / avg(node_memory_MemTotal_bytes{job="${jobName}"}))) * 100`,
+              refId: 'A'
+            }
+          ],
+          fieldConfig: {
+            defaults: {
+              unit: 'percent',
+              min: 0,
+              max: 100,
+              thresholds: {
+                mode: 'absolute',
+                steps: [
+                  { value: 0, color: 'green' },
+                  { value: 70, color: 'yellow' },
+                  { value: 85, color: 'red' }
+                ]
+              }
+            }
+          },
+          options: {
+            graphMode: 'none',
+            textMode: 'value'
+          }
+        },
+        // CPU 사용률 그래프
+        {
+          id: 3,
+          gridPos: { x: 0, y: 4, w: 12, h: 8 },
           title: 'CPU 사용률',
-          type: 'graph',
+          type: 'timeseries',
           targets: [
             {
               expr: `100 - (avg(rate(node_cpu_seconds_total{mode="idle",job="${jobName}"}[5m])) * 100)`,
@@ -88,17 +152,43 @@ async function createDashboard(jobName, dashboardTitle, auth) {
               refId: 'A'
             }
           ],
-          yaxes: [
-            { format: 'percent', min: 0, max: 100 },
-            { format: 'short' }
-          ]
+          fieldConfig: {
+            defaults: {
+              unit: 'percent',
+              min: 0,
+              max: 100,
+              custom: {
+                drawStyle: 'line',
+                lineInterpolation: 'smooth',
+                showPoints: 'auto',
+                pointSize: 5
+              },
+              thresholds: {
+                mode: 'absolute',
+                steps: [
+                  { value: 0, color: 'green' },
+                  { value: 70, color: 'yellow' },
+                  { value: 85, color: 'red' }
+                ]
+              }
+            }
+          },
+          options: {
+            legend: {
+              displayMode: 'table',
+              placement: 'bottom'
+            },
+            tooltip: {
+              mode: 'multi'
+            }
+          }
         },
-        // Memory 사용률 패널
+        // Memory 사용률 그래프
         {
-          id: 2,
-          gridPos: { x: 12, y: 0, w: 12, h: 8 },
+          id: 4,
+          gridPos: { x: 12, y: 4, w: 12, h: 8 },
           title: 'Memory 사용률',
-          type: 'graph',
+          type: 'timeseries',
           targets: [
             {
               expr: `(1 - (avg(node_memory_MemAvailable_bytes{job="${jobName}"}) / avg(node_memory_MemTotal_bytes{job="${jobName}"}))) * 100`,
@@ -106,53 +196,75 @@ async function createDashboard(jobName, dashboardTitle, auth) {
               refId: 'A'
             }
           ],
-          yaxes: [
-            { format: 'percent', min: 0, max: 100 },
-            { format: 'short' }
-          ]
-        },
-        // CPU 사용률 (인스턴스별)
-        {
-          id: 3,
-          gridPos: { x: 0, y: 8, w: 12, h: 8 },
-          title: 'CPU 사용률 (인스턴스별)',
-          type: 'graph',
-          targets: [
-            {
-              expr: `100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle",job="${jobName}"}[5m])) * 100)`,
-              legendFormat: '{{instance}}',
-              refId: 'A'
+          fieldConfig: {
+            defaults: {
+              unit: 'percent',
+              min: 0,
+              max: 100,
+              custom: {
+                drawStyle: 'line',
+                lineInterpolation: 'smooth',
+                showPoints: 'auto',
+                pointSize: 5
+              },
+              thresholds: {
+                mode: 'absolute',
+                steps: [
+                  { value: 0, color: 'green' },
+                  { value: 70, color: 'yellow' },
+                  { value: 85, color: 'red' }
+                ]
+              }
             }
-          ],
-          yaxes: [
-            { format: 'percent', min: 0, max: 100 },
-            { format: 'short' }
-          ]
-        },
-        // Memory 사용률 (인스턴스별)
-        {
-          id: 4,
-          gridPos: { x: 12, y: 8, w: 12, h: 8 },
-          title: 'Memory 사용률 (인스턴스별)',
-          type: 'graph',
-          targets: [
-            {
-              expr: `(1 - (avg by (instance) (node_memory_MemAvailable_bytes{job="${jobName}"}) / avg by (instance) (node_memory_MemTotal_bytes{job="${jobName}"}))) * 100`,
-              legendFormat: '{{instance}}',
-              refId: 'A'
+          },
+          options: {
+            legend: {
+              displayMode: 'table',
+              placement: 'bottom'
+            },
+            tooltip: {
+              mode: 'multi'
             }
-          ],
-          yaxes: [
-            { format: 'percent', min: 0, max: 100 },
-            { format: 'short' }
-          ]
+          }
         },
-        // Disk 사용률
+        // Disk 사용률 현재 값 (Stat)
         {
           id: 5,
-          gridPos: { x: 0, y: 16, w: 12, h: 8 },
+          gridPos: { x: 12, y: 0, w: 6, h: 4 },
+          title: 'Disk 사용률 (현재)',
+          type: 'stat',
+          targets: [
+            {
+              expr: `100 - ((avg(node_filesystem_avail_bytes{job="${jobName}",fstype!="rootfs"}) / avg(node_filesystem_size_bytes{job="${jobName}",fstype!="rootfs"})) * 100)`,
+              refId: 'A'
+            }
+          ],
+          fieldConfig: {
+            defaults: {
+              unit: 'percent',
+              min: 0,
+              max: 100,
+              thresholds: {
+                mode: 'absolute',
+                steps: [
+                  { value: 0, color: 'green' },
+                  { value: 70, color: 'yellow' },
+                  { value: 85, color: 'red' }
+                ]
+              }
+            }
+          },
+          options: {
+            graphMode: 'none',
+            textMode: 'value'
+          }
+        },
+        // Disk 사용률 그래프
+        {
+          id: 6,
+          gridPos: { x: 0, y: 12, w: 12, h: 8 },
           title: 'Disk 사용률',
-          type: 'graph',
+          type: 'timeseries',
           targets: [
             {
               expr: `100 - ((avg(node_filesystem_avail_bytes{job="${jobName}",fstype!="rootfs"}) / avg(node_filesystem_size_bytes{job="${jobName}",fstype!="rootfs"})) * 100)`,
@@ -160,17 +272,43 @@ async function createDashboard(jobName, dashboardTitle, auth) {
               refId: 'A'
             }
           ],
-          yaxes: [
-            { format: 'percent', min: 0, max: 100 },
-            { format: 'short' }
-          ]
+          fieldConfig: {
+            defaults: {
+              unit: 'percent',
+              min: 0,
+              max: 100,
+              custom: {
+                drawStyle: 'line',
+                lineInterpolation: 'smooth',
+                showPoints: 'auto',
+                pointSize: 5
+              },
+              thresholds: {
+                mode: 'absolute',
+                steps: [
+                  { value: 0, color: 'green' },
+                  { value: 70, color: 'yellow' },
+                  { value: 85, color: 'red' }
+                ]
+              }
+            }
+          },
+          options: {
+            legend: {
+              displayMode: 'table',
+              placement: 'bottom'
+            },
+            tooltip: {
+              mode: 'multi'
+            }
+          }
         },
         // Network I/O
         {
-          id: 6,
-          gridPos: { x: 12, y: 16, w: 12, h: 8 },
+          id: 7,
+          gridPos: { x: 12, y: 12, w: 12, h: 8 },
           title: 'Network I/O',
-          type: 'graph',
+          type: 'timeseries',
           targets: [
             {
               expr: `rate(node_network_receive_bytes_total{job="${jobName}"}[5m])`,
@@ -183,10 +321,26 @@ async function createDashboard(jobName, dashboardTitle, auth) {
               refId: 'B'
             }
           ],
-          yaxes: [
-            { format: 'bytes' },
-            { format: 'short' }
-          ]
+          fieldConfig: {
+            defaults: {
+              unit: 'Bps',
+              custom: {
+                drawStyle: 'line',
+                lineInterpolation: 'smooth',
+                showPoints: 'auto',
+                pointSize: 5
+              }
+            }
+          },
+          options: {
+            legend: {
+              displayMode: 'table',
+              placement: 'bottom'
+            },
+            tooltip: {
+              mode: 'multi'
+            }
+          }
         }
       ],
       time: {
