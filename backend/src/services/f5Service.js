@@ -128,19 +128,71 @@ async function getF5Pools() {
   try {
     const f5Server = F5_SERVERS[0]; // 첫 번째 서버 사용
     const token = await authenticate(f5Server);
-    const path = `/mgmt/tm/ltm/pool?$select=name,partition`;
+    const path = `/mgmt/tm/ltm/pool?$select=name,partition,membersReference`;
     const response = await f5ApiCall(f5Server, token, 'GET', path);
     
-    const pools = (response.items || []).map(pool => ({
-      name: pool.name,
-      partition: pool.partition || F5_PARTITION,
-      fullName: pool.name
-    }));
+    const pools = (response.items || []).map(pool => {
+      const partition = pool.partition || F5_PARTITION;
+      const poolName = pool.name;
+      const fullName = partition === 'Common' ? poolName : `/${partition}/${poolName}`;
+      
+      return {
+        name: poolName,
+        partition: partition,
+        fullName: fullName,
+        displayName: fullName
+      };
+    });
     
     return { success: true, pools };
   } catch (error) {
     console.error('[F5 Service] Pool 목록 조회 실패:', error.message);
     return { success: false, pools: [], error: error.message };
+  }
+}
+
+/**
+ * F5 Pool 상세 정보 조회 (멤버 목록 포함)
+ * @param {string} poolName - Pool 이름
+ * @param {string} partition - Partition (선택, 기본값: Common)
+ * @returns {Promise<object>} Pool 상세 정보
+ */
+async function getF5PoolDetails(poolName, partition = F5_PARTITION) {
+  try {
+    const f5Server = F5_SERVERS[0];
+    const token = await authenticate(f5Server);
+    const poolPath = partition === 'Common' ? poolName : `~${partition}~${poolName}`;
+    const path = `/mgmt/tm/ltm/pool/${poolPath}?expandSubcollections=true`;
+    const response = await f5ApiCall(f5Server, token, 'GET', path);
+    
+    // 멤버 목록 추출
+    const members = (response.membersReference?.items || []).map(member => {
+      const memberName = member.name || '';
+      const parts = memberName.split(':');
+      const ip = parts[0] || '';
+      const port = parts[1] || '80';
+      
+      return {
+        name: memberName,
+        ip: ip,
+        port: port,
+        state: member.state || 'unknown',
+        status: member.session || 'unknown'
+      };
+    });
+    
+    return {
+      success: true,
+      pool: {
+        name: response.name,
+        partition: response.partition || partition,
+        members: members,
+        memberCount: members.length
+      }
+    };
+  } catch (error) {
+    console.error('[F5 Service] Pool 상세 정보 조회 실패:', error.message);
+    return { success: false, error: error.message };
   }
 }
 
@@ -182,6 +234,7 @@ async function getF5VirtualServers() {
 
 module.exports = {
   getF5Pools,
-  getF5VirtualServers
+  getF5VirtualServers,
+  getF5PoolDetails
 };
 

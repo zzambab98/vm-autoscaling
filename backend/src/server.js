@@ -7,7 +7,7 @@ const { saveConfig, getConfigs, getConfigById, updateConfig, deleteConfig, setCo
 const { createAlertRule, deleteAlertRule, getAlertRules } = require('./services/prometheusAlertService');
 const { addRoutingRule, deleteRoutingRule, getRoutingRules } = require('./services/alertmanagerService');
 const { createJenkinsJob, deleteJenkinsJob, getJenkinsJobStatus, getJenkinsJobs, triggerJenkinsJob } = require('./services/jenkinsService');
-const { getF5Pools, getF5VirtualServers } = require('./services/f5Service');
+const { getF5Pools, getF5VirtualServers, getF5PoolDetails } = require('./services/f5Service');
 
 const PORT = process.env.PORT || 4410;
 
@@ -612,6 +612,25 @@ const server = http.createServer((req, res) => {
     (async () => {
       try {
         const result = await getF5VirtualServers();
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // F5 Pool 상세 정보 조회 API
+  if (req.method === 'GET' && parsedUrl.pathname.startsWith('/api/f5/pools/')) {
+    const poolPath = parsedUrl.pathname.replace('/api/f5/pools/', '');
+    const { poolName, partition } = parsedUrl.query;
+    
+    (async () => {
+      try {
+        // URL 경로에서 poolName 추출 (예: /api/f5/pools/pool-name)
+        const name = poolName || poolPath;
+        const part = partition || 'Common';
+        const result = await getF5PoolDetails(name, part);
         sendJSONResponse(res, 200, result);
       } catch (error) {
         sendJSONResponse(res, 500, { error: error.message });
