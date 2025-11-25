@@ -116,20 +116,23 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
 
     try {
       let result;
-      if (configId) {
+      // configId가 있고 'new'가 아닐 때만 수정, 그 외에는 생성
+      if (configId && configId !== 'new') {
         result = await autoscalingApi.updateConfig(configId, formData);
       } else {
         result = await autoscalingApi.createConfig(formData);
       }
 
       if (result.success) {
-        setMessage({ type: 'success', text: `설정이 ${configId ? '수정' : '생성'}되었습니다.` });
+        const isUpdate = configId && configId !== 'new';
+        setMessage({ type: 'success', text: `설정이 ${isUpdate ? '수정' : '생성'}되었습니다.` });
         if (onSuccess) {
           setTimeout(() => onSuccess(), 1000);
         }
       }
     } catch (error) {
-      setMessage({ type: 'error', text: `설정 ${configId ? '수정' : '생성'} 실패: ${error.message}` });
+      const isUpdate = configId && configId !== 'new';
+      setMessage({ type: 'error', text: `설정 ${isUpdate ? '수정' : '생성'} 실패: ${error.message}` });
     } finally {
       setLoading(false);
     }
