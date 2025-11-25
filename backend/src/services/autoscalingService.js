@@ -93,6 +93,16 @@ function validateConfig(config) {
     }
   }
 
+  // Jenkins 설정 검증
+  if (config.jenkins && config.jenkins.useExistingJob) {
+    if (!config.jenkins.jobName) {
+      errors.push('Jenkins Job 이름이 필요합니다.');
+    }
+    if (!config.jenkins.webhookToken) {
+      errors.push('Jenkins Webhook 토큰이 필요합니다.');
+    }
+  }
+
   return { valid: errors.length === 0, errors };
 }
 
@@ -223,8 +233,12 @@ async function deleteConfig(configId) {
       await deleteRoutingRule(config.serviceName);
 
       // Jenkins Job 삭제
-      const jobName = `autoscale-${config.serviceName.toLowerCase().replace(/\s+/g, '-')}`;
-      await deleteJenkinsJob(jobName);
+      if (!config.jenkins || !config.jenkins.useExistingJob) {
+        const jobName = config.jenkins?.jobName || `autoscale-${config.serviceName.toLowerCase().replace(/\s+/g, '-')}`;
+        await deleteJenkinsJob(jobName);
+      } else {
+        console.log(`[Autoscaling Service] 기존 Jenkins Job 유지: ${config.jenkins.jobName}`);
+      }
     } catch (error) {
       console.error(`[Autoscaling Service] 리소스 정리 실패:`, error);
       // 정리 실패해도 설정은 삭제됨
@@ -264,6 +278,8 @@ async function setConfigEnabled(configId, enabled) {
   }
 
   // 설정 활성화 시 PLG Stack 및 Jenkins 연동
+  const updatedConfig = { ...config };
+
   if (enabled && !config.enabled) {
     try {
       const { createAlertRule } = require('./prometheusAlertService');
@@ -283,8 +299,19 @@ async function setConfigEnabled(configId, enabled) {
       // Alertmanager 라우팅 규칙 추가
       await addRoutingRule(config);
 
-      // Jenkins Job 생성
-      await createJenkinsJob(config);
+      // Jenkins Job 생성 또는 기존 Job 사용
+      if (updatedConfig.jenkins && updatedConfig.jenkins.useExistingJob) {
+        console.log(`[Autoscaling Service] 기존 Jenkins Job 사용: ${updatedConfig.jenkins.jobName}`);
+      } else {
+        const jobResult = await createJenkinsJob(updatedConfig);
+        updatedConfig.jenkins = {
+          ...(updatedConfig.jenkins || {}),
+          jobName: jobResult.jobName,
+          webhookToken: jobResult.webhookToken,
+          webhookUrl: jobResult.webhookUrl,
+          useExistingJob: false
+        };
+      }
 
       console.log(`[Autoscaling Service] PLG Stack 및 Jenkins 연동 완료: ${config.serviceName}`);
     } catch (error) {
@@ -307,8 +334,12 @@ async function setConfigEnabled(configId, enabled) {
       await deleteRoutingRule(config.serviceName);
 
       // Jenkins Job 삭제
-      const jobName = `autoscale-${config.serviceName.toLowerCase().replace(/\s+/g, '-')}`;
-      await deleteJenkinsJob(jobName);
+      if (!config.jenkins || !config.jenkins.useExistingJob) {
+        const jobName = config.jenkins?.jobName || `autoscale-${config.serviceName.toLowerCase().replace(/\s+/g, '-')}`;
+        await deleteJenkinsJob(jobName);
+      } else {
+        console.log(`[Autoscaling Service] 기존 Jenkins Job 유지: ${config.jenkins.jobName}`);
+      }
 
       console.log(`[Autoscaling Service] 리소스 정리 완료: ${config.serviceName}`);
     } catch (error) {
@@ -317,7 +348,8 @@ async function setConfigEnabled(configId, enabled) {
     }
   }
 
-  return await updateConfig(configId, { enabled });
+  updatedConfig.enabled = enabled;
+  return await saveConfig(updatedConfig);
 }
 
 module.exports = {

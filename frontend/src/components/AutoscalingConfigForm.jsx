@@ -3,43 +3,63 @@ import { autoscalingApi } from '../services/autoscalingApi';
 import { templateApi } from '../services/templateApi';
 import f5Api from '../services/f5Api';
 
+const defaultFormData = {
+  serviceName: '',
+  templateId: '',
+  enabled: false,
+  monitoring: {
+    cpuThreshold: 80,
+    memoryThreshold: 80,
+    duration: 5,
+    prometheusJobName: ''
+  },
+  scaling: {
+    minVms: 2,
+    maxVms: 10,
+    scaleOutStep: 1,
+    scaleInStep: 1,
+    cooldownPeriod: 300
+  },
+  f5: {
+    poolName: '',
+    vip: '',
+    vipPort: 80,
+    healthCheckPath: '/'
+  },
+  network: {
+    ipPoolStart: '',
+    ipPoolEnd: '',
+    subnet: '255.255.255.0',
+    gateway: '',
+    vlan: ''
+  },
+  jenkins: {
+    useExistingJob: false,
+    jobName: '',
+    webhookToken: '',
+    webhookUrl: ''
+  }
+};
+
+function normalizeConfig(config = {}) {
+  return {
+    ...defaultFormData,
+    ...config,
+    monitoring: { ...defaultFormData.monitoring, ...(config.monitoring || {}) },
+    scaling: { ...defaultFormData.scaling, ...(config.scaling || {}) },
+    f5: { ...defaultFormData.f5, ...(config.f5 || {}) },
+    network: { ...defaultFormData.network, ...(config.network || {}) },
+    jenkins: { ...defaultFormData.jenkins, ...(config.jenkins || {}) }
+  };
+}
+
 function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
   const [templates, setTemplates] = useState([]);
   const [f5Pools, setF5Pools] = useState([]);
   const [f5Vips, setF5Vips] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
-  const [formData, setFormData] = useState({
-    serviceName: '',
-    templateId: '',
-    enabled: false,
-    monitoring: {
-      cpuThreshold: 80,
-      memoryThreshold: 80,
-      duration: 5,
-      prometheusJobName: ''
-    },
-    scaling: {
-      minVms: 2,
-      maxVms: 10,
-      scaleOutStep: 1,
-      scaleInStep: 1,
-      cooldownPeriod: 300
-    },
-    f5: {
-      poolName: '',
-      vip: '',
-      vipPort: 80,
-      healthCheckPath: '/'
-    },
-    network: {
-      ipPoolStart: '',
-      ipPoolEnd: '',
-      subnet: '255.255.255.0',
-      gateway: '',
-      vlan: ''
-    }
-  });
+  const [formData, setFormData] = useState(defaultFormData);
 
   useEffect(() => {
     loadTemplates();
@@ -98,7 +118,7 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
     try {
       const result = await autoscalingApi.getConfigById(configId);
       if (result.success && result.config) {
-        setFormData(result.config);
+        setFormData(normalizeConfig(result.config));
       } else {
         setMessage({ type: 'error', text: '설정을 찾을 수 없습니다.' });
       }
@@ -443,6 +463,53 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
             />
           </div>
         </div>
+
+        {/* Jenkins 설정 */}
+        <h3 style={{ marginTop: '30px', marginBottom: '12px', color: '#2c3e50' }}>Jenkins 설정</h3>
+        <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <input
+            type="checkbox"
+            checked={formData.jenkins.useExistingJob}
+            onChange={(e) => updateNestedField('jenkins', 'useExistingJob', e.target.checked)}
+          />
+          기존 Jenkins Job 사용 (예: plg-autoscale-out)
+        </label>
+        <p style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '-10px', marginBottom: '12px' }}>
+          기존 Job을 사용할 경우 Job 이름과 Webhook 토큰을 입력하세요. 입력하지 않으면 새 Job이 생성됩니다.
+        </p>
+
+        {formData.jenkins.useExistingJob && (
+          <>
+            <label className="label">Jenkins Job 이름 *</label>
+            <input
+              type="text"
+              className="input"
+              value={formData.jenkins.jobName}
+              onChange={(e) => updateNestedField('jenkins', 'jobName', e.target.value)}
+              placeholder="plg-autoscale-out"
+              required={formData.jenkins.useExistingJob}
+            />
+
+            <label className="label">Webhook 토큰 *</label>
+            <input
+              type="text"
+              className="input"
+              value={formData.jenkins.webhookToken}
+              onChange={(e) => updateNestedField('jenkins', 'webhookToken', e.target.value)}
+              placeholder="plg-autoscale-token"
+              required={formData.jenkins.useExistingJob}
+            />
+
+            <label className="label">Webhook URL (선택)</label>
+            <input
+              type="text"
+              className="input"
+              value={formData.jenkins.webhookUrl}
+              onChange={(e) => updateNestedField('jenkins', 'webhookUrl', e.target.value)}
+              placeholder="http://10.255.0.103:8080/generic-webhook-trigger/invoke?token=..."
+            />
+          </>
+        )}
 
         <div style={{ marginTop: '30px', display: 'flex', gap: '10px' }}>
           <button

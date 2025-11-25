@@ -579,10 +579,16 @@ const server = http.createServer((req, res) => {
         
         // Jenkins webhook 호출
         const { triggerJenkinsJob } = require('./services/jenkinsService');
-        const jobName = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}`;
-        const webhookToken = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-token`;
+        const jobName = (config.jenkins && config.jenkins.jobName) 
+          ? config.jenkins.jobName 
+          : `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}`;
+        const webhookToken = (config.jenkins && config.jenkins.webhookToken)
+          ? config.jenkins.webhookToken
+          : `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-token`;
         const JENKINS_URL = process.env.JENKINS_URL || 'http://10.255.0.103:8080';
-        const webhookUrl = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookToken}`;
+        const webhookUrl = (config.jenkins && config.jenkins.webhookUrl)
+          ? config.jenkins.webhookUrl
+          : `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookToken}`;
         
         // Jenkins webhook에 POST 요청
         const axios = require('axios');
