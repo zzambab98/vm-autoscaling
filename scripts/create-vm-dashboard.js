@@ -65,7 +65,8 @@ function makeRequest(url, method, data, auth) {
 
 // VM 최적화 대시보드 생성
 async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
-  const instanceFilter = hostIP ? `instance="${hostIP}:9100"` : `job="${jobName}"`;
+  // Job을 호스트 단위로 생성하므로 job 라벨을 기준으로 필터링한다.
+  const labelFilter = `job="${jobName}"`;
   
   const dashboard = {
     dashboard: {
@@ -83,7 +84,7 @@ async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
           title: 'CPU 사용률',
           type: 'stat',
           targets: [{
-            expr: `100 - (avg(rate(node_cpu_seconds_total{mode="idle",${instanceFilter}}[5m])) * 100)`,
+            expr: `100 - (avg(rate(node_cpu_seconds_total{mode="idle",${labelFilter}}[5m])) * 100)`,
             refId: 'A'
           }],
           fieldConfig: {
@@ -113,7 +114,7 @@ async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
           title: 'Memory 사용률',
           type: 'stat',
           targets: [{
-            expr: `(1 - (avg(node_memory_MemAvailable_bytes{${instanceFilter}}) / avg(node_memory_MemTotal_bytes{${instanceFilter}}))) * 100`,
+            expr: `(1 - (avg(node_memory_MemAvailable_bytes{${labelFilter}}) / avg(node_memory_MemTotal_bytes{${labelFilter}}))) * 100`,
             refId: 'A'
           }],
           fieldConfig: {
@@ -143,7 +144,7 @@ async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
           title: 'Disk 사용률',
           type: 'stat',
           targets: [{
-            expr: `100 - ((avg(node_filesystem_avail_bytes{${instanceFilter},fstype!="rootfs",mountpoint!="/boot"}) / avg(node_filesystem_size_bytes{${instanceFilter},fstype!="rootfs",mountpoint!="/boot"})) * 100)`,
+            expr: `100 - ((avg(node_filesystem_avail_bytes{${labelFilter},fstype!="rootfs",mountpoint!="/boot"}) / avg(node_filesystem_size_bytes{${labelFilter},fstype!="rootfs",mountpoint!="/boot"})) * 100)`,
             refId: 'A'
           }],
           fieldConfig: {
@@ -173,7 +174,7 @@ async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
           title: 'Load Average',
           type: 'stat',
           targets: [{
-            expr: `avg(node_load1{${instanceFilter}})`,
+            expr: `avg(node_load1{${labelFilter}})`,
             refId: 'A'
           }],
           fieldConfig: {
@@ -195,7 +196,7 @@ async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
           title: 'CPU 사용률 (%)',
           type: 'timeseries',
           targets: [{
-            expr: `100 - (avg by (mode) (rate(node_cpu_seconds_total{${instanceFilter}}[5m])) * 100)`,
+            expr: `100 - (avg by (mode) (rate(node_cpu_seconds_total{${labelFilter}}[5m])) * 100)`,
             legendFormat: '{{mode}}',
             refId: 'A'
           }],
@@ -238,7 +239,7 @@ async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
           title: 'CPU 코어별 사용률',
           type: 'timeseries',
           targets: [{
-            expr: `100 - (avg by (cpu) (rate(node_cpu_seconds_total{mode="idle",${instanceFilter}}[5m])) * 100)`,
+            expr: `100 - (avg by (cpu) (rate(node_cpu_seconds_total{mode="idle",${labelFilter}}[5m])) * 100)`,
             legendFormat: 'CPU {{cpu}}',
             refId: 'A'
           }],
@@ -274,27 +275,27 @@ async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
           type: 'timeseries',
           targets: [
             {
-              expr: `avg(node_memory_MemTotal_bytes{${instanceFilter}})`,
+              expr: `avg(node_memory_MemTotal_bytes{${labelFilter}})`,
               legendFormat: 'Total',
               refId: 'A'
             },
             {
-              expr: `avg(node_memory_MemFree_bytes{${instanceFilter}})`,
+              expr: `avg(node_memory_MemFree_bytes{${labelFilter}})`,
               legendFormat: 'Free',
               refId: 'B'
             },
             {
-              expr: `avg(node_memory_MemAvailable_bytes{${instanceFilter}})`,
+              expr: `avg(node_memory_MemAvailable_bytes{${labelFilter}})`,
               legendFormat: 'Available',
               refId: 'C'
             },
             {
-              expr: `avg(node_memory_Buffers_bytes{${instanceFilter}})`,
+              expr: `avg(node_memory_Buffers_bytes{${labelFilter}})`,
               legendFormat: 'Buffers',
               refId: 'D'
             },
             {
-              expr: `avg(node_memory_Cached_bytes{${instanceFilter}})`,
+              expr: `avg(node_memory_Cached_bytes{${labelFilter}})`,
               legendFormat: 'Cached',
               refId: 'E'
             }
@@ -326,7 +327,7 @@ async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
           title: 'Memory 사용률 (%)',
           type: 'timeseries',
           targets: [{
-            expr: `(1 - (avg(node_memory_MemAvailable_bytes{${instanceFilter}}) / avg(node_memory_MemTotal_bytes{${instanceFilter}}))) * 100`,
+            expr: `(1 - (avg(node_memory_MemAvailable_bytes{${labelFilter}}) / avg(node_memory_MemTotal_bytes{${labelFilter}}))) * 100`,
             legendFormat: 'Memory 사용률',
             refId: 'A'
           }],
@@ -370,17 +371,17 @@ async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
           type: 'timeseries',
           targets: [
             {
-              expr: `avg(node_memory_SwapTotal_bytes{${instanceFilter}})`,
+              expr: `avg(node_memory_SwapTotal_bytes{${labelFilter}})`,
               legendFormat: 'Swap Total',
               refId: 'A'
             },
             {
-              expr: `avg(node_memory_SwapFree_bytes{${instanceFilter}})`,
+              expr: `avg(node_memory_SwapFree_bytes{${labelFilter}})`,
               legendFormat: 'Swap Free',
               refId: 'B'
             },
             {
-              expr: `avg(node_memory_SwapCached_bytes{${instanceFilter}})`,
+              expr: `avg(node_memory_SwapCached_bytes{${labelFilter}})`,
               legendFormat: 'Swap Cached',
               refId: 'C'
             }
@@ -412,7 +413,7 @@ async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
           title: 'Swap 사용률 (%)',
           type: 'timeseries',
           targets: [{
-            expr: `(1 - (avg(node_memory_SwapFree_bytes{${instanceFilter}}) / avg(node_memory_SwapTotal_bytes{${instanceFilter}}))) * 100`,
+            expr: `(1 - (avg(node_memory_SwapFree_bytes{${labelFilter}}) / avg(node_memory_SwapTotal_bytes{${labelFilter}}))) * 100`,
             legendFormat: 'Swap 사용률',
             refId: 'A'
           }],
@@ -447,7 +448,7 @@ async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
           title: 'Disk 사용률 (파일시스템별)',
           type: 'timeseries',
           targets: [{
-            expr: `100 - ((avg by (mountpoint) (node_filesystem_avail_bytes{${instanceFilter},fstype!="rootfs",mountpoint!="/boot"})) / avg by (mountpoint) (node_filesystem_size_bytes{${instanceFilter},fstype!="rootfs",mountpoint!="/boot"})) * 100)`,
+            expr: `100 - ((avg by (mountpoint) (node_filesystem_avail_bytes{${labelFilter},fstype!="rootfs",mountpoint!="/boot"})) / avg by (mountpoint) (node_filesystem_size_bytes{${labelFilter},fstype!="rootfs",mountpoint!="/boot"})) * 100)`,
             legendFormat: '{{mountpoint}}',
             refId: 'A'
           }],
@@ -489,12 +490,12 @@ async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
           type: 'timeseries',
           targets: [
             {
-              expr: `rate(node_disk_read_bytes_total{${instanceFilter}}[5m])`,
+              expr: `rate(node_disk_read_bytes_total{${labelFilter}}[5m])`,
               legendFormat: '{{device}} - Read',
               refId: 'A'
             },
             {
-              expr: `rate(node_disk_written_bytes_total{${instanceFilter}}[5m])`,
+              expr: `rate(node_disk_written_bytes_total{${labelFilter}}[5m])`,
               legendFormat: '{{device}} - Write',
               refId: 'B'
             }
@@ -529,12 +530,12 @@ async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
           type: 'timeseries',
           targets: [
             {
-              expr: `rate(node_network_receive_bytes_total{${instanceFilter},device!="lo"}[5m])`,
+              expr: `rate(node_network_receive_bytes_total{${labelFilter},device!="lo"}[5m])`,
               legendFormat: '{{device}} - Receive',
               refId: 'A'
             },
             {
-              expr: `rate(node_network_transmit_bytes_total{${instanceFilter},device!="lo"}[5m])`,
+              expr: `rate(node_network_transmit_bytes_total{${labelFilter},device!="lo"}[5m])`,
               legendFormat: '{{device}} - Transmit',
               refId: 'B'
             }
@@ -567,12 +568,12 @@ async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
           type: 'timeseries',
           targets: [
             {
-              expr: `rate(node_network_receive_packets_total{${instanceFilter},device!="lo"}[5m])`,
+              expr: `rate(node_network_receive_packets_total{${labelFilter},device!="lo"}[5m])`,
               legendFormat: '{{device}} - Receive',
               refId: 'A'
             },
             {
-              expr: `rate(node_network_transmit_packets_total{${instanceFilter},device!="lo"}[5m])`,
+              expr: `rate(node_network_transmit_packets_total{${labelFilter},device!="lo"}[5m])`,
               legendFormat: '{{device}} - Transmit',
               refId: 'B'
             }
@@ -607,17 +608,17 @@ async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
           type: 'timeseries',
           targets: [
             {
-              expr: `avg(node_load1{${instanceFilter}})`,
+              expr: `avg(node_load1{${labelFilter}})`,
               legendFormat: '1m',
               refId: 'A'
             },
             {
-              expr: `avg(node_load5{${instanceFilter}})`,
+              expr: `avg(node_load5{${labelFilter}})`,
               legendFormat: '5m',
               refId: 'B'
             },
             {
-              expr: `avg(node_load15{${instanceFilter}})`,
+              expr: `avg(node_load15{${labelFilter}})`,
               legendFormat: '15m',
               refId: 'C'
             }
@@ -650,11 +651,11 @@ async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
           title: '프로세스 수',
           type: 'timeseries',
           targets: [{
-            expr: `avg(node_procs_running{${instanceFilter}})`,
+            expr: `avg(node_procs_running{${labelFilter}})`,
             legendFormat: 'Running',
             refId: 'A'
           }, {
-            expr: `avg(node_procs_blocked{${instanceFilter}})`,
+            expr: `avg(node_procs_blocked{${labelFilter}})`,
             legendFormat: 'Blocked',
             refId: 'B'
           }],
@@ -685,11 +686,11 @@ async function createVMDashboard(jobName, dashboardTitle, hostIP, auth) {
           title: '파일 디스크립터',
           type: 'timeseries',
           targets: [{
-            expr: `avg(node_filefd_allocated{${instanceFilter}})`,
+            expr: `avg(node_filefd_allocated{${labelFilter}})`,
             legendFormat: 'Allocated',
             refId: 'A'
           }, {
-            expr: `avg(node_filefd_maximum{${instanceFilter}})`,
+            expr: `avg(node_filefd_maximum{${labelFilter}})`,
             legendFormat: 'Maximum',
             refId: 'B'
           }],

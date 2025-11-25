@@ -109,6 +109,12 @@ export const prometheusApi = {
   getTargets: async (jobName) => {
     const response = await api.get(`/api/prometheus/targets?jobName=${jobName}`);
     return response.data;
+  },
+
+  // Job 삭제
+  deleteJob: async (jobName) => {
+    const response = await api.delete(`/api/prometheus/jobs/${encodeURIComponent(jobName)}`);
+    return response.data;
   }
 };
 

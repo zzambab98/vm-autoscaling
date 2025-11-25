@@ -75,6 +75,27 @@ function PrometheusMonitoring() {
     }
   };
 
+  const deleteJob = async (jobNameToDelete) => {
+    if (!confirm(`정말로 Job '${jobNameToDelete}'을 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      const result = await prometheusApi.deleteJob(jobNameToDelete);
+      if (result.success) {
+        setMessage({ type: 'success', text: result.message });
+        await loadJobs();
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: `Job 삭제 실패: ${error.message}` });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const toggleTarget = (index) => {
     setTargets(prev => prev.map((t, i) => 
       i === index ? { ...t, enabled: !t.enabled } : t
@@ -251,6 +272,7 @@ function PrometheusMonitoring() {
                 <th>Job 이름</th>
                 <th>Targets</th>
                 <th>Labels</th>
+                <th>작업</th>
               </tr>
             </thead>
             <tbody>
@@ -259,6 +281,16 @@ function PrometheusMonitoring() {
                   <td>{job.jobName}</td>
                   <td>{job.targets.join(', ')}</td>
                   <td>{JSON.stringify(job.labels)}</td>
+                  <td>
+                    <button
+                      className="button button-danger"
+                      onClick={() => deleteJob(job.jobName)}
+                      disabled={loading}
+                      style={{ fontSize: '12px', padding: '4px 8px' }}
+                    >
+                      삭제
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

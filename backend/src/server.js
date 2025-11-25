@@ -1,7 +1,7 @@
 const http = require('http');
 const url = require('url');
 const { installNodeExporter, checkNodeExporterStatus, installNodeExporterOnMultipleServers } = require('./services/nodeExporterService');
-const { addPrometheusJob, getPrometheusJobs, getPrometheusTargets } = require('./services/prometheusMonitoringService');
+const { addPrometheusJob, getPrometheusJobs, getPrometheusTargets, deletePrometheusJob } = require('./services/prometheusMonitoringService');
 const { getTemplates, getTemplateById, convertVmToTemplate, deleteTemplate, getVmList } = require('./services/templateService');
 const { saveConfig, getConfigs, getConfigById, updateConfig, deleteConfig, setConfigEnabled } = require('./services/autoscalingService');
 const { createAlertRule, deleteAlertRule, getAlertRules } = require('./services/prometheusAlertService');
@@ -157,6 +157,20 @@ const server = http.createServer((req, res) => {
     (async () => {
       try {
         const result = await getPrometheusTargets(jobName);
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // Prometheus Job 삭제 API
+  if (req.method === 'DELETE' && parsedUrl.pathname.startsWith('/api/prometheus/jobs/')) {
+    const jobName = decodeURIComponent(parsedUrl.pathname.split('/').pop());
+    (async () => {
+      try {
+        const result = await deletePrometheusJob(jobName);
         sendJSONResponse(res, 200, result);
       } catch (error) {
         sendJSONResponse(res, 500, { error: error.message });
