@@ -25,6 +25,11 @@ function sendJSONResponse(res, status, data, headers = {}) {
 
 const server = http.createServer((req, res) => {
   const parsedUrl = url.parse(req.url, true);
+  
+  // 디버깅: 요청 로그 (개발 환경에서만)
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[${req.method}] ${parsedUrl.pathname}`, parsedUrl.query);
+  }
 
   // CORS Preflight 처리
   if (req.method === 'OPTIONS') {

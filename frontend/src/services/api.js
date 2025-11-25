@@ -13,6 +13,8 @@ const api = axios.create({
 // 요청 인터셉터
 api.interceptors.request.use(
   (config) => {
+    // 디버깅: 요청 URL 로그
+    console.log('[API Request]', config.method?.toUpperCase(), config.url);
     return config;
   },
   (error) => {
@@ -28,6 +30,12 @@ api.interceptors.response.use(
   },
   (error) => {
     console.error('API Error:', error);
+    console.error('[API Error Details]', {
+      url: error.config?.url,
+      method: error.config?.method,
+      status: error.response?.status,
+      data: error.response?.data
+    });
     
     // 네트워크 에러
     if (!error.response) {
