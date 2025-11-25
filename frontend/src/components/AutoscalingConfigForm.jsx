@@ -450,7 +450,7 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
             className="button button-success"
             disabled={loading}
           >
-            {loading ? '저장 중...' : (configId ? '수정' : '생성')}
+            {loading ? '저장 중...' : (configId && configId !== 'new' ? '수정' : '저장')}
           </button>
           {onCancel && (
             <button
