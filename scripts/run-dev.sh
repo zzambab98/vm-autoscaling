@@ -29,3 +29,4 @@ trap "kill $BACKEND_PID $FRONTEND_PID; exit" INT TERM
 # 프로세스 대기
 wait
 
+

@@ -75,9 +75,10 @@ async function addRoutingRule(config) {
       receiver => receiver.name !== `jenkins-webhook-${serviceName}`
     );
 
-    // Jenkins Webhook URL 생성 (서비스별 토큰 사용)
-    const webhookToken = `autoscale-${serviceName}-token`;
-    const webhookUrl = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookToken}`;
+    const BACKEND_URL = process.env.BACKEND_URL || 'http://10.255.0.103:4000';
+
+    // Backend Webhook URL (Middleware)
+    const webhookUrl = `${BACKEND_URL}/api/webhook/scale`;
 
     // 새 수신자 추가
     const newReceiver = {
@@ -87,11 +88,7 @@ async function addRoutingRule(config) {
           url: webhookUrl,
           send_resolved: true,
           http_config: {
-            follow_redirects: true,
-            basic_auth: {
-              username: JENKINS_WEBHOOK_USER,
-              password: JENKINS_WEBHOOK_PASSWORD
-            }
+            follow_redirects: true
           }
         }
       ]
@@ -107,7 +104,7 @@ async function addRoutingRule(config) {
 
     // 6. 설정 파일 백업
     const backupCommand = `${sshCommand} "sudo cp ${ALERTMANAGER_CONFIG_PATH} ${ALERTMANAGER_CONFIG_PATH}.backup.$(date +%Y%m%d_%H%M%S)"`;
-    await execPromise(backupCommand).catch(() => {});
+    await execPromise(backupCommand).catch(() => { });
 
     // 7. 새 설정 파일 작성
     const tempFile = `/tmp/alertmanager_${Date.now()}.yml`;
@@ -122,7 +119,7 @@ async function addRoutingRule(config) {
     await execPromise(moveCommand);
 
     // 10. 임시 파일 삭제
-    await fs.unlink(tempFile).catch(() => {});
+    await fs.unlink(tempFile).catch(() => { });
 
     // 11. Alertmanager 컨테이너 재시작
     const restartCommand = `${sshCommand} "sudo docker restart alertmanager"`;
@@ -131,7 +128,6 @@ async function addRoutingRule(config) {
     return {
       success: true,
       serviceName: serviceName,
-      webhookToken: webhookToken,
       webhookUrl: webhookUrl,
       message: 'Alertmanager 라우팅 규칙이 추가되었습니다.'
     };
@@ -178,7 +174,7 @@ async function deleteRoutingRule(serviceName) {
     });
 
     const backupCommand = `${sshCommand} "sudo cp ${ALERTMANAGER_CONFIG_PATH} ${ALERTMANAGER_CONFIG_PATH}.backup.$(date +%Y%m%d_%H%M%S)"`;
-    await execPromise(backupCommand).catch(() => {});
+    await execPromise(backupCommand).catch(() => { });
 
     const tempFile = `/tmp/alertmanager_${Date.now()}.yml`;
     await fs.writeFile(tempFile, newConfigYaml);
@@ -189,7 +185,7 @@ async function deleteRoutingRule(serviceName) {
     const moveCommand = `${sshCommand} "sudo mv /tmp/alertmanager_new.yml ${ALERTMANAGER_CONFIG_PATH}"`;
     await execPromise(moveCommand);
 
-    await fs.unlink(tempFile).catch(() => {});
+    await fs.unlink(tempFile).catch(() => { });
 
     // 6. Alertmanager 컨테이너 재시작
     const restartCommand = `${sshCommand} "sudo docker restart alertmanager"`;
@@ -244,4 +240,5 @@ module.exports = {
   deleteRoutingRule,
   getRoutingRules
 };
+
 

@@ -50,5 +50,9 @@ export const autoscalingApi = {
   }
 };
 
+export const {
+  getConfigs
+} = autoscalingApi;
+
 export default autoscalingApi;
 

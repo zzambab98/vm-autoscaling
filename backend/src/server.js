@@ -109,8 +109,8 @@ const server = http.createServer((req, res) => {
         const { jobName, targets, labels } = payload;
 
         if (!jobName || !targets || !Array.isArray(targets)) {
-          return sendJSONResponse(res, 400, { 
-            error: 'jobName과 targets (배열)가 필요합니다.' 
+          return sendJSONResponse(res, 400, {
+            error: 'jobName과 targets (배열)가 필요합니다.'
           });
         }
 
@@ -322,8 +322,8 @@ const server = http.createServer((req, res) => {
   }
 
   // 오토스케일링 설정 활성화/비활성화 API
-  if (req.method === 'POST' && parsedUrl.pathname.includes('/api/autoscaling/configs/') && 
-      (parsedUrl.pathname.endsWith('/enable') || parsedUrl.pathname.endsWith('/disable'))) {
+  if (req.method === 'POST' && parsedUrl.pathname.includes('/api/autoscaling/configs/') &&
+    (parsedUrl.pathname.endsWith('/enable') || parsedUrl.pathname.endsWith('/disable'))) {
     const pathParts = parsedUrl.pathname.split('/');
     const configId = pathParts[pathParts.length - 2];
     const action = pathParts[pathParts.length - 1];
@@ -494,6 +494,64 @@ const server = http.createServer((req, res) => {
         const result = await triggerJenkinsJob(jobName, parameters);
         sendJSONResponse(res, 200, result);
       } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    });
+    return;
+  }
+
+  // Autoscaling Webhook Handler (AlertManager -> Backend -> Jenkins)
+  if (req.method === 'POST' && parsedUrl.pathname === '/api/webhook/scale') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const alerts = payload.alerts || [];
+        const results = [];
+
+        console.log('[Webhook] Received AlertManager payload:', JSON.stringify(payload, null, 2));
+
+        for (const alert of alerts) {
+          if (alert.status === 'firing') {
+            const { service, autoscaleConfigId, alertname } = alert.labels;
+
+            if (!service) {
+              console.warn('[Webhook] Service label missing in alert:', alert);
+              continue;
+            }
+
+            const jobName = `autoscale-${service.toLowerCase().replace(/\s+/g, '-')}`;
+            let action = '';
+
+            if (alertname && alertname.includes('HighResourceUsage')) {
+              action = 'SCALE_UP';
+            } else if (alertname && alertname.includes('LowResourceUsage')) {
+              action = 'SCALE_DOWN';
+            } else {
+              console.warn(`[Webhook] Unknown alert name: ${alertname}`);
+              continue;
+            }
+
+            console.log(`[Webhook] Triggering ${action} for ${service} (Job: ${jobName})`);
+
+            try {
+              const result = await triggerJenkinsJob(jobName, {
+                ACTION: action,
+                AUTOSCALE_CONFIG_ID: autoscaleConfigId || '',
+                SERVICE_NAME: service
+              });
+              results.push(result);
+            } catch (err) {
+              console.error(`[Webhook] Failed to trigger Jenkins job for ${service}:`, err.message);
+              results.push({ success: false, service, error: err.message });
+            }
+          }
+        }
+
+        sendJSONResponse(res, 200, { success: true, processed: results });
+      } catch (error) {
+        console.error('[Webhook] Error processing webhook:', error);
         sendJSONResponse(res, 500, { error: error.message });
       }
     });

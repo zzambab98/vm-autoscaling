@@ -2,20 +2,36 @@ import { useState } from 'react';
 import { nodeExporterApi } from '../services/api';
 
 function NodeExporterInstall() {
+  const sshKeyOptions = [
+    {
+      label: 'dana-cocktail',
+      value: '/Users/jhlee/Desktop/Work/Dana-Cloud-Oper/DanaIX-신규 VM 생성/00. SSH-PemKey-List/dana-cocktail'
+    },
+    {
+      label: 'danainfra',
+      value: '/Users/jhlee/Desktop/Work/Dana-Cloud-Oper/DanaIX-신규 VM 생성/00. SSH-PemKey-List/danainfra'
+    },
+    { label: '직접 입력', value: 'custom' }
+  ];
+
   const [servers, setServers] = useState([
     { ip: '10.255.48.230', name: 'auto-vm-test-01', status: 'unknown', installing: false },
     { ip: '10.255.48.231', name: 'auto-vm-test-02', status: 'unknown', installing: false }
   ]);
   const [sshUser, setSshUser] = useState('ubuntu');
-  const [sshKey, setSshKey] = useState('/Users/jhlee/Desktop/Work/Dana-Cloud-Oper/DanaIX-신규 VM 생성/00. SSH-PemKey-List/danainfra');
+  const [selectedSshKey, setSelectedSshKey] = useState(sshKeyOptions[0].value);
+  const [customSshKey, setCustomSshKey] = useState('');
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const getEffectiveSshKey = () =>
+    selectedSshKey === 'custom' ? customSshKey.trim() : selectedSshKey;
 
   const checkStatus = async (serverIp) => {
     try {
       const result = await nodeExporterApi.checkStatus(serverIp, {
         sshUser,
-        sshKey
+        sshKey: getEffectiveSshKey()
       });
       
       setServers(prev => prev.map(s => 
@@ -37,7 +53,7 @@ function NodeExporterInstall() {
     try {
       const result = await nodeExporterApi.install(serverIp, {
         sshUser,
-        sshKey
+        sshKey: getEffectiveSshKey()
       });
 
       if (result.success) {
@@ -63,7 +79,7 @@ function NodeExporterInstall() {
       const serverIps = servers.map(s => s.ip);
       const result = await nodeExporterApi.installMultiple(serverIps, {
         sshUser,
-        sshKey
+        sshKey: getEffectiveSshKey()
       });
 
       if (result.success) {
@@ -114,14 +130,35 @@ function NodeExporterInstall() {
           placeholder="ubuntu"
         />
 
-        <label className="label">SSH Key 경로</label>
-        <input
-          type="text"
+        <label className="label">SSH Key 선택</label>
+        <select
           className="input"
-          value={sshKey}
-          onChange={(e) => setSshKey(e.target.value)}
-          placeholder="/path/to/ssh/key"
-        />
+          value={selectedSshKey}
+          onChange={(e) => setSelectedSshKey(e.target.value)}
+        >
+          {sshKeyOptions.map(option => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+
+        {selectedSshKey === 'custom' && (
+          <>
+            <label className="label">직접 입력 경로</label>
+            <input
+              type="text"
+              className="input"
+              value={customSshKey}
+              onChange={(e) => setCustomSshKey(e.target.value)}
+              placeholder="/path/to/ssh/key"
+            />
+          </>
+        )}
+
+        <p style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '8px' }}>
+          선택된 SSH Key로 모든 서버에 접속합니다. 사용자별 키 추가가 필요하면 "직접 입력"을 사용하세요.
+        </p>
       </div>
 
       <div style={{ marginBottom: '20px' }}>
