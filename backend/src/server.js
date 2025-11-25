@@ -7,8 +7,9 @@ const { saveConfig, getConfigs, getConfigById, updateConfig, deleteConfig, setCo
 const { createAlertRule, deleteAlertRule, getAlertRules } = require('./services/prometheusAlertService');
 const { addRoutingRule, deleteRoutingRule, getRoutingRules } = require('./services/alertmanagerService');
 const { createJenkinsJob, deleteJenkinsJob, getJenkinsJobStatus, getJenkinsJobs, triggerJenkinsJob } = require('./services/jenkinsService');
+const { getF5Pools, getF5VirtualServers } = require('./services/f5Service');
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 4410;
 
 function sendJSONResponse(res, status, data, headers = {}) {
   const payload = JSON.stringify(data);
@@ -500,61 +501,122 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Autoscaling Webhook Handler (AlertManager -> Backend -> Jenkins)
-  if (req.method === 'POST' && parsedUrl.pathname === '/api/webhook/scale') {
+
+
+  // Webhook 엔드포인트: Alertmanager에서 받은 webhook을 설정 정보와 함께 Jenkins에 전달
+  if (req.method === 'POST' && parsedUrl.pathname.startsWith('/api/webhook/autoscale/')) {
+    const serviceName = decodeURIComponent(parsedUrl.pathname.split('/').pop());
     let body = '';
     req.on('data', chunk => { body += chunk.toString(); });
     req.on('end', async () => {
       try {
-        const payload = JSON.parse(body || '{}');
-        const alerts = payload.alerts || [];
-        const results = [];
-
-        console.log('[Webhook] Received AlertManager payload:', JSON.stringify(payload, null, 2));
-
-        for (const alert of alerts) {
-          if (alert.status === 'firing') {
-            const { service, autoscaleConfigId, alertname } = alert.labels;
-
-            if (!service) {
-              console.warn('[Webhook] Service label missing in alert:', alert);
-              continue;
+        const alertmanagerPayload = JSON.parse(body || '{}');
+        
+        // 설정 정보 조회
+        const { getConfigs } = require('./services/autoscalingService');
+        const { getTemplateById } = require('./services/templateService');
+        const configs = await getConfigs();
+        const config = configs.find(c => c.serviceName === serviceName && c.enabled);
+        
+        if (!config) {
+          console.warn(`[Webhook] 설정을 찾을 수 없습니다: ${serviceName}`);
+          sendJSONResponse(res, 404, { error: `설정을 찾을 수 없습니다: ${serviceName}` });
+          return;
+        }
+        
+        // 템플릿 정보 조회
+        let templateName = '';
+        if (config.templateId) {
+          try {
+            const template = await getTemplateById(config.templateId);
+            if (template) {
+              templateName = template.name;
             }
-
-            const jobName = `autoscale-${service.toLowerCase().replace(/\s+/g, '-')}`;
-            let action = '';
-
-            if (alertname && alertname.includes('HighResourceUsage')) {
-              action = 'SCALE_UP';
-            } else if (alertname && alertname.includes('LowResourceUsage')) {
-              action = 'SCALE_DOWN';
-            } else {
-              console.warn(`[Webhook] Unknown alert name: ${alertname}`);
-              continue;
-            }
-
-            console.log(`[Webhook] Triggering ${action} for ${service} (Job: ${jobName})`);
-
-            try {
-              const result = await triggerJenkinsJob(jobName, {
-                ACTION: action,
-                AUTOSCALE_CONFIG_ID: autoscaleConfigId || '',
-                SERVICE_NAME: service
-              });
-              results.push(result);
-            } catch (err) {
-              console.error(`[Webhook] Failed to trigger Jenkins job for ${service}:`, err.message);
-              results.push({ success: false, service, error: err.message });
-            }
+          } catch (error) {
+            console.warn(`[Webhook] 템플릿 조회 실패:`, error.message);
           }
         }
-
-        sendJSONResponse(res, 200, { success: true, processed: results });
+        
+        // Jenkins에 전달할 payload 구성 (설정 정보 포함)
+        const jenkinsPayload = {
+          alerts: alertmanagerPayload.alerts || [],
+          config: {
+            templateName: templateName,
+            network: {
+              ipPoolStart: config.network?.ipPoolStart || '',
+              ipPoolEnd: config.network?.ipPoolEnd || '',
+              subnet: config.network?.subnet || '255.255.255.0',
+              gateway: config.network?.gateway || '',
+              vlan: config.network?.vlan || ''
+            },
+            f5: {
+              poolName: config.f5?.poolName || '',
+              vip: config.f5?.vip || '',
+              vipPort: config.f5?.vipPort || '80',
+              healthCheckPath: config.f5?.healthCheckPath || '/'
+            }
+          }
+        };
+        
+        // Jenkins webhook 호출
+        const { triggerJenkinsJob } = require('./services/jenkinsService');
+        const jobName = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}`;
+        const webhookToken = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-token`;
+        const JENKINS_URL = process.env.JENKINS_URL || 'http://10.255.0.103:8080';
+        const webhookUrl = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookToken}`;
+        
+        // Jenkins webhook에 POST 요청
+        const axios = require('axios');
+        const JENKINS_WEBHOOK_USER = process.env.JENKINS_WEBHOOK_USER || 'danacloud';
+        const JENKINS_WEBHOOK_PASSWORD = process.env.JENKINS_WEBHOOK_PASSWORD || '!danacloud12';
+        
+        await axios.post(webhookUrl, jenkinsPayload, {
+          auth: {
+            username: JENKINS_WEBHOOK_USER,
+            password: JENKINS_WEBHOOK_PASSWORD
+          },
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        console.log(`[Webhook] Jenkins Job 트리거 완료: ${jobName}`);
+        sendJSONResponse(res, 200, { 
+          success: true, 
+          message: 'Webhook이 Jenkins에 전달되었습니다.',
+          jobName: jobName
+        });
       } catch (error) {
-        console.error('[Webhook] Error processing webhook:', error);
+        console.error(`[Webhook] 처리 실패:`, error.message);
         sendJSONResponse(res, 500, { error: error.message });
       }
     });
+    return;
+  }
+
+  // F5 Pool 목록 조회 API
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/f5/pools') {
+    (async () => {
+      try {
+        const result = await getF5Pools();
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // F5 VIP 목록 조회 API
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/f5/vips') {
+    (async () => {
+      try {
+        const result = await getF5VirtualServers();
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
     return;
   }
 

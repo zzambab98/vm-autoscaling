@@ -79,11 +79,15 @@ function TemplateForm({ onSuccess }) {
             required
           >
             <option value="">VM 선택</option>
-            {vmList.map(vm => (
-              <option key={vm.name} value={vm.name}>
-                {vm.name}
-              </option>
-            ))}
+            {vmList.map((vm, index) => {
+              const vmName = typeof vm === 'string' ? vm : (vm?.name || `VM-${index}`);
+              const vmValue = typeof vm === 'string' ? vm : (vm?.name || vm?.path || `VM-${index}`);
+              return (
+                <option key={vmValue || index} value={vmValue}>
+                  {vmName}
+                </option>
+              );
+            })}
           </select>
         ) : (
           <input

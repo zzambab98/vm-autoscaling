@@ -81,6 +81,56 @@ async function generateJobXml(config) {
                   <value>$.alerts[0].labels.service</value>
                   <regexpFilter></regexpFilter>
                 </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                  <key>TEMPLATE_NAME</key>
+                  <value>$.config.templateName</value>
+                  <regexpFilter></regexpFilter>
+                </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                  <key>IP_POOL_START</key>
+                  <value>$.config.network.ipPoolStart</value>
+                  <regexpFilter></regexpFilter>
+                </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                  <key>IP_POOL_END</key>
+                  <value>$.config.network.ipPoolEnd</value>
+                  <regexpFilter></regexpFilter>
+                </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                  <key>SUBNET</key>
+                  <value>$.config.network.subnet</value>
+                  <regexpFilter></regexpFilter>
+                </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                  <key>GATEWAY</key>
+                  <value>$.config.network.gateway</value>
+                  <regexpFilter></regexpFilter>
+                </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                  <key>VLAN</key>
+                  <value>$.config.network.vlan</value>
+                  <regexpFilter></regexpFilter>
+                </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                  <key>F5_POOL_NAME</key>
+                  <value>$.config.f5.poolName</value>
+                  <regexpFilter></regexpFilter>
+                </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                  <key>VIP</key>
+                  <value>$.config.f5.vip</value>
+                  <regexpFilter></regexpFilter>
+                </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                  <key>VIP_PORT</key>
+                  <value>$.config.f5.vipPort</value>
+                  <regexpFilter></regexpFilter>
+                </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                  <key>HEALTH_CHECK_PATH</key>
+                  <value>$.config.f5.healthCheckPath</value>
+                  <regexpFilter></regexpFilter>
+                </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
               </values>
             </org.jenkinsci.plugins.gwt.GenericTriggerVariables>
           </variables>

@@ -13,13 +13,19 @@ function TemplateList() {
 
   const loadTemplates = async () => {
     setLoading(true);
+    setMessage(null);
     try {
       const result = await templateApi.getTemplates();
-      if (result.success) {
+      if (result && result.success) {
         setTemplates(result.templates || []);
+      } else {
+        setTemplates([]);
+        setMessage({ type: 'error', text: '템플릿 목록을 불러올 수 없습니다.' });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: `템플릿 목록 조회 실패: ${error.message}` });
+      console.error('템플릿 목록 조회 실패:', error);
+      setTemplates([]);
+      setMessage({ type: 'error', text: `템플릿 목록 조회 실패: ${error.message || '알 수 없는 오류'}` });
     } finally {
       setLoading(false);
     }

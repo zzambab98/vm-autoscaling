@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import NodeExporterInstall from './components/NodeExporterInstall';
 import PrometheusMonitoring from './components/PrometheusMonitoring';
 import TemplateList from './components/TemplateList';
@@ -7,6 +7,7 @@ import AutoscalingConfigList from './components/AutoscalingConfigList';
 import AutoscalingConfigForm from './components/AutoscalingConfigForm';
 import MonitoringDashboard from './components/MonitoringDashboard';
 import ScaleOutEventList from './components/ScaleOutEventList';
+import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
 
 function App() {
@@ -15,6 +16,12 @@ function App() {
   const [refreshConfigs, setRefreshConfigs] = useState(0);
   const [editingConfigId, setEditingConfigId] = useState(null);
   const [viewingConfigId, setViewingConfigId] = useState(null);
+
+  // 컴포넌트 마운트 시 에러 확인
+  useEffect(() => {
+    console.log('App component mounted');
+    console.log('Active tab:', activeTab);
+  }, [activeTab]);
 
   const handleTemplateCreated = () => {
     setRefreshTemplates(prev => prev + 1);
@@ -89,14 +96,16 @@ function App() {
       </div>
 
       {activeTab === 'templates' && (
-        <>
+        <ErrorBoundary>
           <TemplateForm key={refreshTemplates} onSuccess={handleTemplateCreated} />
-          <TemplateList key={`list-${refreshTemplates}`} />
-        </>
+          <ErrorBoundary>
+            <TemplateList key={`list-${refreshTemplates}`} />
+          </ErrorBoundary>
+        </ErrorBoundary>
       )}
 
       {activeTab === 'autoscaling' && (
-        <>
+        <ErrorBoundary>
           {editingConfigId ? (
             <AutoscalingConfigForm
               key={editingConfigId}
@@ -127,13 +136,29 @@ function App() {
               />
             </>
           )}
-        </>
+        </ErrorBoundary>
       )}
 
-      {activeTab === 'node-exporter' && <NodeExporterInstall />}
-      {activeTab === 'prometheus' && <PrometheusMonitoring />}
-      {activeTab === 'monitoring' && <MonitoringDashboard />}
-      {activeTab === 'events' && <ScaleOutEventList />}
+      {activeTab === 'node-exporter' && (
+        <ErrorBoundary>
+          <NodeExporterInstall />
+        </ErrorBoundary>
+      )}
+      {activeTab === 'prometheus' && (
+        <ErrorBoundary>
+          <PrometheusMonitoring />
+        </ErrorBoundary>
+      )}
+      {activeTab === 'monitoring' && (
+        <ErrorBoundary>
+          <MonitoringDashboard />
+        </ErrorBoundary>
+      )}
+      {activeTab === 'events' && (
+        <ErrorBoundary>
+          <ScaleOutEventList />
+        </ErrorBoundary>
+      )}
     </div>
   );
 }

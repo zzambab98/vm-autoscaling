@@ -104,54 +104,65 @@ pipeline {
                         error("템플릿 이름이 설정되지 않았습니다.")
                     }
                     
+                    if (!env.VM_IP) {
+                        error("VM IP가 할당되지 않았습니다.")
+                    }
+                    
                     def vmName = "${params.SERVICE_NAME}-${BUILD_NUMBER}-${System.currentTimeMillis()}"
                     vmName = vmName.toLowerCase().replaceAll(/[^a-z0-9-]/, '-')
                     
                     echo "VM 생성 시작: ${vmName}"
                     echo "템플릿: ${params.TEMPLATE_NAME}"
                     echo "IP: ${env.VM_IP}"
+                    echo "서브넷: ${params.SUBNET}"
+                    echo "게이트웨이: ${params.GATEWAY}"
+                    echo "VLAN: ${params.VLAN}"
                     
-                    // govc를 사용하여 VM 클론
-                    sh """
+                    // govc를 사용하여 VM 클론 (IP 설정 포함)
+                    def cloneCommand = """
                         export GOVC_URL="${GOVC_URL}"
                         export GOVC_USERNAME="${GOVC_USERNAME}"
                         export GOVC_PASSWORD="${GOVC_PASSWORD}"
                         
-                        govc vm.clone \
-                            -vm="${params.TEMPLATE_NAME}" \
-                            -name="${vmName}" \
+                        govc vm.clone \\
+                            -vm="${params.TEMPLATE_NAME}" \\
+                            -name="${vmName}" \\
                             -on=false
                     """
                     
-                    // VM 네트워크 설정 (고정 IP)
+                    // VLAN이 지정된 경우 네트워크 설정
                     if (params.VLAN) {
+                        cloneCommand += """ \\
+                            -net="${params.VLAN}"
+                        """
+                    }
+                    
+                    cloneCommand += """ \\
+                        "${vmName}"
+                    """
+                    
+                    sh cloneCommand
+                    
+                    // VM 네트워크 어댑터에 IP 설정
+                    if (params.VLAN && env.VM_IP && params.SUBNET && params.GATEWAY) {
+                        echo "=== VM 네트워크 IP 설정 ==="
                         sh """
                             export GOVC_URL="${GOVC_URL}"
                             export GOVC_USERNAME="${GOVC_USERNAME}"
                             export GOVC_PASSWORD="${GOVC_PASSWORD}"
                             
-                            govc vm.network.change \
-                                -vm="${vmName}" \
-                                -net="${params.VLAN}"
+                            # VM의 네트워크 어댑터에 IP 설정
+                            govc vm.customize \\
+                                -vm="${vmName}" \\
+                                -ip="${env.VM_IP}" \\
+                                -netmask="${params.SUBNET}" \\
+                                -gateway="${params.GATEWAY}" \\
+                                -hostname="${vmName}" || echo "Customization 실패 (계속 진행)"
                         """
                     }
                     
                     env.VM_NAME = vmName
                     echo "VM 생성 완료: ${env.VM_NAME}"
-                }
-            }
-        }
-        
-        stage('Configure VM IP') {
-            steps {
-                script {
-                    echo "=== VM IP 설정 ==="
-                    
-                    // VM에 고정 IP 설정 (cloud-init 또는 vCenter 설정)
-                    // 실제 구현은 환경에 따라 다를 수 있음
-                    echo "VM IP 설정: ${env.VM_IP}"
-                    echo "서브넷: ${params.SUBNET}"
-                    echo "게이트웨이: ${params.GATEWAY}"
                 }
             }
         }

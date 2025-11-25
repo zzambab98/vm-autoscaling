@@ -1,13 +1,55 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4410';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  timeout: 30000 // 30초 타임아웃
 });
+
+// 요청 인터셉터
+api.interceptors.request.use(
+  (config) => {
+    return config;
+  },
+  (error) => {
+    console.error('Request error:', error);
+    return Promise.reject(error);
+  }
+);
+
+// 응답 인터셉터 - 에러 처리
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    console.error('API Error:', error);
+    
+    // 네트워크 에러
+    if (!error.response) {
+      console.error('Network error:', error.message);
+      return Promise.reject(new Error('서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요.'));
+    }
+    
+    // HTTP 에러
+    const status = error.response?.status;
+    const message = error.response?.data?.error || error.message || '알 수 없는 오류가 발생했습니다.';
+    
+    if (status === 500) {
+      return Promise.reject(new Error(`서버 오류: ${message}`));
+    } else if (status === 404) {
+      return Promise.reject(new Error(`요청한 리소스를 찾을 수 없습니다: ${message}`));
+    } else if (status === 400) {
+      return Promise.reject(new Error(`잘못된 요청: ${message}`));
+    }
+    
+    return Promise.reject(new Error(message));
+  }
+);
 
 // Node Exporter API
 export const nodeExporterApi = {

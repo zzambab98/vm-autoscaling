@@ -28,21 +28,32 @@ async function installNodeExporter(serverIp, options = {}) {
       throw new Error('SSH Key 또는 Password가 필요합니다.');
     }
 
-    // Node Exporter 설치 스크립트 실행
-    const installScript = `
-      # Node Exporter 다운로드
-      cd /tmp
-      wget -q https://github.com/prometheus/node_exporter/releases/download/v${nodeExporterVersion}/node_exporter-${nodeExporterVersion}.linux-amd64.tar.gz
-      
-      # 압축 해제
-      tar xvfz node_exporter-${nodeExporterVersion}.linux-amd64.tar.gz
-      
-      # 실행 파일 복사
-      sudo cp node_exporter-${nodeExporterVersion}.linux-amd64/node_exporter /usr/local/bin/
-      sudo chmod +x /usr/local/bin/node_exporter
-      
-      # systemd 서비스 파일 생성
-      sudo tee /etc/systemd/system/node_exporter.service > /dev/null <<EOF
+    // Node Exporter 설치 스크립트를 임시 파일로 전송하여 실행
+    const installScript = `#!/bin/bash
+set -e
+
+# 기존 Node Exporter 서비스 중지 (이미 설치된 경우)
+sudo systemctl stop node_exporter 2>/dev/null || true
+sudo systemctl disable node_exporter 2>/dev/null || true
+
+# 실행 중인 프로세스 종료
+sudo pkill -f node_exporter 2>/dev/null || true
+sleep 2
+
+# Node Exporter 다운로드
+cd /tmp
+wget -q https://github.com/prometheus/node_exporter/releases/download/v${nodeExporterVersion}/node_exporter-${nodeExporterVersion}.linux-amd64.tar.gz
+
+# 압축 해제
+tar xvfz node_exporter-${nodeExporterVersion}.linux-amd64.tar.gz
+
+# 실행 파일 복사 (기존 파일이 있으면 먼저 삭제)
+sudo rm -f /usr/local/bin/node_exporter
+sudo cp node_exporter-${nodeExporterVersion}.linux-amd64/node_exporter /usr/local/bin/
+sudo chmod +x /usr/local/bin/node_exporter
+
+# systemd 서비스 파일 생성
+sudo tee /etc/systemd/system/node_exporter.service > /dev/null <<'SERVICEEOF'
 [Unit]
 Description=Node Exporter
 After=network.target
@@ -56,22 +67,26 @@ RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-EOF
-      
-      # systemd 리로드 및 서비스 시작
-      sudo systemctl daemon-reload
-      sudo systemctl start node_exporter
-      sudo systemctl enable node_exporter
-      
-      # 방화벽 설정 (UFW 또는 iptables)
-      sudo ufw allow 9100/tcp 2>/dev/null || sudo iptables -A INPUT -p tcp --dport 9100 -j ACCEPT 2>/dev/null || true
-      
-      # 설치 확인
-      sleep 2
-      curl -s http://localhost:9100/metrics | head -5
-    `;
+SERVICEEOF
 
-    const command = `${sshCommand} "${installScript.replace(/\n/g, ' ')}"`;
+# systemd 리로드 및 서비스 시작
+sudo systemctl daemon-reload
+sudo systemctl start node_exporter
+sudo systemctl enable node_exporter
+
+# 방화벽 설정 (UFW 또는 iptables)
+sudo ufw allow 9100/tcp 2>/dev/null || sudo iptables -A INPUT -p tcp --dport 9100 -j ACCEPT 2>/dev/null || true
+
+# 설치 확인
+sleep 2
+curl -s http://localhost:9100/metrics | head -5 || echo "Node Exporter 설치 완료 (메트릭 확인 실패)"
+`;
+
+    // 스크립트를 base64로 인코딩하여 전송
+    const scriptBase64 = Buffer.from(installScript).toString('base64');
+    
+    // 원격에서 스크립트를 디코딩하고 실행
+    const command = `${sshCommand} "echo '${scriptBase64}' | base64 -d | bash"`;
     
     const { stdout, stderr } = await execPromise(command, {
       timeout: 300000, // 5분 타임아웃
@@ -120,14 +135,15 @@ async function checkNodeExporterStatus(serverIp, options = {}) {
     }
 
     // 상태 확인 스크립트
-    const checkScript = `
-      # 서비스 상태 확인
-      systemctl is-active node_exporter 2>/dev/null || echo "inactive"
-      systemctl is-enabled node_exporter 2>/dev/null || echo "disabled"
-      curl -s http://localhost:9100/metrics | head -1 2>/dev/null || echo "not_responding"
-    `;
+    const checkScript = `#!/bin/bash
+systemctl is-active node_exporter 2>/dev/null || echo "inactive"
+systemctl is-enabled node_exporter 2>/dev/null || echo "disabled"
+curl -s http://localhost:9100/metrics | head -1 2>/dev/null || echo "not_responding"
+`;
 
-    const command = `${sshCommand} "${checkScript.replace(/\n/g, ' ')}"`;
+    // 스크립트를 base64로 인코딩하여 전송
+    const scriptBase64 = Buffer.from(checkScript).toString('base64');
+    const command = `${sshCommand} "echo '${scriptBase64}' | base64 -d | bash"`;
     const { stdout } = await execPromise(command, { timeout: 10000 });
 
     const lines = stdout.trim().split('\n');

@@ -8,6 +8,7 @@ const TEMPLATES_DATA_PATH = path.join(__dirname, '../../data/templates.json');
 const VCENTER_URL = process.env.GOVC_URL || process.env.VCENTER_URL;
 const VCENTER_USERNAME = process.env.GOVC_USERNAME || process.env.VCENTER_USERNAME;
 const VCENTER_PASSWORD = process.env.GOVC_PASSWORD || process.env.VCENTER_PASSWORD;
+const DEFAULT_DATASTORE = process.env.GOVC_DATASTORE || process.env.VCENTER_DATASTORE || 'OS-Datastore-Power-Store';
 
 /**
  * 데이터 파일 초기화
@@ -60,10 +61,11 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
       throw new Error('vCenter 연결 정보가 설정되지 않았습니다. 환경 변수를 확인하세요.');
     }
 
-    // 1. VM이 존재하는지 확인
+    // 1. VM이 존재하는지 확인하고 datastore 정보 가져오기
     const checkVmCommand = `govc vm.info -json "${vmName}"`;
+    let vmInfo;
     try {
-      await execPromise(checkVmCommand, {
+      const { stdout } = await execPromise(checkVmCommand, {
         env: {
           ...process.env,
           GOVC_URL: VCENTER_URL,
@@ -71,9 +73,160 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
           GOVC_PASSWORD: VCENTER_PASSWORD
         }
       });
+      vmInfo = JSON.parse(stdout);
     } catch (error) {
       throw new Error(`VM '${vmName}'을 찾을 수 없습니다.`);
     }
+
+    // VM의 datastore 정보 추출
+    let datastore = null;
+    if (vmInfo && vmInfo.Datastore) {
+      // Datastore가 배열인 경우 첫 번째 사용
+      const datastores = Array.isArray(vmInfo.Datastore) ? vmInfo.Datastore : [vmInfo.Datastore];
+      if (datastores.length > 0) {
+        // Datastore 객체에서 이름 추출
+        const dsInfo = datastores[0];
+        datastore = typeof dsInfo === 'string' ? dsInfo : (dsInfo.Value || dsInfo.Name || null);
+      }
+    }
+
+    // 환경변수 또는 기본값에서 datastore 확인
+    if (!datastore) {
+      datastore = DEFAULT_DATASTORE;
+      console.log(`[Template Service] Datastore를 기본값으로 사용: ${datastore}`);
+    }
+
+    // VM의 resource pool 정보 추출
+    let resourcePool = null;
+    
+    // 방법 1: VM 정보에서 직접 추출
+    if (vmInfo && vmInfo.ResourcePool) {
+      const rpInfo = vmInfo.ResourcePool;
+      if (typeof rpInfo === 'string') {
+        resourcePool = rpInfo;
+      } else if (rpInfo && rpInfo.Value) {
+        resourcePool = rpInfo.Value;
+      } else if (rpInfo && rpInfo.Name) {
+        resourcePool = rpInfo.Name;
+      }
+    }
+    
+    // 방법 2: VM의 경로를 찾아서 resource pool 조회
+    if (!resourcePool) {
+      try {
+        // VM의 전체 경로 찾기
+        const findCommand = `govc find . -type m -name "${vmName}"`;
+        const { stdout: vmPath } = await execPromise(findCommand, {
+          env: {
+            ...process.env,
+            GOVC_URL: VCENTER_URL,
+            GOVC_USERNAME: VCENTER_USERNAME,
+            GOVC_PASSWORD: VCENTER_PASSWORD
+          }
+        });
+        const vmFullPath = vmPath.trim().split('\n')[0];
+        
+        if (vmFullPath) {
+          // VM의 resource pool 직접 조회
+          const rpCommand = `govc object.collect -s "${vmFullPath}" resourcePool`;
+          const { stdout: rpOutput } = await execPromise(rpCommand, {
+            env: {
+              ...process.env,
+              GOVC_URL: VCENTER_URL,
+              GOVC_USERNAME: VCENTER_USERNAME,
+              GOVC_PASSWORD: VCENTER_PASSWORD
+            }
+          });
+          const rpValue = rpOutput.trim();
+          if (rpValue && rpValue !== '' && rpValue !== 'null') {
+            resourcePool = rpValue;
+            console.log(`[Template Service] Resource Pool 찾음 (VM 경로): ${resourcePool}`);
+          }
+        }
+      } catch (error) {
+        console.warn('[Template Service] Resource Pool 조회 실패 (VM 경로):', error.message);
+      }
+    }
+    
+    // 방법 3: VM의 호스트를 통해 클러스터의 기본 resource pool 찾기
+    if (!resourcePool && vmInfo && vmInfo.Runtime && vmInfo.Runtime.Host) {
+      try {
+        const hostInfo = vmInfo.Runtime.Host;
+        let hostValue = null;
+        
+        if (typeof hostInfo === 'string') {
+          hostValue = hostInfo;
+        } else if (hostInfo && hostInfo.Value) {
+          hostValue = hostInfo.Value;
+        } else if (hostInfo && hostInfo.Name) {
+          hostValue = hostInfo.Name;
+        }
+        
+        if (hostValue) {
+          console.log(`[Template Service] Host 정보: ${hostValue}`);
+          
+          // 호스트의 부모(클러스터) 찾기
+          const parentCommand = `govc object.collect -s "${hostValue}" parent`;
+          const { stdout: parentOutput } = await execPromise(parentCommand, {
+            env: {
+              ...process.env,
+              GOVC_URL: VCENTER_URL,
+              GOVC_USERNAME: VCENTER_USERNAME,
+              GOVC_PASSWORD: VCENTER_PASSWORD
+            }
+          });
+          const parentValue = parentOutput.trim();
+          
+          console.log(`[Template Service] Parent (Cluster): ${parentValue}`);
+          
+          if (parentValue && parentValue !== 'null' && parentValue !== '') {
+            // 클러스터의 기본 resource pool (Resources) 사용
+            const clusterRpPath = `${parentValue}/Resources`;
+            resourcePool = clusterRpPath;
+            console.log(`[Template Service] Resource Pool 찾음 (클러스터 기본): ${resourcePool}`);
+          }
+        }
+      } catch (error) {
+        console.warn('[Template Service] Resource Pool 조회 실패 (클러스터):', error.message);
+      }
+    }
+    
+    // 방법 4: VM이 속한 클러스터의 기본 resource pool 사용 (최후의 수단)
+    if (!resourcePool) {
+      try {
+        // 모든 클러스터의 기본 resource pool 찾기
+        const findRpCommand = `govc find . -type p -name Resources | head -1`;
+        const { stdout: rpOutput } = await execPromise(findRpCommand, {
+          env: {
+            ...process.env,
+            GOVC_URL: VCENTER_URL,
+            GOVC_USERNAME: VCENTER_USERNAME,
+            GOVC_PASSWORD: VCENTER_PASSWORD
+          }
+        });
+        const rpValue = rpOutput.trim();
+        if (rpValue && rpValue !== '') {
+          resourcePool = rpValue;
+          console.log(`[Template Service] Resource Pool 찾음 (기본 Resources): ${resourcePool}`);
+        }
+      } catch (error) {
+        console.warn('[Template Service] Resource Pool 조회 실패 (기본 Resources):', error.message);
+      }
+    }
+
+    // 방법 4: 환경변수에서 resource pool 확인
+    if (!resourcePool) {
+      resourcePool = process.env.GOVC_RESOURCE_POOL || process.env.VCENTER_RESOURCE_POOL;
+    }
+    
+    // resource pool이 없으면 에러 발생 (상세한 디버깅 정보 포함)
+    if (!resourcePool) {
+      console.error('[Template Service] Resource Pool을 찾을 수 없습니다.');
+      console.error('[Template Service] VM Info:', JSON.stringify(vmInfo, null, 2));
+      throw new Error('Resource Pool을 찾을 수 없습니다. 환경변수 GOVC_RESOURCE_POOL을 설정하거나 VM의 Resource Pool 정보를 확인하세요. 예: export GOVC_RESOURCE_POOL="/Datacenter/host/Cluster-01/Resources"');
+    }
+    
+    console.log(`[Template Service] 최종 Resource Pool: ${resourcePool}`);
 
     // 2. VM을 템플릿으로 변환
     // 주의: govc vm.markastemplate은 VM을 직접 템플릿으로 변환합니다.
@@ -87,8 +240,30 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
     const cloneName = `${templateName}-temp-${Date.now()}`;
     
     console.log(`[Template Service] VM 클론 시작: ${vmName} -> ${cloneName}`);
-    const cloneCommand = `govc vm.clone -vm="${vmName}" -name="${cloneName}"`;
     
+    // govc vm.clone 명령어 구성
+    // datastore와 resource pool이 여러 개인 경우 명시적으로 지정 필요
+    let cloneCommand = `govc vm.clone -vm="${vmName}"`;
+    
+    if (datastore) {
+      cloneCommand += ` -ds="${datastore}"`;
+      console.log(`[Template Service] Datastore 지정: ${datastore}`);
+    } else {
+      console.warn('[Template Service] Datastore가 지정되지 않았습니다. 기본 datastore를 사용합니다.');
+    }
+    
+    if (resourcePool) {
+      cloneCommand += ` -pool="${resourcePool}"`;
+      console.log(`[Template Service] Resource Pool 지정: ${resourcePool}`);
+    } else {
+      console.warn('[Template Service] Resource Pool이 지정되지 않았습니다. 기본 resource pool을 사용합니다.');
+    }
+    
+    // 템플릿용 클론은 전원을 끈 상태로 생성 (-on=false)
+    // 네트워크 설정 없이 생성하여 IP 중복 방지
+    cloneCommand += ` -on=false "${cloneName}"`;
+    
+    console.log(`[Template Service] 클론 명령어: ${cloneCommand}`);
     await execPromise(cloneCommand, {
       env: {
         ...process.env,
@@ -98,6 +273,38 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
       },
       timeout: 600000 // 10분 타임아웃
     });
+
+    // 클론된 VM의 전원 상태 확인 및 강제 종료 (안전장치)
+    console.log(`[Template Service] 클론된 VM 전원 상태 확인: ${cloneName}`);
+    try {
+      const powerStateCommand = `govc vm.power -get "${cloneName}"`;
+      const { stdout: powerState } = await execPromise(powerStateCommand, {
+        env: {
+          ...process.env,
+          GOVC_URL: VCENTER_URL,
+          GOVC_USERNAME: VCENTER_USERNAME,
+          GOVC_PASSWORD: VCENTER_PASSWORD
+        }
+      });
+      
+      if (powerState.trim().toLowerCase().includes('on') || powerState.trim().toLowerCase().includes('powered on')) {
+        console.log(`[Template Service] VM이 전원이 켜져 있습니다. 전원을 끕니다: ${cloneName}`);
+        const powerOffCommand = `govc vm.power -off -force "${cloneName}"`;
+        await execPromise(powerOffCommand, {
+          env: {
+            ...process.env,
+            GOVC_URL: VCENTER_URL,
+            GOVC_USERNAME: VCENTER_USERNAME,
+            GOVC_PASSWORD: VCENTER_PASSWORD
+          },
+          timeout: 60000 // 1분 타임아웃
+        });
+        // 전원이 완전히 꺼질 때까지 대기
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    } catch (error) {
+      console.warn(`[Template Service] 전원 상태 확인/종료 실패 (계속 진행):`, error.message);
+    }
 
     console.log(`[Template Service] 템플릿으로 변환 시작: ${cloneName}`);
     const markTemplateCommand = `govc vm.markastemplate "${cloneName}"`;
@@ -114,16 +321,39 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
     // 3. 템플릿 이름 변경 (필요한 경우)
     if (cloneName !== templateName) {
       console.log(`[Template Service] 템플릿 이름 변경: ${cloneName} -> ${templateName}`);
-      const renameCommand = `govc object.rename "${cloneName}" "${templateName}"`;
       
-      await execPromise(renameCommand, {
-        env: {
-          ...process.env,
-          GOVC_URL: VCENTER_URL,
-          GOVC_USERNAME: VCENTER_USERNAME,
-          GOVC_PASSWORD: VCENTER_PASSWORD
+      // VM의 전체 경로 찾기
+      try {
+        const findCommand = `govc find . -type m -name "${cloneName}"`;
+        const { stdout: vmPath } = await execPromise(findCommand, {
+          env: {
+            ...process.env,
+            GOVC_URL: VCENTER_URL,
+            GOVC_USERNAME: VCENTER_USERNAME,
+            GOVC_PASSWORD: VCENTER_PASSWORD
+          }
+        });
+        const vmFullPath = vmPath.trim().split('\n')[0];
+        
+        if (vmFullPath) {
+          // 전체 경로를 사용하여 이름 변경
+          const renameCommand = `govc object.rename "${vmFullPath}" "${templateName}"`;
+          await execPromise(renameCommand, {
+            env: {
+              ...process.env,
+              GOVC_URL: VCENTER_URL,
+              GOVC_USERNAME: VCENTER_USERNAME,
+              GOVC_PASSWORD: VCENTER_PASSWORD
+            }
+          });
+          console.log(`[Template Service] 템플릿 이름 변경 완료: ${templateName}`);
+        } else {
+          console.warn(`[Template Service] VM 경로를 찾을 수 없어 이름 변경을 건너뜁니다: ${cloneName}`);
         }
-      });
+      } catch (error) {
+        console.warn(`[Template Service] 템플릿 이름 변경 실패 (템플릿은 생성됨):`, error.message);
+        // 이름 변경 실패해도 템플릿은 생성되었으므로 계속 진행
+      }
     }
 
     // 4. 템플릿 메타데이터 저장
@@ -249,7 +479,7 @@ async function getVmList() {
       return [];
     }
 
-    const command = `govc ls -json /vm`;
+    const command = `govc ls /vm`;
     const { stdout } = await execPromise(command, {
       env: {
         ...process.env,
@@ -259,11 +489,18 @@ async function getVmList() {
       }
     });
 
-    const vms = JSON.parse(stdout);
-    return vms.map(vm => ({
-      name: vm.Path.split('/').pop(),
-      path: vm.Path
-    }));
+    // govc ls는 한 줄에 하나씩 경로를 반환합니다
+    const lines = stdout.trim().split('\n').filter(line => line.trim());
+    
+    return lines.map(path => {
+      // 경로에서 VM 이름 추출 (마지막 부분)
+      const parts = path.split('/');
+      const name = parts[parts.length - 1];
+      return {
+        name: name,
+        path: path
+      };
+    });
   } catch (error) {
     console.error('[Template Service] VM 목록 조회 실패:', error);
     return [];

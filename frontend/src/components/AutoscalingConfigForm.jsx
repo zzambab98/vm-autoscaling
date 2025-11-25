@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { autoscalingApi } from '../services/autoscalingApi';
 import { templateApi } from '../services/templateApi';
+import f5Api from '../services/f5Api';
 
 function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
   const [templates, setTemplates] = useState([]);
+  const [f5Pools, setF5Pools] = useState([]);
+  const [f5Vips, setF5Vips] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [formData, setFormData] = useState({
@@ -40,7 +43,9 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
 
   useEffect(() => {
     loadTemplates();
-    if (configId) {
+    loadF5Data();
+    // configId가 있고 'new'가 아닐 때만 설정 조회
+    if (configId && configId !== 'new') {
       loadConfig();
     }
   }, [configId]);
@@ -56,12 +61,46 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
     }
   };
 
+  const loadF5Data = async () => {
+    try {
+      // F5 Pool 목록 조회
+      const poolsResult = await f5Api.getPools();
+      if (poolsResult && poolsResult.success) {
+        setF5Pools(poolsResult.pools || []);
+      } else {
+        console.warn('F5 Pool 목록 조회 실패:', poolsResult?.error || '알 수 없는 오류');
+        setF5Pools([]);
+      }
+      
+      // F5 VIP 목록 조회
+      const vipsResult = await f5Api.getVips();
+      if (vipsResult && vipsResult.success) {
+        setF5Vips(vipsResult.vips || []);
+      } else {
+        console.warn('F5 VIP 목록 조회 실패:', vipsResult?.error || '알 수 없는 오류');
+        setF5Vips([]);
+      }
+    } catch (error) {
+      console.error('F5 데이터 조회 실패:', error);
+      setF5Pools([]);
+      setF5Vips([]);
+    }
+  };
+
   const loadConfig = async () => {
+    // configId가 없거나 'new'이면 조회하지 않음 (새 설정 생성)
+    if (!configId || configId === 'new') {
+      return;
+    }
+    
     setLoading(true);
+    setMessage(null); // 이전 메시지 초기화
     try {
       const result = await autoscalingApi.getConfigById(configId);
       if (result.success && result.config) {
         setFormData(result.config);
+      } else {
+        setMessage({ type: 'error', text: '설정을 찾을 수 없습니다.' });
       }
     } catch (error) {
       setMessage({ type: 'error', text: `설정 조회 실패: ${error.message}` });
@@ -108,7 +147,7 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
 
   return (
     <div className="card">
-      <h2>{configId ? '오토스케일링 설정 수정' : '오토스케일링 설정 생성'}</h2>
+      <h2>{configId && configId !== 'new' ? '오토스케일링 설정 수정' : '오토스케일링 설정 생성'}</h2>
 
       {message && (
         <div className={message.type === 'success' ? 'success' : 'error'}>
@@ -250,26 +289,74 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
         {/* F5 설정 */}
         <h3 style={{ marginTop: '30px', marginBottom: '12px', color: '#2c3e50' }}>F5 설정</h3>
         <label className="label">Pool 이름 *</label>
-        <input
-          type="text"
-          className="input"
-          value={formData.f5.poolName}
-          onChange={(e) => updateNestedField('f5', 'poolName', e.target.value)}
-          placeholder="예: auto-vm-test-pool"
-          required
-        />
+        {f5Pools.length > 0 ? (
+          <select
+            className="input"
+            value={formData.f5.poolName}
+            onChange={(e) => updateNestedField('f5', 'poolName', e.target.value)}
+            required
+          >
+            <option value="">Pool 선택</option>
+            {f5Pools.map(pool => (
+              <option key={pool.name} value={pool.name}>
+                {pool.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <>
+            <input
+              type="text"
+              className="input"
+              value={formData.f5.poolName}
+              onChange={(e) => updateNestedField('f5', 'poolName', e.target.value)}
+              placeholder="F5 Pool 목록을 불러올 수 없습니다. F5 서버 정보를 확인하세요 (예: auto-vm-test-pool)"
+              required
+            />
+            <p style={{ fontSize: '12px', color: '#e74c3c', marginTop: '5px' }}>
+              ⚠️ F5 API 연결 실패. 환경 변수(F5_SERVERS, F5_USER, F5_PASSWORD)를 확인하세요.
+            </p>
+          </>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px' }}>
           <div>
             <label className="label">VIP 주소 *</label>
-            <input
-              type="text"
-              className="input"
-              value={formData.f5.vip}
-              onChange={(e) => updateNestedField('f5', 'vip', e.target.value)}
-              placeholder="예: 10.255.48.229"
-              required
-            />
+            {f5Vips.length > 0 ? (
+              <select
+                className="input"
+                value={f5Vips.find(vip => vip.ip === formData.f5.vip && parseInt(vip.port) === formData.f5.vipPort)?.displayName || ''}
+                onChange={(e) => {
+                  const selectedVip = f5Vips.find(vip => vip.displayName === e.target.value);
+                  if (selectedVip) {
+                    updateNestedField('f5', 'vip', selectedVip.ip);
+                    updateNestedField('f5', 'vipPort', parseInt(selectedVip.port));
+                  }
+                }}
+                required
+              >
+                <option value="">VIP 선택</option>
+                {f5Vips.map(vip => (
+                  <option key={vip.name} value={vip.displayName}>
+                    {vip.displayName}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  className="input"
+                  value={formData.f5.vip}
+                  onChange={(e) => updateNestedField('f5', 'vip', e.target.value)}
+                  placeholder="F5 VIP 목록을 불러올 수 없습니다. F5 서버 정보를 확인하세요 (예: 10.255.48.229)"
+                  required
+                />
+                <p style={{ fontSize: '12px', color: '#e74c3c', marginTop: '5px' }}>
+                  ⚠️ F5 API 연결 실패. 환경 변수(F5_SERVERS, F5_USER, F5_PASSWORD)를 확인하세요.
+                </p>
+              </>
+            )}
           </div>
           <div>
             <label className="label">VIP 포트 *</label>

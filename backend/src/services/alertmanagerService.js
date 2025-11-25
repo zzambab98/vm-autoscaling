@@ -75,10 +75,11 @@ async function addRoutingRule(config) {
       receiver => receiver.name !== `jenkins-webhook-${serviceName}`
     );
 
-    const BACKEND_URL = process.env.BACKEND_URL || 'http://10.255.0.103:4000';
-
-    // Backend Webhook URL (Middleware)
-    const webhookUrl = `${BACKEND_URL}/api/webhook/scale`;
+    // Jenkins Webhook URL (백엔드를 통해 설정 정보 포함)
+    const webhookToken = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-token`;
+    // 백엔드 webhook 엔드포인트를 통해 설정 정보를 포함하여 Jenkins에 전달
+    const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:4410';
+    const webhookUrl = `${BACKEND_URL}/api/webhook/autoscale/${serviceName}`;
 
     // 새 수신자 추가
     const newReceiver = {
@@ -88,7 +89,10 @@ async function addRoutingRule(config) {
           url: webhookUrl,
           send_resolved: true,
           http_config: {
-            follow_redirects: true
+            basic_auth: {
+              username: JENKINS_WEBHOOK_USER,
+              password: JENKINS_WEBHOOK_PASSWORD
+            }
           }
         }
       ]
@@ -129,6 +133,7 @@ async function addRoutingRule(config) {
       success: true,
       serviceName: serviceName,
       webhookUrl: webhookUrl,
+      webhookToken: webhookToken,
       message: 'Alertmanager 라우팅 규칙이 추가되었습니다.'
     };
   } catch (error) {
