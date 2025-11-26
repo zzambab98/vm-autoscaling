@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { prometheusApi } from '../services/api';
 
+// 시스템 Job 목록 (삭제 불가)
+const SYSTEM_JOBS = ['prometheus', 'alertmanager', 'loki'];
+
 function PrometheusMonitoring() {
   const [jobName, setJobName] = useState('auto-vm-test-service');
   const [targets, setTargets] = useState([
@@ -25,7 +28,11 @@ function PrometheusMonitoring() {
     try {
       const result = await prometheusApi.getJobs();
       if (result.success) {
-        setJobs(result.jobs);
+        // 시스템 Job 필터링 (삭제 불가능한 Job 제외)
+        const filteredJobs = result.jobs.filter(
+          job => !SYSTEM_JOBS.includes(job.jobName)
+        );
+        setJobs(filteredJobs);
       }
     } catch (error) {
       console.error('Failed to load jobs:', error);
