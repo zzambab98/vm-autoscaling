@@ -180,11 +180,11 @@ function PrometheusMonitoring() {
           <input
             type="text"
             className="input"
-          value={labels.environment}
-          onChange={(e) => setLabels({ ...labels, environment: e.target.value })}
-          placeholder="environment"
-        />
-      </div>
+            value={labels.environment}
+            onChange={(e) => setLabels({ ...labels, environment: e.target.value })}
+            placeholder="environment"
+          />
+        </div>
 
       <div style={{ marginBottom: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
