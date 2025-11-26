@@ -10,8 +10,8 @@
       "prometheusJobName": "auto-vm-test-service"
     },
     "scaling": {
-      "minVms": 2,
-      "maxVms": 10,
+      "minVms": 3,
+      "maxVms": 4,
       "scaleOutStep": 1,
       "scaleInStep": 1,
       "cooldownPeriod": 300
@@ -23,8 +23,8 @@
       "healthCheckPath": "/"
     },
     "network": {
-      "ipPoolStart": "10.255.48.200",
-      "ipPoolEnd": "10.255.48.205",
+      "ipPoolStart": "10.255.48.100",
+      "ipPoolEnd": "10.255.48.102",
       "subnet": "255.255.255.0",
       "gateway": "10.255.48.1",
       "vlan": "vlan_1048"
@@ -35,8 +35,8 @@
       "webhookToken": "11c729d250790bec23d77c6144053e7b03",
       "webhookUrl": "http://10.255.0.103:8080/generic-webhook-trigger/invoke?token=11c729d250790bec23d77c6144053e7b03"
     },
-    "id": "config-1764049037540",
-    "createdAt": "2025-11-25T05:37:17.540Z",
-    "updatedAt": "2025-11-25T07:35:00.000Z"
+    "id": "config-1764136171911",
+    "createdAt": "2025-11-26T05:49:31.911Z",
+    "updatedAt": "2025-11-26T05:50:35.080Z"
   }
 ]
