@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { alertmanagerApi } from '../services/api';
 
+// 기본 Jenkins 설정 (모든 서비스가 공통으로 사용)
+const DEFAULT_JENKINS_URL = 'http://10.255.0.103:8080';
+const DEFAULT_WEBHOOK_TOKEN = '11c729d250790bec23d77c6144053e7b03';
+const DEFAULT_WEBHOOK_URL = `${DEFAULT_JENKINS_URL}/generic-webhook-trigger/invoke?token=${DEFAULT_WEBHOOK_TOKEN}`;
+
 function AlertmanagerRouting() {
   const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -8,8 +13,8 @@ function AlertmanagerRouting() {
   const [formData, setFormData] = useState({
     serviceName: '',
     receiver: '',
-    webhookUrl: '',
-    webhookToken: ''
+    webhookUrl: DEFAULT_WEBHOOK_URL,  // 기본값으로 미리 채움
+    webhookToken: DEFAULT_WEBHOOK_TOKEN  // 기본값으로 미리 채움
   });
 
   useEffect(() => {
@@ -32,8 +37,8 @@ function AlertmanagerRouting() {
   };
 
   const addRoute = async () => {
-    if (!formData.serviceName || !formData.webhookUrl) {
-      setMessage({ type: 'error', text: '서비스 이름과 Webhook URL은 필수입니다.' });
+    if (!formData.serviceName) {
+      setMessage({ type: 'error', text: '서비스 이름은 필수입니다.' });
       return;
     }
 
@@ -41,16 +46,27 @@ function AlertmanagerRouting() {
     setMessage(null);
 
     try {
+      // Webhook URL이 비어있으면 기본값 사용
+      const webhookUrl = formData.webhookUrl || DEFAULT_WEBHOOK_URL;
+      // Webhook Token이 비어있으면 기본값 사용
+      const webhookToken = formData.webhookToken || DEFAULT_WEBHOOK_TOKEN;
+
       const result = await alertmanagerApi.addRoute({
         serviceName: formData.serviceName,
         receiver: formData.receiver || `jenkins-webhook-${formData.serviceName}`,
-        webhookUrl: formData.webhookUrl,
-        webhookToken: formData.webhookToken || `autoscale-${formData.serviceName.toLowerCase().replace(/\s+/g, '-')}-token`
+        webhookUrl: webhookUrl,
+        webhookToken: webhookToken
       });
 
       if (result.success) {
         setMessage({ type: 'success', text: '라우팅 규칙이 추가되었습니다.' });
-        setFormData({ serviceName: '', receiver: '', webhookUrl: '', webhookToken: '' });
+        // 기본값으로 초기화 (서비스 이름만 비우고 나머지는 기본값 유지)
+        setFormData({ 
+          serviceName: '', 
+          receiver: '', 
+          webhookUrl: DEFAULT_WEBHOOK_URL, 
+          webhookToken: DEFAULT_WEBHOOK_TOKEN 
+        });
         await loadRoutes();
       }
     } catch (error) {
@@ -120,9 +136,12 @@ function AlertmanagerRouting() {
           className="input"
           value={formData.webhookUrl}
           onChange={(e) => setFormData({ ...formData, webhookUrl: e.target.value })}
-          placeholder="예: http://10.255.0.103:8080/generic-webhook-trigger/invoke?token=plg-autoscale-token"
+          placeholder={DEFAULT_WEBHOOK_URL}
           required
         />
+        <p style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '-10px', marginBottom: '12px' }}>
+          기본값: {DEFAULT_WEBHOOK_URL} (모든 서비스가 공통으로 사용)
+        </p>
 
         <label className="label">Webhook 토큰 (선택)</label>
         <input
@@ -130,8 +149,11 @@ function AlertmanagerRouting() {
           className="input"
           value={formData.webhookToken}
           onChange={(e) => setFormData({ ...formData, webhookToken: e.target.value })}
-          placeholder="자동 생성: autoscale-{서비스이름}-token"
+          placeholder={DEFAULT_WEBHOOK_TOKEN}
         />
+        <p style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '-10px', marginBottom: '12px' }}>
+          기본값: {DEFAULT_WEBHOOK_TOKEN} (plg-autoscale-out 파이프라인 토큰)
+        </p>
 
         <div style={{ marginTop: '15px' }}>
           <button
