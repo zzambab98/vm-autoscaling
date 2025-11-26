@@ -583,9 +583,10 @@ const server = http.createServer((req, res) => {
         const jobName = (config.jenkins && config.jenkins.jobName) 
           ? config.jenkins.jobName 
           : `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}`;
+        const JENKINS_DEFAULT_WEBHOOK_TOKEN = process.env.JENKINS_DEFAULT_WEBHOOK_TOKEN || '11c729d250790bec23d77c6144053e7b03';
         const webhookToken = (config.jenkins && config.jenkins.webhookToken)
           ? config.jenkins.webhookToken
-          : `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-token`;
+          : JENKINS_DEFAULT_WEBHOOK_TOKEN;
         const JENKINS_URL = process.env.JENKINS_URL || 'http://10.255.0.103:8080';
         const webhookUrl = (config.jenkins && config.jenkins.webhookUrl)
           ? config.jenkins.webhookUrl

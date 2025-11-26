@@ -11,6 +11,7 @@ const ALERTMANAGER_CONFIG_PATH = '/mnt/plg-stack/alertmanager/config/alertmanage
 const JENKINS_URL = process.env.JENKINS_URL || 'http://10.255.0.103:8080';
 const JENKINS_WEBHOOK_USER = process.env.JENKINS_WEBHOOK_USER || 'danacloud';
 const JENKINS_WEBHOOK_PASSWORD = process.env.JENKINS_WEBHOOK_PASSWORD || '!danacloud12';
+const JENKINS_DEFAULT_WEBHOOK_TOKEN = process.env.JENKINS_DEFAULT_WEBHOOK_TOKEN || '11c729d250790bec23d77c6144053e7b03';
 
 /**
  * Alertmanager 라우팅 규칙 추가
@@ -94,7 +95,7 @@ async function addRoutingRule(config) {
       } else {
         // 기본값: Jenkins URL + token
         const normalizedServiceName = serviceName.toLowerCase().replace(/\s+/g, '-');
-        const token = webhookToken || config.jenkins?.webhookToken || `autoscale-${normalizedServiceName}-token`;
+        const token = webhookToken || config.jenkins?.webhookToken || JENKINS_DEFAULT_WEBHOOK_TOKEN;
         finalWebhookUrl = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${token}`;
       }
     }

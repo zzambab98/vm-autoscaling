@@ -1,16 +1,21 @@
 const axios = require('axios');
 
 const JENKINS_URL = process.env.JENKINS_URL || 'http://10.255.0.103:8080';
-const JENKINS_USER = process.env.JENKINS_WEB_USER || 'danacloud';
-const JENKINS_PASSWORD = process.env.JENKINS_WEB_PASSWORD || '!danacloud12';
+const JENKINS_USER = process.env.JENKINS_WEB_USER || 'leo';
+const JENKINS_API_TOKEN = process.env.JENKINS_API_TOKEN || '11c729d250790bec23d77c6144053e7b03';
+const JENKINS_PASSWORD = process.env.JENKINS_WEB_PASSWORD || '!danacloud12'; // Web UI 로그인용
 const JENKINS_SERVER = process.env.JENKINS_SERVER || '10.255.0.103';
 const JENKINS_SSH_USER = process.env.JENKINS_SSH_USER || 'jenkins';
 const JENKINS_SSH_PASSWORD = process.env.JENKINS_SSH_PASSWORD || '!danacloud12';
 const GIT_REPO_URL = process.env.GIT_REPO_URL || 'https://github.com/zzambab98/vm-autoscaling.git';
 
-// Jenkins API 인증 헤더
+// Jenkins API 인증 헤더 (API 토큰 사용)
 function getAuthHeader() {
-  const auth = Buffer.from(`${JENKINS_USER}:${JENKINS_PASSWORD}`).toString('base64');
+  // API 토큰이 있으면 사용자명:토큰 형식으로 사용, 없으면 사용자명:비밀번호 사용
+  const credentials = JENKINS_API_TOKEN 
+    ? `${JENKINS_USER}:${JENKINS_API_TOKEN}`
+    : `${JENKINS_USER}:${JENKINS_PASSWORD}`;
+  const auth = Buffer.from(credentials).toString('base64');
   return `Basic ${auth}`;
 }
 
