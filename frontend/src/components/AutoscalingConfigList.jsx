@@ -105,7 +105,7 @@ function AutoscalingConfigList({ onEdit, onView }) {
           등록된 설정이 없습니다.
         </div>
       ) : (
-        <table className="table">
+        <table className="table autoscaling-table">
           <thead>
             <tr>
               <th>서비스 이름</th>
@@ -148,28 +148,19 @@ function AutoscalingConfigList({ onEdit, onView }) {
                     ? new Date(config.createdAt).toLocaleString('ko-KR')
                     : '-'}
                 </td>
-                <td>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <td className="actions-cell">
+                  <div className="autoscaling-actions">
                     {onEdit && (
                       <button
-                        className="button button-primary"
+                        className="button button-primary button-compact"
                         onClick={() => onEdit(config.id)}
                         disabled={loading}
                       >
                         수정
                       </button>
                     )}
-                    {onView && (
-                      <button
-                        className="button"
-                        onClick={() => onView(config.id)}
-                        disabled={loading}
-                      >
-                        상세
-                      </button>
-                    )}
                     <button
-                      className={`button ${config.enabled ? 'button-warning' : 'button-success'}`}
+                      className={`button ${config.enabled ? 'button-warning' : 'button-success'} button-compact`}
                       onClick={() => handleToggleEnabled(config.id, config.enabled)}
                       disabled={loading}
                     >
@@ -178,13 +169,13 @@ function AutoscalingConfigList({ onEdit, onView }) {
                     {deleteConfirm?.id === config.id ? (
                       <>
                         <button
-                          className="button button-danger"
+                          className="button button-danger button-compact"
                           onClick={() => handleDelete(config.id, config.serviceName)}
                         >
                           확인
                         </button>
                         <button
-                          className="button"
+                          className="button button-compact"
                           onClick={cancelDelete}
                         >
                           취소
@@ -192,7 +183,7 @@ function AutoscalingConfigList({ onEdit, onView }) {
                       </>
                     ) : (
                       <button
-                        className="button button-danger"
+                        className="button button-danger button-compact"
                         onClick={() => handleDelete(config.id, config.serviceName)}
                         disabled={loading}
                       >

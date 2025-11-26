@@ -59,18 +59,17 @@ stop_existing_services() {
     rm -f "${FRONTEND_PID_FILE}"
   fi
   
-  # 포트 기반으로 프로세스 종료
+  # 포트 기반으로 프로세스 종료 (4410 / 5520만)
   echo "    포트 ${BACKEND_PORT} 사용 프로세스 종료 중..."
   lsof -ti:${BACKEND_PORT} | xargs kill -9 2>/dev/null || true
   
   echo "    포트 ${FRONTEND_PORT} 사용 프로세스 종료 중..."
   lsof -ti:${FRONTEND_PORT} | xargs kill -9 2>/dev/null || true
   
-  # 프로세스 이름 기반으로 종료 (VM-Autoscaling 경로 포함)
-  echo "    관련 프로세스 종료 중..."
-  pkill -f "VM-Autoscaling.*backend.*server.js" 2>/dev/null || true
-  pkill -f "VM-Autoscaling.*frontend.*vite" 2>/dev/null || true
-  pkill -f "VM-Autoscaling.*frontend.*npm.*dev" 2>/dev/null || true
+  # ⚠ VM-Autoscaling 문자열 기반 pkill 제거 → 다른 프로젝트와 충돌 방지
+  # pkill -f "VM-Autoscaling.*backend.*server.js" 2>/dev/null || true
+  # pkill -f "VM-Autoscaling.*frontend.*vite" 2>/dev/null || true
+  # pkill -f "VM-Autoscaling.*frontend.*npm.*dev" 2>/dev/null || true
   
   sleep 2
   echo "[+] 기존 서비스 종료 완료"

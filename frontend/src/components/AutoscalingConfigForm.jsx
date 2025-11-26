@@ -3,63 +3,43 @@ import { autoscalingApi } from '../services/autoscalingApi';
 import { templateApi } from '../services/templateApi';
 import f5Api from '../services/f5Api';
 
-const defaultFormData = {
-  serviceName: '',
-  templateId: '',
-  enabled: false,
-  monitoring: {
-    cpuThreshold: 80,
-    memoryThreshold: 80,
-    duration: 5,
-    prometheusJobName: ''
-  },
-  scaling: {
-    minVms: 2,
-    maxVms: 10,
-    scaleOutStep: 1,
-    scaleInStep: 1,
-    cooldownPeriod: 300
-  },
-  f5: {
-    poolName: '',
-    vip: '',
-    vipPort: 80,
-    healthCheckPath: '/'
-  },
-  network: {
-    ipPoolStart: '',
-    ipPoolEnd: '',
-    subnet: '255.255.255.0',
-    gateway: '',
-    vlan: ''
-  },
-  jenkins: {
-    useExistingJob: false,
-    jobName: '',
-    webhookToken: '',
-    webhookUrl: ''
-  }
-};
-
-function normalizeConfig(config = {}) {
-  return {
-    ...defaultFormData,
-    ...config,
-    monitoring: { ...defaultFormData.monitoring, ...(config.monitoring || {}) },
-    scaling: { ...defaultFormData.scaling, ...(config.scaling || {}) },
-    f5: { ...defaultFormData.f5, ...(config.f5 || {}) },
-    network: { ...defaultFormData.network, ...(config.network || {}) },
-    jenkins: { ...defaultFormData.jenkins, ...(config.jenkins || {}) }
-  };
-}
-
 function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
   const [templates, setTemplates] = useState([]);
   const [f5Pools, setF5Pools] = useState([]);
   const [f5Vips, setF5Vips] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
-  const [formData, setFormData] = useState(defaultFormData);
+  const [formData, setFormData] = useState({
+    serviceName: '',
+    templateId: '',
+    enabled: false,
+    monitoring: {
+      cpuThreshold: 80,
+      memoryThreshold: 80,
+      duration: 5,
+      prometheusJobName: ''
+    },
+    scaling: {
+      minVms: 2,
+      maxVms: 10,
+      scaleOutStep: 1,
+      scaleInStep: 1,
+      cooldownPeriod: 300
+    },
+    f5: {
+      poolName: '',
+      vip: '',
+      vipPort: 80,
+      healthCheckPath: '/'
+    },
+    network: {
+      ipPoolStart: '',
+      ipPoolEnd: '',
+      subnet: '255.255.255.0',
+      gateway: '',
+      vlan: ''
+    }
+  });
 
   useEffect(() => {
     loadTemplates();
@@ -118,7 +98,7 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
     try {
       const result = await autoscalingApi.getConfigById(configId);
       if (result.success && result.config) {
-        setFormData(normalizeConfig(result.config));
+        setFormData(result.config);
       } else {
         setMessage({ type: 'error', text: '설정을 찾을 수 없습니다.' });
       }
@@ -135,39 +115,21 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
     setMessage(null);
 
     try {
-      // Jenkins 설정 기본값 처리
-      const submitData = { ...formData };
-      if (submitData.jenkins && submitData.jenkins.useExistingJob) {
-        // 기본값이 비어있으면 자동으로 채우기
-        if (!submitData.jenkins.jobName) {
-          submitData.jenkins.jobName = 'plg-autoscale-out';
-        }
-        if (!submitData.jenkins.webhookToken) {
-          submitData.jenkins.webhookToken = '11c729d250790bec23d77c6144053e7b03';
-        }
-        if (!submitData.jenkins.webhookUrl) {
-          submitData.jenkins.webhookUrl = 'http://10.255.0.103:8080/generic-webhook-trigger/invoke?token=11c729d250790bec23d77c6144053e7b03';
-        }
-      }
-
       let result;
-      // configId가 있고 'new'가 아닐 때만 수정, 그 외에는 생성
-      if (configId && configId !== 'new') {
-        result = await autoscalingApi.updateConfig(configId, submitData);
+      if (configId) {
+        result = await autoscalingApi.updateConfig(configId, formData);
       } else {
-        result = await autoscalingApi.createConfig(submitData);
+        result = await autoscalingApi.createConfig(formData);
       }
 
       if (result.success) {
-        const isUpdate = configId && configId !== 'new';
-        setMessage({ type: 'success', text: `설정이 ${isUpdate ? '수정' : '생성'}되었습니다.` });
+        setMessage({ type: 'success', text: `설정이 ${configId ? '수정' : '생성'}되었습니다.` });
         if (onSuccess) {
           setTimeout(() => onSuccess(), 1000);
         }
       }
     } catch (error) {
-      const isUpdate = configId && configId !== 'new';
-      setMessage({ type: 'error', text: `설정 ${isUpdate ? '수정' : '생성'} 실패: ${error.message}` });
+      setMessage({ type: 'error', text: `설정 ${configId ? '수정' : '생성'} 실패: ${error.message}` });
     } finally {
       setLoading(false);
     }
@@ -267,11 +229,6 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
 
         {/* 스케일링 설정 */}
         <h3 style={{ marginTop: '30px', marginBottom: '12px', color: '#2c3e50' }}>스케일링 설정</h3>
-        <p style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '-10px', marginBottom: '15px' }}>
-          ⚠️ 최소/최대 VM 수는 <strong>전체 VM 개수</strong>를 의미합니다 (기존 VM + 새로 생성될 VM).
-          <br />
-          예: 기존 VM 2대가 있고 최소 3, 최대 4로 설정하면 → 기존 2대 + 신규 1~2대 = 총 3~4대
-        </p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
           <div>
             <label className="label">최소 VM 수 *</label>
@@ -283,9 +240,6 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
               min="1"
               required
             />
-            <p style={{ fontSize: '11px', color: '#95a5a6', marginTop: '4px', marginBottom: 0 }}>
-              전체 VM 개수 (기존 + 신규)
-            </p>
           </div>
           <div>
             <label className="label">최대 VM 수 *</label>
@@ -297,9 +251,6 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
               min="1"
               required
             />
-            <p style={{ fontSize: '11px', color: '#95a5a6', marginTop: '4px', marginBottom: 0 }}>
-              전체 VM 개수 (기존 + 신규)
-            </p>
           </div>
         </div>
 
@@ -490,78 +441,13 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
           </div>
         </div>
 
-        {/* Jenkins 설정 */}
-        <h3 style={{ marginTop: '30px', marginBottom: '12px', color: '#2c3e50' }}>Jenkins 설정</h3>
-        <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <input
-            type="checkbox"
-            checked={formData.jenkins.useExistingJob}
-            onChange={(e) => {
-              const checked = e.target.checked;
-              updateNestedField('jenkins', 'useExistingJob', checked);
-              // 체크하면 기본값 자동 입력
-              if (checked) {
-                setFormData(prev => ({
-                  ...prev,
-                  jenkins: {
-                    ...prev.jenkins,
-                    jobName: prev.jenkins.jobName || 'plg-autoscale-out',
-                    webhookToken: prev.jenkins.webhookToken || '11c729d250790bec23d77c6144053e7b03',
-                    webhookUrl: prev.jenkins.webhookUrl || 'http://10.255.0.103:8080/generic-webhook-trigger/invoke?token=11c729d250790bec23d77c6144053e7b03'
-                  }
-                }));
-              }
-            }}
-          />
-          기존 Jenkins Job 사용 (모든 서비스가 공통으로 사용: plg-autoscale-out)
-        </label>
-        <p style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '-10px', marginBottom: '12px' }}>
-          모든 서비스가 같은 Jenkins 파이프라인(plg-autoscale-out)을 사용합니다. 체크하면 기본값이 자동으로 입력됩니다.
-        </p>
-
-        {formData.jenkins.useExistingJob && (
-          <>
-            <label className="label">Jenkins Job 이름 *</label>
-            <input
-              type="text"
-              className="input"
-              value={formData.jenkins.jobName || 'plg-autoscale-out'}
-              onChange={(e) => updateNestedField('jenkins', 'jobName', e.target.value)}
-              placeholder="plg-autoscale-out"
-              required={formData.jenkins.useExistingJob}
-            />
-
-            <label className="label">Webhook 토큰 *</label>
-            <input
-              type="text"
-              className="input"
-              value={formData.jenkins.webhookToken || '11c729d250790bec23d77c6144053e7b03'}
-              onChange={(e) => updateNestedField('jenkins', 'webhookToken', e.target.value)}
-              placeholder="11c729d250790bec23d77c6144053e7b03"
-              required={formData.jenkins.useExistingJob}
-            />
-
-            <label className="label">Webhook URL (선택)</label>
-            <input
-              type="text"
-              className="input"
-              value={formData.jenkins.webhookUrl || 'http://10.255.0.103:8080/generic-webhook-trigger/invoke?token=11c729d250790bec23d77c6144053e7b03'}
-              onChange={(e) => updateNestedField('jenkins', 'webhookUrl', e.target.value)}
-              placeholder="http://10.255.0.103:8080/generic-webhook-trigger/invoke?token=11c729d250790bec23d77c6144053e7b03"
-            />
-            <p style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '-10px', marginBottom: '12px' }}>
-              기본값이 자동으로 입력됩니다. 변경이 필요한 경우에만 수정하세요.
-            </p>
-          </>
-        )}
-
         <div style={{ marginTop: '30px', display: 'flex', gap: '10px' }}>
           <button
             type="submit"
             className="button button-success"
             disabled={loading}
           >
-            {loading ? '저장 중...' : (configId && configId !== 'new' ? '수정' : '저장')}
+            {loading ? '저장 중...' : (configId ? '수정' : '생성')}
           </button>
           {onCancel && (
             <button

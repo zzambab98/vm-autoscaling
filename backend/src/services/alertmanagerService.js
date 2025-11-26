@@ -11,7 +11,6 @@ const ALERTMANAGER_CONFIG_PATH = '/mnt/plg-stack/alertmanager/config/alertmanage
 const JENKINS_URL = process.env.JENKINS_URL || 'http://10.255.0.103:8080';
 const JENKINS_WEBHOOK_USER = process.env.JENKINS_WEBHOOK_USER || 'danacloud';
 const JENKINS_WEBHOOK_PASSWORD = process.env.JENKINS_WEBHOOK_PASSWORD || '!danacloud12';
-const JENKINS_DEFAULT_WEBHOOK_TOKEN = process.env.JENKINS_DEFAULT_WEBHOOK_TOKEN || '11c729d250790bec23d77c6144053e7b03';
 
 /**
  * Alertmanager 라우팅 규칙 추가
@@ -21,15 +20,8 @@ const JENKINS_DEFAULT_WEBHOOK_TOKEN = process.env.JENKINS_DEFAULT_WEBHOOK_TOKEN 
 async function addRoutingRule(config) {
   const {
     serviceName,
-    id: configId,
-    receiver, // 직접 지정된 receiver 이름 (선택)
-    webhookUrl, // 직접 지정된 webhook URL (선택)
-    webhookToken // 직접 지정된 webhook token (선택)
+    id: configId
   } = config;
-
-  if (!serviceName) {
-    throw new Error('serviceName은 필수입니다.');
-  }
 
   try {
     const sshCommand = `ssh -i "${PLG_STACK_SSH_KEY}" -o StrictHostKeyChecking=no ${PLG_STACK_USER}@${PLG_STACK_SERVER}`;
@@ -62,15 +54,12 @@ async function addRoutingRule(config) {
       route => !(route.match && route.match.service === serviceName)
     );
 
-    // Receiver 이름 결정
-    const receiverName = receiver || `jenkins-webhook-${serviceName}`;
-
     // 새 라우팅 규칙 추가 (맨 앞에 추가하여 우선순위 부여)
     const newRoute = {
       match: {
         service: serviceName
       },
-      receiver: receiverName,
+      receiver: `jenkins-webhook-${serviceName}`,
       continue: false
     };
 
@@ -83,35 +72,21 @@ async function addRoutingRule(config) {
 
     // 기존 수신자 제거 (같은 이름)
     alertmanagerConfig.receivers = alertmanagerConfig.receivers.filter(
-      receiver => receiver.name !== receiverName
+      receiver => receiver.name !== `jenkins-webhook-${serviceName}`
     );
 
-    // Jenkins Webhook URL 결정
-    let finalWebhookUrl = webhookUrl;
-    if (!finalWebhookUrl) {
-      // config.jenkins에서 가져오기 (오토스케일링 설정에서 호출된 경우)
-      if (config.jenkins?.webhookUrl) {
-        finalWebhookUrl = config.jenkins.webhookUrl;
-      } else {
-        // 기본값: Jenkins URL + token
-        const normalizedServiceName = serviceName.toLowerCase().replace(/\s+/g, '-');
-        const token = webhookToken || config.jenkins?.webhookToken || JENKINS_DEFAULT_WEBHOOK_TOKEN;
-        finalWebhookUrl = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${token}`;
-      }
-    }
-
-    // 필요 시 백엔드 중계 엔드포인트 사용 (추가 메타데이터 전달용)
-    if (config.jenkins?.useBackendWebhookProxy) {
-      const backendUrl = process.env.BACKEND_URL || 'http://localhost:4410';
-      finalWebhookUrl = `${backendUrl}/api/webhook/autoscale/${serviceName}`;
-    }
+    // Jenkins Webhook URL (백엔드를 통해 설정 정보 포함)
+    const webhookToken = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-token`;
+    // 백엔드 webhook 엔드포인트를 통해 설정 정보를 포함하여 Jenkins에 전달
+    const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:4410';
+    const webhookUrl = `${BACKEND_URL}/api/webhook/autoscale/${serviceName}`;
 
     // 새 수신자 추가
     const newReceiver = {
-      name: receiverName,
+      name: `jenkins-webhook-${serviceName}`,
       webhook_configs: [
         {
-          url: finalWebhookUrl,
+          url: webhookUrl,
           send_resolved: true,
           http_config: {
             basic_auth: {
@@ -157,8 +132,8 @@ async function addRoutingRule(config) {
     return {
       success: true,
       serviceName: serviceName,
-      receiver: receiverName,
-      webhookUrl: finalWebhookUrl,
+      webhookUrl: webhookUrl,
+      webhookToken: webhookToken,
       message: 'Alertmanager 라우팅 규칙이 추가되었습니다.'
     };
   } catch (error) {

@@ -1,13 +1,13 @@
 const http = require('http');
 const url = require('url');
 const { installNodeExporter, checkNodeExporterStatus, installNodeExporterOnMultipleServers } = require('./services/nodeExporterService');
-const { addPrometheusJob, getPrometheusJobs, getPrometheusTargets, deletePrometheusJob } = require('./services/prometheusMonitoringService');
+const { addPrometheusJob, getPrometheusJobs, getPrometheusTargets } = require('./services/prometheusMonitoringService');
 const { getTemplates, getTemplateById, convertVmToTemplate, deleteTemplate, getVmList } = require('./services/templateService');
 const { saveConfig, getConfigs, getConfigById, updateConfig, deleteConfig, setConfigEnabled } = require('./services/autoscalingService');
 const { createAlertRule, deleteAlertRule, getAlertRules } = require('./services/prometheusAlertService');
 const { addRoutingRule, deleteRoutingRule, getRoutingRules } = require('./services/alertmanagerService');
 const { createJenkinsJob, deleteJenkinsJob, getJenkinsJobStatus, getJenkinsJobs, triggerJenkinsJob } = require('./services/jenkinsService');
-const { getF5Pools, getF5VirtualServers, getF5PoolDetails } = require('./services/f5Service');
+const { getF5Pools, getF5VirtualServers } = require('./services/f5Service');
 
 const PORT = process.env.PORT || 4410;
 
@@ -25,11 +25,6 @@ function sendJSONResponse(res, status, data, headers = {}) {
 
 const server = http.createServer((req, res) => {
   const parsedUrl = url.parse(req.url, true);
-  
-  // 디버깅: 요청 로그 (개발 환경에서만)
-  if (process.env.NODE_ENV !== 'production') {
-    console.log(`[${req.method}] ${parsedUrl.pathname}`, parsedUrl.query);
-  }
 
   // CORS Preflight 처리
   if (req.method === 'OPTIONS') {
@@ -157,20 +152,6 @@ const server = http.createServer((req, res) => {
     (async () => {
       try {
         const result = await getPrometheusTargets(jobName);
-        sendJSONResponse(res, 200, result);
-      } catch (error) {
-        sendJSONResponse(res, 500, { error: error.message });
-      }
-    })();
-    return;
-  }
-
-  // Prometheus Job 삭제 API
-  if (req.method === 'DELETE' && parsedUrl.pathname.startsWith('/api/prometheus/jobs/')) {
-    const jobName = decodeURIComponent(parsedUrl.pathname.split('/').pop());
-    (async () => {
-      try {
-        const result = await deletePrometheusJob(jobName);
         sendJSONResponse(res, 200, result);
       } catch (error) {
         sendJSONResponse(res, 500, { error: error.message });
@@ -558,7 +539,6 @@ const server = http.createServer((req, res) => {
         
         // Jenkins에 전달할 payload 구성 (설정 정보 포함)
         const jenkinsPayload = {
-          status: alertmanagerPayload.status || 'unknown',
           alerts: alertmanagerPayload.alerts || [],
           config: {
             templateName: templateName,
@@ -580,17 +560,10 @@ const server = http.createServer((req, res) => {
         
         // Jenkins webhook 호출
         const { triggerJenkinsJob } = require('./services/jenkinsService');
-        const jobName = (config.jenkins && config.jenkins.jobName) 
-          ? config.jenkins.jobName 
-          : `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}`;
-        const JENKINS_DEFAULT_WEBHOOK_TOKEN = process.env.JENKINS_DEFAULT_WEBHOOK_TOKEN || '11c729d250790bec23d77c6144053e7b03';
-        const webhookToken = (config.jenkins && config.jenkins.webhookToken)
-          ? config.jenkins.webhookToken
-          : JENKINS_DEFAULT_WEBHOOK_TOKEN;
+        const jobName = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}`;
+        const webhookToken = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-token`;
         const JENKINS_URL = process.env.JENKINS_URL || 'http://10.255.0.103:8080';
-        const webhookUrl = (config.jenkins && config.jenkins.webhookUrl)
-          ? config.jenkins.webhookUrl
-          : `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookToken}`;
+        const webhookUrl = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookToken}`;
         
         // Jenkins webhook에 POST 요청
         const axios = require('axios');
@@ -639,25 +612,6 @@ const server = http.createServer((req, res) => {
     (async () => {
       try {
         const result = await getF5VirtualServers();
-        sendJSONResponse(res, 200, result);
-      } catch (error) {
-        sendJSONResponse(res, 500, { error: error.message });
-      }
-    })();
-    return;
-  }
-
-  // F5 Pool 상세 정보 조회 API
-  if (req.method === 'GET' && parsedUrl.pathname.startsWith('/api/f5/pools/')) {
-    const poolPath = parsedUrl.pathname.replace('/api/f5/pools/', '');
-    const { poolName, partition } = parsedUrl.query;
-    
-    (async () => {
-      try {
-        // URL 경로에서 poolName 추출 (예: /api/f5/pools/pool-name)
-        const name = poolName || poolPath;
-        const part = partition || 'Common';
-        const result = await getF5PoolDetails(name, part);
         sendJSONResponse(res, 200, result);
       } catch (error) {
         sendJSONResponse(res, 500, { error: error.message });

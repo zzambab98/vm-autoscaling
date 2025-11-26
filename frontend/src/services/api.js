@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4410';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:6010';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -13,8 +13,6 @@ const api = axios.create({
 // 요청 인터셉터
 api.interceptors.request.use(
   (config) => {
-    // 디버깅: 요청 URL 로그
-    console.log('[API Request]', config.method?.toUpperCase(), config.url);
     return config;
   },
   (error) => {
@@ -30,12 +28,6 @@ api.interceptors.response.use(
   },
   (error) => {
     console.error('API Error:', error);
-    console.error('[API Error Details]', {
-      url: error.config?.url,
-      method: error.config?.method,
-      status: error.response?.status,
-      data: error.response?.data
-    });
     
     // 네트워크 에러
     if (!error.response) {
@@ -111,28 +103,23 @@ export const prometheusApi = {
     return response.data;
   },
 
-  // Job 삭제
   deleteJob: async (jobName) => {
     const response = await api.delete(`/api/prometheus/jobs/${encodeURIComponent(jobName)}`);
     return response.data;
   }
 };
 
-// Alertmanager API
 export const alertmanagerApi = {
-  // 라우팅 규칙 목록 조회
   getRoutes: async () => {
     const response = await api.get('/api/alertmanager/routing-rules');
     return response.data;
   },
 
-  // 라우팅 규칙 추가
-  addRoute: async (routeData) => {
-    const response = await api.post('/api/alertmanager/routing-rules', routeData);
+  addRoute: async (payload) => {
+    const response = await api.post('/api/alertmanager/routing-rules', payload);
     return response.data;
   },
 
-  // 라우팅 규칙 삭제
   deleteRoute: async (serviceName) => {
     const response = await api.delete(`/api/alertmanager/routing-rules/${encodeURIComponent(serviceName)}`);
     return response.data;
