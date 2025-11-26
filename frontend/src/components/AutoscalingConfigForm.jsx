@@ -135,12 +135,27 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
     setMessage(null);
 
     try {
+      // Jenkins 설정 기본값 처리
+      const submitData = { ...formData };
+      if (submitData.jenkins && submitData.jenkins.useExistingJob) {
+        // 기본값이 비어있으면 자동으로 채우기
+        if (!submitData.jenkins.jobName) {
+          submitData.jenkins.jobName = 'plg-autoscale-out';
+        }
+        if (!submitData.jenkins.webhookToken) {
+          submitData.jenkins.webhookToken = '11c729d250790bec23d77c6144053e7b03';
+        }
+        if (!submitData.jenkins.webhookUrl) {
+          submitData.jenkins.webhookUrl = 'http://10.255.0.103:8080/generic-webhook-trigger/invoke?token=11c729d250790bec23d77c6144053e7b03';
+        }
+      }
+
       let result;
       // configId가 있고 'new'가 아닐 때만 수정, 그 외에는 생성
       if (configId && configId !== 'new') {
-        result = await autoscalingApi.updateConfig(configId, formData);
+        result = await autoscalingApi.updateConfig(configId, submitData);
       } else {
-        result = await autoscalingApi.createConfig(formData);
+        result = await autoscalingApi.createConfig(submitData);
       }
 
       if (result.success) {
@@ -481,7 +496,22 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
           <input
             type="checkbox"
             checked={formData.jenkins.useExistingJob}
-            onChange={(e) => updateNestedField('jenkins', 'useExistingJob', e.target.checked)}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              updateNestedField('jenkins', 'useExistingJob', checked);
+              // 체크하면 기본값 자동 입력
+              if (checked) {
+                setFormData(prev => ({
+                  ...prev,
+                  jenkins: {
+                    ...prev.jenkins,
+                    jobName: prev.jenkins.jobName || 'plg-autoscale-out',
+                    webhookToken: prev.jenkins.webhookToken || '11c729d250790bec23d77c6144053e7b03',
+                    webhookUrl: prev.jenkins.webhookUrl || 'http://10.255.0.103:8080/generic-webhook-trigger/invoke?token=11c729d250790bec23d77c6144053e7b03'
+                  }
+                }));
+              }
+            }}
           />
           기존 Jenkins Job 사용 (모든 서비스가 공통으로 사용: plg-autoscale-out)
         </label>
