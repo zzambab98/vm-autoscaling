@@ -7,6 +7,7 @@ import AutoscalingConfigList from './components/AutoscalingConfigList';
 import AutoscalingConfigForm from './components/AutoscalingConfigForm';
 import MonitoringDashboard from './components/MonitoringDashboard';
 import ScaleOutEventList from './components/ScaleOutEventList';
+import AlertmanagerRouting from './components/AlertmanagerRouting';
 import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
 
@@ -82,6 +83,12 @@ function App() {
           PLG Stack 모니터링 등록
         </button>
         <button
+          className={`tab-button ${activeTab === 'alertmanager' ? 'active' : ''}`}
+          onClick={() => setActiveTab('alertmanager')}
+        >
+          Alertmanager 라우팅
+        </button>
+        <button
           className={`tab-button ${activeTab === 'monitoring' ? 'active' : ''}`}
           onClick={() => setActiveTab('monitoring')}
         >
@@ -147,6 +154,11 @@ function App() {
       {activeTab === 'prometheus' && (
         <ErrorBoundary>
           <PrometheusMonitoring />
+        </ErrorBoundary>
+      )}
+      {activeTab === 'alertmanager' && (
+        <ErrorBoundary>
+          <AlertmanagerRouting />
         </ErrorBoundary>
       )}
       {activeTab === 'monitoring' && (

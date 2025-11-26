@@ -118,6 +118,27 @@ export const prometheusApi = {
   }
 };
 
+// Alertmanager API
+export const alertmanagerApi = {
+  // 라우팅 규칙 목록 조회
+  getRoutes: async () => {
+    const response = await api.get('/api/alertmanager/routing-rules');
+    return response.data;
+  },
+
+  // 라우팅 규칙 추가
+  addRoute: async (routeData) => {
+    const response = await api.post('/api/alertmanager/routing-rules', routeData);
+    return response.data;
+  },
+
+  // 라우팅 규칙 삭제
+  deleteRoute: async (serviceName) => {
+    const response = await api.delete(`/api/alertmanager/routing-rules/${encodeURIComponent(serviceName)}`);
+    return response.data;
+  }
+};
+
 // Health Check
 export const healthCheck = async () => {
   const response = await api.get('/health');
