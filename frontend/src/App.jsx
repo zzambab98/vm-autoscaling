@@ -55,12 +55,28 @@ function App() {
       </header>
 
       <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid #ddd', flexWrap: 'wrap' }}>
+        {/* 1. 템플릿 생성 */}
         <button
           className={`tab-button ${activeTab === 'templates' ? 'active' : ''}`}
           onClick={() => setActiveTab('templates')}
         >
           템플릿 관리
         </button>
+        {/* 2. 익스포터 설치 */}
+        <button
+          className={`tab-button ${activeTab === 'node-exporter' ? 'active' : ''}`}
+          onClick={() => setActiveTab('node-exporter')}
+        >
+          Node Exporter 설치
+        </button>
+        {/* 3. PLG 모니터링 등록 */}
+        <button
+          className={`tab-button ${activeTab === 'prometheus' ? 'active' : ''}`}
+          onClick={() => setActiveTab('prometheus')}
+        >
+          PLG Stack 모니터링 등록
+        </button>
+        {/* 4. 오토스케일링 설정 */}
         <button
           className={`tab-button ${activeTab === 'autoscaling' ? 'active' : ''}`}
           onClick={() => {
@@ -70,24 +86,14 @@ function App() {
         >
           오토스케일링 설정
         </button>
-        <button
-          className={`tab-button ${activeTab === 'node-exporter' ? 'active' : ''}`}
-          onClick={() => setActiveTab('node-exporter')}
-        >
-          Node Exporter 설치
-        </button>
-        <button
-          className={`tab-button ${activeTab === 'prometheus' ? 'active' : ''}`}
-          onClick={() => setActiveTab('prometheus')}
-        >
-          PLG Stack 모니터링 등록
-        </button>
+        {/* 5. Alertmanager 라우팅 등록 */}
         <button
           className={`tab-button ${activeTab === 'alertmanager' ? 'active' : ''}`}
           onClick={() => setActiveTab('alertmanager')}
         >
           Alertmanager 라우팅
         </button>
+        {/* 모니터링 및 이벤트 (조회용) */}
         <button
           className={`tab-button ${activeTab === 'monitoring' ? 'active' : ''}`}
           onClick={() => setActiveTab('monitoring')}
