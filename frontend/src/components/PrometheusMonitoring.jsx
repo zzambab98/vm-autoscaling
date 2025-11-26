@@ -185,6 +185,7 @@ function PrometheusMonitoring() {
             placeholder="environment"
           />
         </div>
+      </div>
 
       <div style={{ marginBottom: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
