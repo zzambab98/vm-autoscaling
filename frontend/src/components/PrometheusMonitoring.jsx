@@ -143,9 +143,15 @@ function PrometheusMonitoring() {
           placeholder="auto-vm-test-service"
         />
 
-        <label className="label">Labels</label>
+        <label className="label">Labels (라벨)</label>
+        <p style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '-10px', marginBottom: '10px' }}>
+          Prometheus에서 메트릭을 필터링하고 그룹화하는 데 사용됩니다. Alertmanager가 알림을 라우팅할 때도 사용됩니다.
+        </p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
           <div>
+            <label style={{ fontSize: '12px', color: '#7f8c8d', display: 'block', marginBottom: '4px' }}>
+              instance: 이 Job을 식별하는 이름
+            </label>
             <input
               type="text"
               className="input"
@@ -155,6 +161,9 @@ function PrometheusMonitoring() {
             />
           </div>
           <div>
+            <label style={{ fontSize: '12px', color: '#7f8c8d', display: 'block', marginBottom: '4px' }}>
+              service: 어떤 서비스인지 (Alertmanager 라우팅에 사용)
+            </label>
             <input
               type="text"
               className="input"
@@ -164,9 +173,13 @@ function PrometheusMonitoring() {
             />
           </div>
         </div>
-        <input
-          type="text"
-          className="input"
+        <div style={{ marginTop: '10px' }}>
+          <label style={{ fontSize: '12px', color: '#7f8c8d', display: 'block', marginBottom: '4px' }}>
+            environment: 환경 (test, prod, dev 등)
+          </label>
+          <input
+            type="text"
+            className="input"
           value={labels.environment}
           onChange={(e) => setLabels({ ...labels, environment: e.target.value })}
           placeholder="environment"

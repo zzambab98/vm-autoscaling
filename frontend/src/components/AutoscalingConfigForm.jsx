@@ -472,10 +472,10 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
             checked={formData.jenkins.useExistingJob}
             onChange={(e) => updateNestedField('jenkins', 'useExistingJob', e.target.checked)}
           />
-          기존 Jenkins Job 사용 (예: plg-autoscale-out)
+          기존 Jenkins Job 사용 (모든 서비스가 공통으로 사용: plg-autoscale-out)
         </label>
         <p style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '-10px', marginBottom: '12px' }}>
-          기존 Job을 사용할 경우 Job 이름과 Webhook 토큰을 입력하세요. 입력하지 않으면 새 Job이 생성됩니다.
+          모든 서비스가 같은 Jenkins 파이프라인(plg-autoscale-out)을 사용합니다. 체크하면 기본값이 자동으로 입력됩니다.
         </p>
 
         {formData.jenkins.useExistingJob && (
@@ -484,7 +484,7 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
             <input
               type="text"
               className="input"
-              value={formData.jenkins.jobName}
+              value={formData.jenkins.jobName || 'plg-autoscale-out'}
               onChange={(e) => updateNestedField('jenkins', 'jobName', e.target.value)}
               placeholder="plg-autoscale-out"
               required={formData.jenkins.useExistingJob}
@@ -494,9 +494,9 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
             <input
               type="text"
               className="input"
-              value={formData.jenkins.webhookToken}
+              value={formData.jenkins.webhookToken || '11c729d250790bec23d77c6144053e7b03'}
               onChange={(e) => updateNestedField('jenkins', 'webhookToken', e.target.value)}
-              placeholder="plg-autoscale-token"
+              placeholder="11c729d250790bec23d77c6144053e7b03"
               required={formData.jenkins.useExistingJob}
             />
 
@@ -504,10 +504,13 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
             <input
               type="text"
               className="input"
-              value={formData.jenkins.webhookUrl}
+              value={formData.jenkins.webhookUrl || 'http://10.255.0.103:8080/generic-webhook-trigger/invoke?token=11c729d250790bec23d77c6144053e7b03'}
               onChange={(e) => updateNestedField('jenkins', 'webhookUrl', e.target.value)}
-              placeholder="http://10.255.0.103:8080/generic-webhook-trigger/invoke?token=..."
+              placeholder="http://10.255.0.103:8080/generic-webhook-trigger/invoke?token=11c729d250790bec23d77c6144053e7b03"
             />
+            <p style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '-10px', marginBottom: '12px' }}>
+              기본값이 자동으로 입력됩니다. 변경이 필요한 경우에만 수정하세요.
+            </p>
           </>
         )}
 
