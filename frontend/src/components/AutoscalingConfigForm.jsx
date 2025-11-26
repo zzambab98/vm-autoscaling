@@ -252,6 +252,11 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
 
         {/* 스케일링 설정 */}
         <h3 style={{ marginTop: '30px', marginBottom: '12px', color: '#2c3e50' }}>스케일링 설정</h3>
+        <p style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '-10px', marginBottom: '15px' }}>
+          ⚠️ 최소/최대 VM 수는 <strong>전체 VM 개수</strong>를 의미합니다 (기존 VM + 새로 생성될 VM).
+          <br />
+          예: 기존 VM 2대가 있고 최소 3, 최대 4로 설정하면 → 기존 2대 + 신규 1~2대 = 총 3~4대
+        </p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
           <div>
             <label className="label">최소 VM 수 *</label>
@@ -263,6 +268,9 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
               min="1"
               required
             />
+            <p style={{ fontSize: '11px', color: '#95a5a6', marginTop: '4px', marginBottom: 0 }}>
+              전체 VM 개수 (기존 + 신규)
+            </p>
           </div>
           <div>
             <label className="label">최대 VM 수 *</label>
@@ -274,6 +282,9 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
               min="1"
               required
             />
+            <p style={{ fontSize: '11px', color: '#95a5a6', marginTop: '4px', marginBottom: 0 }}>
+              전체 VM 개수 (기존 + 신규)
+            </p>
           </div>
         </div>
 
