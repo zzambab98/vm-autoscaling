@@ -1,0 +1,429 @@
+// Jenkins Pipeline 통합 스크립트 (검토 및 개선 버전)
+// Alertmanager Webhook → Jenkins → vCenter API → F5 Pool 자동 등록 파이프라인
+// Job 이름: plg-autoscale-out
+
+pipeline {
+    agent any
+    
+    // Generic Webhook Trigger 설정
+    triggers {
+        GenericTrigger(
+            genericVariables: [
+                // Alertmanager에서 전달되는 데이터 파싱
+                [key: 'alertname', value: '$.alerts[0].labels.alertname', regexpFilter: ''],
+                [key: 'instance', value: '$.alerts[0].labels.instance', regexpFilter: ''],
+                [key: 'service', value: '$.alerts[0].labels.service', regexpFilter: ''],
+                [key: 'autoscaleConfigId', value: '$.alerts[0].labels.autoscaleConfigId', regexpFilter: ''],
+                [key: 'severity', value: '$.alerts[0].labels.severity', regexpFilter: ''],
+                [key: 'status', value: '$.status', regexpFilter: ''],
+                [key: 'summary', value: '$.alerts[0].annotations.summary', regexpFilter: ''],
+                [key: 'description', value: '$.alerts[0].annotations.description', regexpFilter: ''],
+                
+                // Config 정보는 Alertmanager payload에 없으므로, autoscaleConfigId로 백엔드 API에서 조회 필요
+                // 또는 Alertmanager가 직접 보내는 경우 config 정보가 없을 수 있음
+            ],
+            causeString: 'Alert: $alertname - Service: $service - Instance: $instance',
+            token: 'plg-autoscale-token',
+            printContributedVariables: true,
+            printPostContent: true,
+            // Resolved 알림은 무시 (firing만 처리)
+            regexpFilterText: '$status',
+            regexpFilterExpression: '^firing$'
+        )
+    }
+    
+    // 환경 변수 설정 (기본값, 실제 값은 오토스케일링 설정에서 가져와야 함)
+    environment {
+        // vCenter 설정 (오토스케일링 설정에서 가져와야 함)
+        VCENTER_SERVER = 'vc.danacloud.local'
+        VCENTER_USER = 'svc-auto'
+        // VCENTER_TEMPLATE는 오토스케일링 설정의 templateId에서 가져와야 함
+        VCENTER_RESOURCE_POOL = 'APP-RP'
+        VCENTER_DATASTORE = 'PowerStore-DS1'
+        VCENTER_CUSTOMIZATION_SPEC = 'app-static'
+        // VM_NAME_PREFIX는 서비스 이름 기반으로 생성
+        
+        // F5 설정 (오토스케일링 설정에서 가져와야 함)
+        F5_SERVER = '10.255.1.80'
+        // F5_POOL_NAME, F5_POOL_PORT, F5_VIP 등은 오토스케일링 설정에서 가져와야 함
+        F5_PARTITION = 'Common'
+        F5_HEALTH_MONITOR = '/Common/http'
+        
+        // 스크립트 경로
+        POWERCLI_SCRIPT_PATH = 'C:\\Scripts\\scaleout.ps1'
+        F5_SCRIPT_PATH = 'C:\\Scripts\\f5-pool-add.ps1'
+        RESULT_DIR = 'C:\\Scripts\\Results'
+        
+        // 타임아웃 설정
+        VM_IP_TIMEOUT = '300'  // 5분
+        
+        // 백엔드 API URL (오토스케일링 설정 조회용)
+        BACKEND_API_URL = 'http://192.168.200.30:6010'  // 또는 환경 변수로 설정
+    }
+    
+    stages {
+        // Stage 1: Alert 데이터 파싱 및 검증
+        stage('Parse Alert') {
+            steps {
+                script {
+                    echo "=========================================="
+                    echo "Alert 데이터 파싱 및 검증"
+                    echo "=========================================="
+                    
+                    def alertname = env.alertname ?: 'Unknown'
+                    def instance = env.instance ?: 'all'  // 'all'로 설정됨 (max() 집계 사용)
+                    def service = env.service ?: 'unknown'
+                    def autoscaleConfigId = env.autoscaleConfigId ?: ''
+                    def severity = env.severity ?: 'warning'
+                    def status = env.status ?: 'unknown'
+                    def summary = env.summary ?: ''
+                    def description = env.description ?: ''
+                    
+                    echo "Alert Name: ${alertname}"
+                    echo "Service: ${service}"
+                    echo "Instance: ${instance}"
+                    echo "Autoscale Config ID: ${autoscaleConfigId}"
+                    echo "Severity: ${severity}"
+                    echo "Status: ${status}"
+                    echo "Summary: ${summary}"
+                    echo "Description: ${description}"
+                    
+                    // Resolved 알림은 무시 (이미 regexpFilter로 필터링되지만 이중 체크)
+                    if (status != 'firing') {
+                        echo "Alert status is '${status}', skipping scale-out"
+                        currentBuild.result = 'ABORTED'
+                        return
+                    }
+                    
+                    // Critical 또는 Warning 알림만 처리
+                    if (severity != 'critical' && severity != 'warning') {
+                        echo "Alert severity is '${severity}', skipping scale-out"
+                        currentBuild.result = 'ABORTED'
+                        return
+                    }
+                    
+                    // Autoscale Config ID가 없으면 오류
+                    if (!autoscaleConfigId) {
+                        error("Autoscale Config ID가 없습니다. Alert Rule 설정을 확인하세요.")
+                    }
+                    
+                    // 환경 변수 저장
+                    env.VM_INSTANCE = instance
+                    env.ALERT_SERVICE = service
+                    env.ALERT_SEVERITY = severity
+                    env.AUTOSCALE_CONFIG_ID = autoscaleConfigId
+                    
+                    echo "Alert 파싱 완료. 오토스케일링 설정 조회 중..."
+                }
+            }
+        }
+        
+        // Stage 2: 오토스케일링 설정 조회
+        stage('Get Autoscaling Config') {
+            steps {
+                script {
+                    echo "=========================================="
+                    echo "오토스케일링 설정 조회"
+                    echo "=========================================="
+                    
+                    def configId = env.AUTOSCALE_CONFIG_ID
+                    
+                    try {
+                        // 백엔드 API에서 오토스케일링 설정 조회
+                        def response = httpRequest(
+                            url: "${env.BACKEND_API_URL}/api/autoscaling/configs/${configId}",
+                            httpMode: 'GET',
+                            contentType: 'APPLICATION_JSON',
+                            validResponseCodes: '200'
+                        )
+                        
+                        def config = readJSON text: response.content
+                        
+                        // vCenter 설정
+                        env.VCENTER_TEMPLATE = config.templateName ?: 'app-template'
+                        env.VM_NAME_PREFIX = "${config.serviceName}-auto" ?: 'app-auto'
+                        
+                        // Network 설정
+                        env.IP_POOL_START = config.network?.ipPoolStart ?: ''
+                        env.IP_POOL_END = config.network?.ipPoolEnd ?: ''
+                        env.SUBNET = config.network?.subnet ?: '255.255.255.0'
+                        env.GATEWAY = config.network?.gateway ?: ''
+                        env.VLAN = config.network?.vlan ?: ''
+                        
+                        // F5 설정
+                        env.F5_POOL_NAME = config.f5?.poolName ?: ''
+                        env.F5_POOL_PORT = config.f5?.vipPort ?: '80'
+                        env.F5_VIP = config.f5?.vip ?: ''
+                        env.F5_HEALTH_CHECK_PATH = config.f5?.healthCheckPath ?: '/'
+                        
+                        echo "오토스케일링 설정 조회 완료:"
+                        echo "  Template: ${env.VCENTER_TEMPLATE}"
+                        echo "  VM Prefix: ${env.VM_NAME_PREFIX}"
+                        echo "  IP Pool: ${env.IP_POOL_START} - ${env.IP_POOL_END}"
+                        echo "  F5 Pool: ${env.F5_POOL_NAME}"
+                        echo "  F5 VIP: ${env.F5_VIP}"
+                        
+                    } catch (Exception e) {
+                        error("오토스케일링 설정 조회 실패: ${e.getMessage()}")
+                    }
+                }
+            }
+        }
+        
+        // Stage 3: vCenter VM 클론
+        stage('VM Clone') {
+            steps {
+                script {
+                    echo "=========================================="
+                    echo "vCenter VM 클론 시작"
+                    echo "=========================================="
+                    
+                    def vmInstance = env.VM_INSTANCE ?: 'all'
+                    
+                    try {
+                        // Windows Agent에서 PowerCLI 스크립트 실행
+                        if (isUnix()) {
+                            // Linux Jenkins에서 SSH로 Windows 서버의 PowerShell 실행
+                            // 주의: powershell-server 호스트명을 실제 Windows 서버 IP나 호스트명으로 변경 필요
+                            def powershellServer = env.POWERSHELL_SERVER ?: '10.255.0.XXX'  // 실제 Windows 서버 IP
+                            
+                            echo "Linux 환경에서 Windows 서버로 SSH 연결..."
+                            echo "Windows 서버: ${powershellServer}"
+                            
+                            // SSH 키 경로 확인 필요
+                            sh """
+                                ssh -i /var/lib/jenkins/.ssh/id_rsa -o StrictHostKeyChecking=no windows-agent@${powershellServer} "
+                                    cd C:\\Scripts && 
+                                    powershell.exe -ExecutionPolicy Bypass -File ${env.POWERCLI_SCRIPT_PATH} \
+                                        -VMInstance ${vmInstance} \
+                                        -VCenterServer ${env.VCENTER_SERVER} \
+                                        -VCenterUser ${env.VCENTER_USER} \
+                                        -TemplateVM ${env.VCENTER_TEMPLATE} \
+                                        -ResourcePool ${env.VCENTER_RESOURCE_POOL} \
+                                        -Datastore ${env.VCENTER_DATASTORE} \
+                                        -CustomizationSpec ${env.VCENTER_CUSTOMIZATION_SPEC} \
+                                        -VMNamePrefix ${env.VM_NAME_PREFIX} \
+                                        -IPPoolStart ${env.IP_POOL_START} \
+                                        -IPPoolEnd ${env.IP_POOL_END} \
+                                        -Subnet ${env.SUBNET} \
+                                        -Gateway ${env.GATEWAY} \
+                                        -VLAN ${env.VLAN}
+                                "
+                            """
+                            
+                            // 결과 파일 읽기 (SSH로 복사)
+                            sh """
+                                scp -i /var/lib/jenkins/.ssh/id_rsa windows-agent@${powershellServer}:C:\\Scripts\\Results\\scaleout-result.json /tmp/scaleout-result.json
+                            """
+                            
+                            def resultFile = readFile('/tmp/scaleout-result.json')
+                            def result = readJSON text: resultFile
+                            
+                            if (result.Success) {
+                                env.NEW_VM_NAME = result.VMName
+                                env.NEW_VM_IP = result.VMIP
+                                echo "VM 생성 완료: ${env.NEW_VM_NAME} (IP: ${env.NEW_VM_IP})"
+                            } else {
+                                error("VM 생성 실패: ${result.ErrorMessage ?: 'Unknown error'}")
+                            }
+                        } else {
+                            // Windows Agent에서 직접 실행
+                            echo "Windows 환경에서 PowerCLI 스크립트 실행..."
+                            
+                            bat """
+                                cd C:\\Scripts
+                                powershell.exe -ExecutionPolicy Bypass -File ${env.POWERCLI_SCRIPT_PATH} \
+                                    -VMInstance ${vmInstance} \
+                                    -VCenterServer ${env.VCENTER_SERVER} \
+                                    -VCenterUser ${env.VCENTER_USER} \
+                                    -TemplateVM ${env.VCENTER_TEMPLATE} \
+                                    -ResourcePool ${env.VCENTER_RESOURCE_POOL} \
+                                    -Datastore ${env.VCENTER_DATASTORE} \
+                                    -CustomizationSpec ${env.VCENTER_CUSTOMIZATION_SPEC} \
+                                    -VMNamePrefix ${env.VM_NAME_PREFIX} \
+                                    -IPPoolStart ${env.IP_POOL_START} \
+                                    -IPPoolEnd ${env.IP_POOL_END} \
+                                    -Subnet ${env.SUBNET} \
+                                    -Gateway ${env.GATEWAY} \
+                                    -VLAN ${env.VLAN}
+                            """
+                            
+                            // 결과 파일 읽기
+                            def resultFile = readFile("${env.RESULT_DIR}\\scaleout-result.json")
+                            def result = readJSON text: resultFile
+                            
+                            if (result.Success) {
+                                env.NEW_VM_NAME = result.VMName
+                                env.NEW_VM_IP = result.VMIP
+                                echo "VM 생성 완료: ${env.NEW_VM_NAME} (IP: ${env.NEW_VM_IP})"
+                            } else {
+                                error("VM 생성 실패: ${result.ErrorMessage ?: 'Unknown error'}")
+                            }
+                        }
+                    } catch (Exception e) {
+                        echo "VM 클론 실패: ${e.getMessage()}"
+                        error("VM 클론 중 오류 발생: ${e.getMessage()}")
+                    }
+                }
+            }
+        }
+        
+        // Stage 4: VM IP 주소 확인 대기
+        stage('Wait for VM IP') {
+            steps {
+                script {
+                    echo "=========================================="
+                    echo "VM IP 주소 확인 대기"
+                    echo "=========================================="
+                    
+                    def vmIP = env.NEW_VM_IP
+                    if (!vmIP || vmIP == 'null' || vmIP == '') {
+                        echo "VM IP 주소가 아직 할당되지 않았습니다. 대기 중..."
+                        sleep(time: 30, unit: 'SECONDS')
+                        
+                        // vCenter에서 IP 재조회 (선택사항)
+                        // 여기서는 PowerCLI 스크립트가 이미 IP를 반환했다고 가정
+                    } else {
+                        echo "VM IP 주소 확인: ${vmIP}"
+                    }
+                    
+                    if (!env.NEW_VM_IP || env.NEW_VM_IP == 'null' || env.NEW_VM_IP == '') {
+                        error("VM IP 주소를 획득하지 못했습니다.")
+                    }
+                }
+            }
+        }
+        
+        // Stage 5: F5 Pool Member 추가
+        stage('F5 Pool Registration') {
+            steps {
+                script {
+                    echo "=========================================="
+                    echo "F5 Pool Member 추가 시작"
+                    echo "=========================================="
+                    
+                    def poolName = env.F5_POOL_NAME
+                    def memberIP = env.NEW_VM_IP
+                    def port = env.F5_POOL_PORT.toInteger()
+                    
+                    if (!poolName || poolName == '') {
+                        error("F5 Pool 이름이 설정되지 않았습니다.")
+                    }
+                    
+                    if (!memberIP || memberIP == 'null' || memberIP == '') {
+                        error("VM IP 주소가 설정되지 않았습니다.")
+                    }
+                    
+                    // F5 Credential 사용
+                    withCredentials([usernamePassword(credentialsId: 'f5-credentials', usernameVariable: 'F5_USERNAME', passwordVariable: 'F5_PASSWORD')]) {
+                        try {
+                            // F5 API 스크립트 실행
+                            if (isUnix()) {
+                                // Linux Jenkins에서 Python 스크립트 실행
+                                echo "Linux 환경에서 Python 스크립트 실행..."
+                                
+                                sh """
+                                    python3 /opt/scripts/f5-pool-add.py \
+                                        ${poolName} \
+                                        ${memberIP} \
+                                        ${port} \
+                                        --f5-server ${env.F5_SERVER} \
+                                        --f5-user ${env.F5_USERNAME} \
+                                        --f5-password '${env.F5_PASSWORD}' \
+                                        --partition ${env.F5_PARTITION} \
+                                        --health-monitor ${env.F5_HEALTH_MONITOR}
+                                """
+                            } else {
+                                // Windows Agent에서 PowerShell 스크립트 실행
+                                echo "Windows 환경에서 PowerShell 스크립트 실행..."
+                                
+                                bat """
+                                    cd C:\\Scripts
+                                    powershell.exe -ExecutionPolicy Bypass -File ${env.F5_SCRIPT_PATH} \
+                                        -PoolName ${poolName} \
+                                        -MemberIP ${memberIP} \
+                                        -Port ${port} \
+                                        -F5Server ${env.F5_SERVER} \
+                                        -F5User ${env.F5_USERNAME} \
+                                        -F5Password '${env.F5_PASSWORD}' \
+                                        -Partition ${env.F5_PARTITION} \
+                                        -HealthMonitor ${env.F5_HEALTH_MONITOR}
+                                """
+                                
+                                // 결과 파일 읽기
+                                def resultFile = readFile("${env.RESULT_DIR}\\f5-pool-add-result.json")
+                                def result = readJSON text: resultFile
+                                
+                                if (result.Success) {
+                                    echo "F5 Pool Member 추가 완료: ${result.MemberName}"
+                                } else {
+                                    error("F5 Pool Member 추가 실패: ${result.ErrorMessage ?: 'Unknown error'}")
+                                }
+                            }
+                            
+                            echo "F5 Pool Member 추가 완료: ${memberIP}:${port}"
+                        } catch (Exception e) {
+                            echo "F5 Pool Member 추가 실패: ${e.getMessage()}"
+                            // F5 등록 실패는 경고로 처리 (VM은 이미 생성됨)
+                            currentBuild.result = 'UNSTABLE'
+                            echo "경고: F5 Pool 등록 실패했지만 VM은 생성되었습니다."
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Stage 6: 결과 요약
+        stage('Summary') {
+            steps {
+                script {
+                    echo "=========================================="
+                    echo "작업 완료 요약"
+                    echo "=========================================="
+                    echo "Alert: ${env.alertname}"
+                    echo "Service: ${env.ALERT_SERVICE}"
+                    echo "Instance: ${env.VM_INSTANCE}"
+                    echo "새 VM 이름: ${env.NEW_VM_NAME ?: 'N/A'}"
+                    echo "새 VM IP: ${env.NEW_VM_IP ?: 'N/A'}"
+                    echo "F5 Pool: ${env.F5_POOL_NAME}"
+                    echo "F5 Member: ${env.NEW_VM_IP ?: 'N/A'}:${env.F5_POOL_PORT}"
+                    echo "=========================================="
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo "Pipeline 실행 완료"
+            // 결과를 파일로 저장
+            script {
+                def summary = """
+                    Alert: ${env.alertname}
+                    Service: ${env.ALERT_SERVICE}
+                    Instance: ${env.VM_INSTANCE}
+                    새 VM 이름: ${env.NEW_VM_NAME ?: 'N/A'}
+                    새 VM IP: ${env.NEW_VM_IP ?: 'N/A'}
+                    F5 Pool: ${env.F5_POOL_NAME}
+                    F5 Member: ${env.NEW_VM_IP ?: 'N/A'}:${env.F5_POOL_PORT}
+                    실행 시간: ${currentBuild.durationString}
+                    결과: ${currentBuild.result ?: 'SUCCESS'}
+                """
+                writeFile file: 'pipeline-summary.txt', text: summary
+                archiveArtifacts artifacts: 'pipeline-summary.txt', fingerprint: true
+            }
+        }
+        success {
+            echo "✅ 자동 스케일아웃 성공"
+            // 성공 알림 (선택사항)
+        }
+        failure {
+            echo "❌ 자동 스케일아웃 실패"
+            // 실패 알림 (선택사항)
+        }
+        unstable {
+            echo "⚠️ 자동 스케일아웃 부분 실패 (VM 생성 성공, F5 등록 실패)"
+        }
+    }
+}
+
