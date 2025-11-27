@@ -62,14 +62,22 @@ function MonitoringDashboard() {
     setLoading(true);
     try {
       const jobName = selectedConfig.monitoring.prometheusJobName;
+      console.log('[MonitoringDashboard] 메트릭 로드 시작:', jobName, duration);
       const [cpu, memory] = await Promise.all([
         getCpuUsage(jobName, duration),
         getMemoryUsage(jobName, duration)
       ]);
+      console.log('[MonitoringDashboard] CPU 데이터:', cpu.length, '개 포인트');
+      console.log('[MonitoringDashboard] Memory 데이터:', memory.length, '개 포인트');
+      if (cpu.length > 0) {
+        console.log('[MonitoringDashboard] CPU 데이터 샘플:', cpu[0]);
+        console.log('[MonitoringDashboard] CPU 데이터 키:', Object.keys(cpu[0] || {}));
+      }
       setCpuData(cpu);
       setMemoryData(memory);
     } catch (error) {
-      console.error('메트릭 로드 실패:', error);
+      console.error('[MonitoringDashboard] 메트릭 로드 실패:', error);
+      console.error('[MonitoringDashboard] 에러 상세:', error.message, error.stack);
     } finally {
       setLoading(false);
     }

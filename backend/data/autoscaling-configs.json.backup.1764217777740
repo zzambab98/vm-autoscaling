@@ -1,17 +1,17 @@
 [
   {
-    "serviceName": "auto-vm-test-service-job",
+    "serviceName": "auto-vm-test-service",
     "templateId": "template-1764043685242",
-    "enabled": true,
+    "enabled": false,
     "monitoring": {
       "cpuThreshold": 80,
       "memoryThreshold": 80,
       "duration": 1,
-      "prometheusJobName": "auto-vm-test-service-job"
+      "prometheusJobName": "auto-vm-test-service"
     },
     "scaling": {
-      "minVms": 3,
-      "maxVms": 4,
+      "minVms": 2,
+      "maxVms": 3,
       "scaleOutStep": 1,
       "scaleInStep": 1,
       "cooldownPeriod": 300
@@ -29,8 +29,8 @@
       "gateway": "10.255.48.1",
       "vlan": "vlan_1048"
     },
-    "id": "config-1764224760047",
-    "createdAt": "2025-11-27T06:26:00.047Z",
-    "updatedAt": "2025-11-27T06:26:16.780Z"
+    "id": "config-1764217769680",
+    "createdAt": "2025-11-27T04:29:29.680Z",
+    "updatedAt": "2025-11-27T04:29:29.681Z"
   }
 ]

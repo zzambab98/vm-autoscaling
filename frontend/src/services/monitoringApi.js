@@ -57,31 +57,57 @@ export async function getCpuUsage(jobName, duration = 60) {
   const start = end - (duration * 60);
   
   // 각 instance별로 CPU 사용률 계산
-  const query = `100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle",job="${jobName}"}[5m])) * 100)`;
+  // 올바른 계산: (1 - idle_rate) * 100
+  // rate()는 초당 증가율이므로, idle mode의 rate는 초당 idle 시간입니다
+  // 여러 CPU 코어가 있으면 avg by (instance)로 평균을 내어 instance별 idle 비율을 구합니다
+  // 주의: 같은 instance label을 가진 여러 target이 있으면 데이터가 합쳐집니다
+  // 각 target별로 고유한 instance label이 필요합니다
+  const query = `(1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle",job="${jobName}"}[5m]))) * 100`;
   
   try {
+    console.log('[Monitoring API] CPU 사용률 조회 시작:', { jobName, duration, query, start, end });
     const results = await queryRangePrometheus(query, start, end, 15);
+    console.log('[Monitoring API] CPU 사용률 조회 결과:', results);
     
     // 데이터 변환 (Recharts 형식)
     // 여러 instance의 데이터를 시간별로 그룹화
     const timeMap = new Map();
     
+    if (!results || results.length === 0) {
+      console.warn('[Monitoring API] CPU 사용률 조회 결과가 비어있습니다.');
+      return [];
+    }
+    
     results.forEach(result => {
       const instance = result.metric?.instance || 'unknown';
-      if (result.values) {
+      console.log('[Monitoring API] Instance 데이터 처리:', instance, result.values?.length || 0, '개 데이터 포인트');
+      if (result.values && result.values.length > 0) {
         result.values.forEach(([timestamp, value]) => {
           const timeKey = new Date(timestamp * 1000).toLocaleTimeString();
           if (!timeMap.has(timeKey)) {
             timeMap.set(timeKey, { time: timeKey });
           }
-          timeMap.get(timeKey)[instance] = parseFloat(value) || 0;
+          // 음수 값 방지 및 0-100 범위로 제한
+          let cpuValue = parseFloat(value) || 0;
+          if (isNaN(cpuValue) || !isFinite(cpuValue)) cpuValue = 0;
+          if (cpuValue < 0) cpuValue = 0;
+          if (cpuValue > 100) cpuValue = 100;
+          timeMap.get(timeKey)[instance] = cpuValue;
         });
+      } else {
+        console.warn('[Monitoring API] Instance에 데이터 포인트가 없습니다:', instance);
       }
     });
     
-    return Array.from(timeMap.values());
+    const finalData = Array.from(timeMap.values());
+    console.log('[Monitoring API] 최종 CPU 데이터:', finalData.length, '개 시간 포인트');
+    if (finalData.length > 0) {
+      console.log('[Monitoring API] 첫 번째 데이터 포인트:', finalData[0]);
+    }
+    return finalData;
   } catch (error) {
     console.error('[Monitoring API] CPU 사용률 조회 실패:', error);
+    console.error('[Monitoring API] 에러 상세:', error.message, error.stack);
     return [];
   }
 }
@@ -133,13 +159,19 @@ export async function getMemoryUsage(jobName, duration = 60) {
  */
 export async function getCurrentCpuUsage(jobName) {
   // 각 instance별로 계산하고 최대값 반환
-  const query = `max(100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle",job="${jobName}"}[5m])) * 100))`;
+  // 올바른 계산: (1 - idle_rate) * 100
+  const query = `max((1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle",job="${jobName}"}[5m]))) * 100)`;
   
   try {
     const results = await queryPrometheus(query);
     
     if (results.length > 0 && results[0].value) {
-      return parseFloat(results[0].value[1]) || 0;
+      let cpuValue = parseFloat(results[0].value[1]) || 0;
+      // NaN, Infinity 체크 및 음수 값 방지, 0-100 범위로 제한
+      if (isNaN(cpuValue) || !isFinite(cpuValue)) cpuValue = 0;
+      if (cpuValue < 0) cpuValue = 0;
+      if (cpuValue > 100) cpuValue = 100;
+      return cpuValue;
     }
     return 0;
   } catch (error) {

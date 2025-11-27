@@ -7,6 +7,7 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
   const [templates, setTemplates] = useState([]);
   const [f5Pools, setF5Pools] = useState([]);
   const [f5Vips, setF5Vips] = useState([]);
+  const [f5Error, setF5Error] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [formData, setFormData] = useState({
@@ -62,28 +63,47 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
   };
 
   const loadF5Data = async () => {
+    setF5Error(null);
+    console.log('[AutoscalingConfigForm] F5 데이터 조회 시작...');
     try {
       // F5 Pool 목록 조회
+      console.log('[AutoscalingConfigForm] F5 Pool 목록 조회 중...');
       const poolsResult = await f5Api.getPools();
+      console.log('[AutoscalingConfigForm] F5 Pool 목록 조회 결과:', poolsResult);
       if (poolsResult && poolsResult.success) {
         setF5Pools(poolsResult.pools || []);
+        console.log('[AutoscalingConfigForm] F5 Pool 목록 설정 완료:', poolsResult.pools?.length || 0, '개');
       } else {
-        console.warn('F5 Pool 목록 조회 실패:', poolsResult?.error || '알 수 없는 오류');
+        const errorMsg = poolsResult?.error || '알 수 없는 오류';
+        console.warn('[AutoscalingConfigForm] F5 Pool 목록 조회 실패:', errorMsg);
         setF5Pools([]);
+        setF5Error(poolsResult?.error || 'F5 API 연결 실패. 환경 변수(F5_SERVERS, F5_USER, F5_PASSWORD)를 확인하세요.');
       }
       
       // F5 VIP 목록 조회
+      console.log('[AutoscalingConfigForm] F5 VIP 목록 조회 중...');
       const vipsResult = await f5Api.getVips();
+      console.log('[AutoscalingConfigForm] F5 VIP 목록 조회 결과:', vipsResult);
       if (vipsResult && vipsResult.success) {
         setF5Vips(vipsResult.vips || []);
+        console.log('[AutoscalingConfigForm] F5 VIP 목록 설정 완료:', vipsResult.vips?.length || 0, '개');
       } else {
-        console.warn('F5 VIP 목록 조회 실패:', vipsResult?.error || '알 수 없는 오류');
+        const errorMsg = vipsResult?.error || '알 수 없는 오류';
+        console.warn('[AutoscalingConfigForm] F5 VIP 목록 조회 실패:', errorMsg);
         setF5Vips([]);
+        if (!f5Error) {
+          setF5Error(vipsResult?.error || 'F5 API 연결 실패. 환경 변수(F5_SERVERS, F5_USER, F5_PASSWORD)를 확인하세요.');
+        }
       }
     } catch (error) {
-      console.error('F5 데이터 조회 실패:', error);
+      console.error('[AutoscalingConfigForm] F5 데이터 조회 실패 (catch):', error);
+      console.error('[AutoscalingConfigForm] Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
       setF5Pools([]);
       setF5Vips([]);
+      setF5Error(error.message || 'F5 API 연결 실패. 환경 변수(F5_SERVERS, F5_USER, F5_PASSWORD)를 확인하세요.');
     }
   };
 
@@ -288,6 +308,22 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
 
         {/* F5 설정 */}
         <h3 style={{ marginTop: '30px', marginBottom: '12px', color: '#2c3e50' }}>F5 설정</h3>
+        {f5Error && (
+          <div style={{ 
+            padding: '12px', 
+            marginBottom: '16px', 
+            backgroundColor: '#fff3cd', 
+            border: '1px solid #ffc107', 
+            borderRadius: '4px',
+            color: '#856404',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span style={{ fontSize: '18px' }}>⚠️</span>
+            <span style={{ color: '#dc3545', fontWeight: '500' }}>{f5Error}</span>
+          </div>
+        )}
         <label className="label">Pool 이름 *</label>
         {f5Pools.length > 0 ? (
           <select
@@ -304,19 +340,14 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
             ))}
           </select>
         ) : (
-          <>
-            <input
-              type="text"
-              className="input"
-              value={formData.f5.poolName}
-              onChange={(e) => updateNestedField('f5', 'poolName', e.target.value)}
-              placeholder="F5 Pool 목록을 불러올 수 없습니다. F5 서버 정보를 확인하세요 (예: auto-vm-test-pool)"
-              required
-            />
-            <p style={{ fontSize: '12px', color: '#e74c3c', marginTop: '5px' }}>
-              ⚠️ F5 API 연결 실패. 환경 변수(F5_SERVERS, F5_USER, F5_PASSWORD)를 확인하세요.
-            </p>
-          </>
+          <input
+            type="text"
+            className="input"
+            value={formData.f5.poolName}
+            onChange={(e) => updateNestedField('f5', 'poolName', e.target.value)}
+            placeholder="F5 Pool 목록을 불러올 수 없습니다. F5 서버 정보를 확인하세요 (예: auto-vm-test-pool)"
+            required
+          />
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px' }}>
@@ -343,19 +374,14 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
                 ))}
               </select>
             ) : (
-              <>
-                <input
-                  type="text"
-                  className="input"
-                  value={formData.f5.vip}
-                  onChange={(e) => updateNestedField('f5', 'vip', e.target.value)}
-                  placeholder="F5 VIP 목록을 불러올 수 없습니다. F5 서버 정보를 확인하세요 (예: 10.255.48.229)"
-                  required
-                />
-                <p style={{ fontSize: '12px', color: '#e74c3c', marginTop: '5px' }}>
-                  ⚠️ F5 API 연결 실패. 환경 변수(F5_SERVERS, F5_USER, F5_PASSWORD)를 확인하세요.
-                </p>
-              </>
+              <input
+                type="text"
+                className="input"
+                value={formData.f5.vip}
+                onChange={(e) => updateNestedField('f5', 'vip', e.target.value)}
+                placeholder="F5 VIP 목록을 불러올 수 없습니다. F5 서버 정보를 확인하세요 (예: 10.255.48.229)"
+                required
+              />
             )}
           </div>
           <div>

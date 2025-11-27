@@ -54,7 +54,13 @@ function PrometheusMonitoring() {
         return;
       }
 
-      const result = await prometheusApi.addJob(jobName, targetList, labels);
+      // service label이 없으면 jobName을 기본값으로 사용
+      const finalLabels = {
+        ...labels,
+        service: labels.service || jobName
+      };
+
+      const result = await prometheusApi.addJob(jobName, targetList, finalLabels);
 
       if (result.success) {
         let messageText = 'Prometheus Job이 추가되었습니다.';
@@ -158,40 +164,32 @@ function PrometheusMonitoring() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
           <div>
             <label style={{ fontSize: '12px', color: '#7f8c8d', display: 'block', marginBottom: '4px' }}>
-              instance: 이 Job을 식별하는 이름
-            </label>
-            <input
-              type="text"
-              className="input"
-              value={labels.instance}
-              onChange={(e) => setLabels({ ...labels, instance: e.target.value })}
-              placeholder="instance"
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: '12px', color: '#7f8c8d', display: 'block', marginBottom: '4px' }}>
-              service: 어떤 서비스인지 (Alertmanager 라우팅에 사용)
+              service *: 어떤 서비스인지 (Alertmanager 라우팅에 사용)
             </label>
             <input
               type="text"
               className="input"
               value={labels.service}
               onChange={(e) => setLabels({ ...labels, service: e.target.value })}
-              placeholder="service"
+              placeholder="service (예: auto-vm-test)"
+              required
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: '12px', color: '#7f8c8d', display: 'block', marginBottom: '4px' }}>
+              environment: 환경 (test, prod, dev 등) - 선택사항
+            </label>
+            <input
+              type="text"
+              className="input"
+              value={labels.environment}
+              onChange={(e) => setLabels({ ...labels, environment: e.target.value })}
+              placeholder="environment (기본값: test)"
             />
           </div>
         </div>
-        <div style={{ marginTop: '10px' }}>
-          <label style={{ fontSize: '12px', color: '#7f8c8d', display: 'block', marginBottom: '4px' }}>
-            environment: 환경 (test, prod, dev 등)
-          </label>
-          <input
-            type="text"
-            className="input"
-            value={labels.environment}
-            onChange={(e) => setLabels({ ...labels, environment: e.target.value })}
-            placeholder="environment"
-          />
+        <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '4px', fontSize: '12px', color: '#6c757d' }}>
+          <strong>참고:</strong> instance label은 각 서버의 IP 주소로 자동 설정됩니다. (예: 10.255.48.230, 10.255.48.231)
         </div>
       </div>
 

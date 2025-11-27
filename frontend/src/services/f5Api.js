@@ -6,11 +6,22 @@ const f5Api = {
    */
   async getPools() {
     try {
-      const response = await api.get('/f5/pools');
+      const response = await api.get('/api/f5/pools');
+      console.log('[F5 API] Pool 목록 조회 성공:', response.data);
       return response.data;
     } catch (error) {
-      console.error('F5 Pool 목록 조회 실패:', error);
-      throw error;
+      console.error('[F5 API] Pool 목록 조회 실패:', error);
+      console.error('[F5 API] Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      // 에러가 발생해도 빈 배열과 에러 메시지를 반환
+      return {
+        success: false,
+        pools: [],
+        error: error.response?.data?.error || error.message || 'F5 Pool 목록 조회 실패'
+      };
     }
   },
 
@@ -19,11 +30,22 @@ const f5Api = {
    */
   async getVips() {
     try {
-      const response = await api.get('/f5/vips');
+      const response = await api.get('/api/f5/vips');
+      console.log('[F5 API] VIP 목록 조회 성공:', response.data);
       return response.data;
     } catch (error) {
-      console.error('F5 VIP 목록 조회 실패:', error);
-      throw error;
+      console.error('[F5 API] VIP 목록 조회 실패:', error);
+      console.error('[F5 API] Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      // 에러가 발생해도 빈 배열과 에러 메시지를 반환
+      return {
+        success: false,
+        vips: [],
+        error: error.response?.data?.error || error.message || 'F5 VIP 목록 조회 실패'
+      };
     }
   }
 };

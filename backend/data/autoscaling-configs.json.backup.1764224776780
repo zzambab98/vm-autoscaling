@@ -2,7 +2,7 @@
   {
     "serviceName": "auto-vm-test-service-job",
     "templateId": "template-1764043685242",
-    "enabled": true,
+    "enabled": false,
     "monitoring": {
       "cpuThreshold": 80,
       "memoryThreshold": 80,
@@ -31,6 +31,6 @@
     },
     "id": "config-1764224760047",
     "createdAt": "2025-11-27T06:26:00.047Z",
-    "updatedAt": "2025-11-27T06:26:16.780Z"
+    "updatedAt": "2025-11-27T06:26:00.047Z"
   }
 ]

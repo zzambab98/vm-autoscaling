@@ -70,7 +70,7 @@ function createDashboardTemplate(jobName, labels = {}) {
           targets: [
             {
               datasource: { type: 'prometheus', uid: GRAFANA_PROMETHEUS_DATASOURCE },
-              expr: `(1 - (node_memory_MemAvailable_bytes{job="${jobName}"} / node_memory_MemTotal_bytes{job="${jobName}"})) * 100`,
+              expr: `(1 - (avg by (instance) (node_memory_MemAvailable_bytes{job="${jobName}"}) / avg by (instance) (node_memory_MemTotal_bytes{job="${jobName}"}))) * 100`,
               legendFormat: '{{instance}}',
               refId: 'A'
             }

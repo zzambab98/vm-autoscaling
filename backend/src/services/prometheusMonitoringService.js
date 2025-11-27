@@ -34,21 +34,24 @@ async function addPrometheusJob(config) {
 
     // 3. 새 Job 추가
     // 각 target별로 고유한 instance label을 사용하도록 설정
-    // target의 IP:port를 instance로 사용하여 각 서버를 구분
+    // target의 IP 주소만 instance로 사용하여 각 서버를 구분 (Grafana에서 IP로 표시)
     const staticConfigs = targets.map(target => {
       // target 형식: "10.255.48.230:9100"
       const [ip, port] = target.split(':');
-      const instanceLabel = `${ip}-${port}`;
+      const instanceLabel = ip; // IP 주소만 사용 (각 target별 고유)
+      
+      // labels에서 instance를 제외한 나머지만 사용 (instance는 IP 주소로 강제 설정)
+      const { instance, ...otherLabels } = labels || {};
       
       return {
         targets: [target],
         labels: {
-          instance: instanceLabel, // 각 target별 고유한 instance
-          service: labels.service || jobName,
-          environment: labels.environment || 'test',
-          ...labels,
-          // 기존 instance label이 있으면 덮어쓰지 않고 추가 정보로 사용
-          originalInstance: labels.instance || jobName
+          instance: instanceLabel, // 각 target별 고유한 instance (IP 주소만) - 항상 IP 주소로 설정
+          service: otherLabels.service || jobName,
+          environment: otherLabels.environment || 'test',
+          ...otherLabels,
+          // 사용자가 입력한 instance는 originalInstance로 저장 (참고용)
+          originalInstance: instance || jobName
         }
       };
     });
@@ -69,8 +72,77 @@ async function addPrometheusJob(config) {
     );
 
     if (existingJobIndex >= 0) {
-      // 기존 Job 업데이트
-      prometheusConfig.scrape_configs[existingJobIndex] = newJob;
+      // 기존 Job이 있으면 target을 병합 (기존 target 유지 + 새 target 추가)
+      const existingJob = prometheusConfig.scrape_configs[existingJobIndex];
+      const existingTargetsMap = new Map(); // target -> staticConfig 매핑
+      
+      // 기존 static_configs의 모든 target을 Map에 추가
+      if (existingJob.static_configs && Array.isArray(existingJob.static_configs)) {
+        existingJob.static_configs.forEach(staticConfig => {
+          if (staticConfig.targets && Array.isArray(staticConfig.targets)) {
+            staticConfig.targets.forEach(target => {
+              // 각 target별로 고유한 instance label을 가진 staticConfig 저장
+              existingTargetsMap.set(target, {
+                targets: [target],
+                labels: staticConfig.labels || {}
+              });
+            });
+          }
+        });
+      }
+      
+      // 새 target들을 Map에 추가 (기존 것과 병합)
+      newJob.static_configs.forEach(staticConfig => {
+        if (staticConfig.targets && Array.isArray(staticConfig.targets)) {
+          staticConfig.targets.forEach(target => {
+            const [ip, port] = target.split(':');
+            const instanceLabel = ip; // IP 주소만 사용
+            
+            // 새 target이면 추가, 기존 target이면 instance label만 업데이트
+            existingTargetsMap.set(target, {
+              targets: [target],
+              labels: {
+                instance: instanceLabel, // 각 target의 IP 주소를 instance로 사용
+                service: labels.service || jobName,
+                environment: labels.environment || 'test',
+                ...labels,
+                originalInstance: labels.instance || jobName
+              }
+            });
+          });
+        }
+      });
+      
+      // 모든 target을 포함하는 새로운 static_configs 생성
+      const mergedStaticConfigs = Array.from(existingTargetsMap.values());
+      
+      // 각 staticConfig의 instance label이 올바른지 확인 및 수정
+      // labels에서 instance를 제외한 나머지만 사용
+      const { instance, ...otherLabels } = labels || {};
+      
+      mergedStaticConfigs.forEach(staticConfig => {
+        if (staticConfig.targets && staticConfig.targets.length > 0) {
+          const target = staticConfig.targets[0];
+          const [ip, port] = target.split(':');
+          // instance label을 항상 target의 IP 주소로 강제 설정
+          if (staticConfig.labels) {
+            staticConfig.labels.instance = ip; // IP 주소로 강제 수정
+            // 다른 labels는 유지하되, service와 environment는 업데이트
+            staticConfig.labels.service = otherLabels.service || jobName;
+            staticConfig.labels.environment = otherLabels.environment || 'test';
+            // 사용자가 입력한 instance는 originalInstance로 저장
+            if (instance) {
+              staticConfig.labels.originalInstance = instance;
+            }
+          }
+        }
+      });
+      
+      // 기존 Job 업데이트 (target 병합)
+      prometheusConfig.scrape_configs[existingJobIndex] = {
+        job_name: jobName,
+        static_configs: mergedStaticConfigs
+      };
     } else {
       // 새 Job 추가
       prometheusConfig.scrape_configs.push(newJob);
@@ -144,11 +216,29 @@ async function getPrometheusJobs() {
 
     return {
       success: true,
-      jobs: jobs.map(job => ({
-        jobName: job.job_name,
-        targets: job.static_configs?.[0]?.targets || [],
-        labels: job.static_configs?.[0]?.labels || {}
-      }))
+      jobs: jobs.map(job => {
+        // 모든 static_configs의 targets를 합쳐서 반환
+        const allTargets = [];
+        const allLabels = {};
+        
+        if (job.static_configs && Array.isArray(job.static_configs)) {
+          job.static_configs.forEach(staticConfig => {
+            if (staticConfig.targets && Array.isArray(staticConfig.targets)) {
+              allTargets.push(...staticConfig.targets);
+            }
+            // labels는 첫 번째 static_config의 것을 사용 (공통 labels)
+            if (staticConfig.labels && Object.keys(allLabels).length === 0) {
+              Object.assign(allLabels, staticConfig.labels);
+            }
+          });
+        }
+        
+        return {
+          jobName: job.job_name,
+          targets: allTargets,
+          labels: allLabels
+        };
+      })
     };
   } catch (error) {
     console.error(`[Prometheus] Job 목록 조회 실패:`, error);

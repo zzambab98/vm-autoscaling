@@ -126,6 +126,29 @@ async function f5ApiCall(f5Server, token, method, path) {
  */
 async function getF5Pools() {
   try {
+    // 환경 변수 확인
+    if (!F5_SERVERS || F5_SERVERS.length === 0 || !F5_SERVERS[0]) {
+      return { 
+        success: false, 
+        pools: [], 
+        error: 'F5_SERVERS 환경 변수가 설정되지 않았습니다.' 
+      };
+    }
+    if (!F5_USER) {
+      return { 
+        success: false, 
+        pools: [], 
+        error: 'F5_USER 환경 변수가 설정되지 않았습니다.' 
+      };
+    }
+    if (!F5_PASSWORD) {
+      return { 
+        success: false, 
+        pools: [], 
+        error: 'F5_PASSWORD 환경 변수가 설정되지 않았습니다.' 
+      };
+    }
+
     const f5Server = F5_SERVERS[0]; // 첫 번째 서버 사용
     const token = await authenticate(f5Server);
     const path = `/mgmt/tm/ltm/pool?$select=name,partition`;
@@ -140,6 +163,14 @@ async function getF5Pools() {
     return { success: true, pools };
   } catch (error) {
     console.error('[F5 Service] Pool 목록 조회 실패:', error.message);
+    // 환경 변수 관련 에러인지 확인
+    if (error.message.includes('환경 변수') || !F5_SERVERS || !F5_USER || !F5_PASSWORD) {
+      return { 
+        success: false, 
+        pools: [], 
+        error: 'F5 API 연결 실패. 환경 변수(F5_SERVERS, F5_USER, F5_PASSWORD)를 확인하세요.' 
+      };
+    }
     return { success: false, pools: [], error: error.message };
   }
 }
@@ -150,6 +181,29 @@ async function getF5Pools() {
  */
 async function getF5VirtualServers() {
   try {
+    // 환경 변수 확인
+    if (!F5_SERVERS || F5_SERVERS.length === 0 || !F5_SERVERS[0]) {
+      return { 
+        success: false, 
+        vips: [], 
+        error: 'F5_SERVERS 환경 변수가 설정되지 않았습니다.' 
+      };
+    }
+    if (!F5_USER) {
+      return { 
+        success: false, 
+        vips: [], 
+        error: 'F5_USER 환경 변수가 설정되지 않았습니다.' 
+      };
+    }
+    if (!F5_PASSWORD) {
+      return { 
+        success: false, 
+        vips: [], 
+        error: 'F5_PASSWORD 환경 변수가 설정되지 않았습니다.' 
+      };
+    }
+
     const f5Server = F5_SERVERS[0]; // 첫 번째 서버 사용
     const token = await authenticate(f5Server);
     const path = `/mgmt/tm/ltm/virtual?$select=name,destination,partition,pool`;
@@ -176,6 +230,14 @@ async function getF5VirtualServers() {
     return { success: true, vips };
   } catch (error) {
     console.error('[F5 Service] Virtual Server 목록 조회 실패:', error.message);
+    // 환경 변수 관련 에러인지 확인
+    if (error.message.includes('환경 변수') || !F5_SERVERS || !F5_USER || !F5_PASSWORD) {
+      return { 
+        success: false, 
+        vips: [], 
+        error: 'F5 API 연결 실패. 환경 변수(F5_SERVERS, F5_USER, F5_PASSWORD)를 확인하세요.' 
+      };
+    }
     return { success: false, vips: [], error: error.message };
   }
 }

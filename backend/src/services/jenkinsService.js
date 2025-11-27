@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 const JENKINS_URL = process.env.JENKINS_URL || 'http://10.255.0.103:8080';
-const JENKINS_USER = process.env.JENKINS_WEB_USER || 'leo';
+const JENKINS_USER = process.env.JENKINS_WEB_USER || 'danacloud';
 const JENKINS_API_TOKEN = process.env.JENKINS_API_TOKEN || '11c729d250790bec23d77c6144053e7b03';
 const JENKINS_PASSWORD = process.env.JENKINS_WEB_PASSWORD || '!danacloud12'; // Web UI 로그인용
 const JENKINS_SERVER = process.env.JENKINS_SERVER || '10.255.0.103';

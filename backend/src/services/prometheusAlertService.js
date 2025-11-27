@@ -62,6 +62,9 @@ async function createAlertRule(config) {
     // - max(100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle",job="${prometheusJobName}"}[5m])) * 100))
     // Memory 사용률: 각 instance별로 계산하고, 그 중 최대값이 임계값을 초과하면 Alert 발생
     // - max((1 - (avg by (instance) (node_memory_MemAvailable_bytes{job="${prometheusJobName}"}) / avg by (instance) (node_memory_MemTotal_bytes{job="${prometheusJobName}"}))) * 100)
+    // 
+    // 주의: max() 집계를 사용하므로 특정 instance를 지정할 수 없음
+    // Jenkins 파이프라인에서 instance 정보가 필요하므로, annotations에 모든 instance 목록을 포함
     const alertRule = {
       alert: `${serviceName}_HighResourceUsage`,
       expr: `(
@@ -73,11 +76,13 @@ async function createAlertRule(config) {
       labels: {
         severity: 'warning',
         service: serviceName,
-        autoscaleConfigId: configId
+        autoscaleConfigId: configId,
+        instance: 'all' // max() 집계를 사용하므로 모든 instance를 의미
       },
       annotations: {
         summary: `${serviceName} 리소스 사용률이 높습니다`,
-        description: `CPU 또는 Memory 사용률이 임계값(${cpuThreshold}% CPU, ${memoryThreshold}% Memory)을 초과하여 ${duration}분 이상 지속되었습니다. 자동 스케일아웃이 필요합니다.`
+        description: `CPU 또는 Memory 사용률이 임계값(${cpuThreshold}% CPU, ${memoryThreshold}% Memory)을 초과하여 ${duration}분 이상 지속되었습니다. 자동 스케일아웃이 필요합니다.`,
+        instances: `{{ \$labels.job }}/{{ \$labels.instance }}` // 모든 instance 정보 포함
       }
     };
 

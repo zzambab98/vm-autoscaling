@@ -1,6 +1,6 @@
 [
   {
-    "serviceName": "auto-vm-test-service-job",
+    "serviceName": "auto-vm-test-service",
     "templateId": "template-1764043685242",
     "enabled": true,
     "monitoring": {
@@ -29,8 +29,13 @@
       "gateway": "10.255.48.1",
       "vlan": "vlan_1048"
     },
-    "id": "config-1764224760047",
-    "createdAt": "2025-11-27T06:26:00.047Z",
-    "updatedAt": "2025-11-27T06:26:16.780Z"
+    "jenkins": {
+      "jobName": "plg-autoscale-out",
+      "webhookToken": "plg-autoscale-token",
+      "webhookUrl": "http://10.255.0.103:8080/generic-webhook-trigger/invoke?token=plg-autoscale-token"
+    },
+    "id": "config-1764223387258",
+    "createdAt": "2025-11-27T06:03:07.258Z",
+    "updatedAt": "2025-11-27T06:03:17.793Z"
   }
 ]

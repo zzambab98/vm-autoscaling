@@ -78,7 +78,7 @@ async function addRoutingRule(config) {
 
     // Jenkins Webhook URL (직접 Jenkins로 전송)
     // 모든 서비스가 같은 plg-autoscale-out 파이프라인을 사용
-    const JENKINS_DEFAULT_WEBHOOK_TOKEN = process.env.JENKINS_DEFAULT_WEBHOOK_TOKEN || '11c729d250790bec23d77c6144053e7b03';
+    const JENKINS_DEFAULT_WEBHOOK_TOKEN = process.env.JENKINS_DEFAULT_WEBHOOK_TOKEN || 'plg-autoscale-token';
     const webhookToken = (config.jenkins && config.jenkins.webhookToken)
       ? config.jenkins.webhookToken
       : JENKINS_DEFAULT_WEBHOOK_TOKEN;
