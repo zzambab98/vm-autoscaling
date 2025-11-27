@@ -7,6 +7,7 @@ function TemplateList() {
   const [message, setMessage] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
+  // 컴포넌트가 마운트될 때마다 템플릿 목록 조회 (탭 클릭 시마다)
   useEffect(() => {
     loadTemplates();
   }, []);
@@ -15,15 +16,24 @@ function TemplateList() {
     setLoading(true);
     setMessage(null);
     try {
+      console.log('[TemplateList] 템플릿 목록 조회 시작...');
       const result = await templateApi.getTemplates();
+      console.log('[TemplateList] API 응답:', result);
+      
       if (result && result.success) {
-        setTemplates(result.templates || []);
+        const templates = result.templates || [];
+        console.log('[TemplateList] 템플릿 개수:', templates.length);
+        setTemplates(templates);
+        if (templates.length === 0) {
+          setMessage({ type: 'info', text: '등록된 템플릿이 없습니다.' });
+        }
       } else {
+        console.warn('[TemplateList] 응답 형식 오류:', result);
         setTemplates([]);
         setMessage({ type: 'error', text: '템플릿 목록을 불러올 수 없습니다.' });
       }
     } catch (error) {
-      console.error('템플릿 목록 조회 실패:', error);
+      console.error('[TemplateList] 템플릿 목록 조회 실패:', error);
       setTemplates([]);
       setMessage({ type: 'error', text: `템플릿 목록 조회 실패: ${error.message || '알 수 없는 오류'}` });
     } finally {

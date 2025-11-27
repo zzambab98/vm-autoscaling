@@ -47,28 +47,39 @@ export async function queryRangePrometheus(query, start, end, step = 15) {
 }
 
 /**
- * CPU 사용률 조회
+ * CPU 사용률 조회 (각 instance별)
  * @param {string} jobName - Prometheus Job 이름
  * @param {number} duration - 조회 기간 (분)
- * @returns {Promise<Array>} CPU 사용률 데이터
+ * @returns {Promise<Array>} CPU 사용률 데이터 (각 instance별)
  */
 export async function getCpuUsage(jobName, duration = 60) {
   const end = Math.floor(Date.now() / 1000);
   const start = end - (duration * 60);
   
-  const query = `100 - (avg(rate(node_cpu_seconds_total{mode="idle",job="${jobName}"}[5m])) * 100)`;
+  // 각 instance별로 CPU 사용률 계산
+  const query = `100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle",job="${jobName}"}[5m])) * 100)`;
   
   try {
     const results = await queryRangePrometheus(query, start, end, 15);
     
     // 데이터 변환 (Recharts 형식)
-    if (results.length > 0 && results[0].values) {
-      return results[0].values.map(([timestamp, value]) => ({
-        time: new Date(timestamp * 1000).toLocaleTimeString(),
-        cpu: parseFloat(value) || 0
-      }));
-    }
-    return [];
+    // 여러 instance의 데이터를 시간별로 그룹화
+    const timeMap = new Map();
+    
+    results.forEach(result => {
+      const instance = result.metric?.instance || 'unknown';
+      if (result.values) {
+        result.values.forEach(([timestamp, value]) => {
+          const timeKey = new Date(timestamp * 1000).toLocaleTimeString();
+          if (!timeMap.has(timeKey)) {
+            timeMap.set(timeKey, { time: timeKey });
+          }
+          timeMap.get(timeKey)[instance] = parseFloat(value) || 0;
+        });
+      }
+    });
+    
+    return Array.from(timeMap.values());
   } catch (error) {
     console.error('[Monitoring API] CPU 사용률 조회 실패:', error);
     return [];
@@ -76,27 +87,39 @@ export async function getCpuUsage(jobName, duration = 60) {
 }
 
 /**
- * Memory 사용률 조회
+ * Memory 사용률 조회 (각 instance별)
  * @param {string} jobName - Prometheus Job 이름
  * @param {number} duration - 조회 기간 (분)
- * @returns {Promise<Array>} Memory 사용률 데이터
+ * @returns {Promise<Array>} Memory 사용률 데이터 (각 instance별)
  */
 export async function getMemoryUsage(jobName, duration = 60) {
   const end = Math.floor(Date.now() / 1000);
   const start = end - (duration * 60);
   
-  const query = `(1 - (avg(node_memory_MemAvailable_bytes{job="${jobName}"}) / avg(node_memory_MemTotal_bytes{job="${jobName}"}))) * 100`;
+  // 각 instance별로 Memory 사용률 계산
+  const query = `(1 - (avg by (instance) (node_memory_MemAvailable_bytes{job="${jobName}"}) / avg by (instance) (node_memory_MemTotal_bytes{job="${jobName}"}))) * 100`;
   
   try {
     const results = await queryRangePrometheus(query, start, end, 15);
     
-    if (results.length > 0 && results[0].values) {
-      return results[0].values.map(([timestamp, value]) => ({
-        time: new Date(timestamp * 1000).toLocaleTimeString(),
-        memory: parseFloat(value) || 0
-      }));
-    }
-    return [];
+    // 데이터 변환 (Recharts 형식)
+    // 여러 instance의 데이터를 시간별로 그룹화
+    const timeMap = new Map();
+    
+    results.forEach(result => {
+      const instance = result.metric?.instance || 'unknown';
+      if (result.values) {
+        result.values.forEach(([timestamp, value]) => {
+          const timeKey = new Date(timestamp * 1000).toLocaleTimeString();
+          if (!timeMap.has(timeKey)) {
+            timeMap.set(timeKey, { time: timeKey });
+          }
+          timeMap.get(timeKey)[instance] = parseFloat(value) || 0;
+        });
+      }
+    });
+    
+    return Array.from(timeMap.values());
   } catch (error) {
     console.error('[Monitoring API] Memory 사용률 조회 실패:', error);
     return [];
@@ -104,12 +127,13 @@ export async function getMemoryUsage(jobName, duration = 60) {
 }
 
 /**
- * 현재 CPU 사용률 조회 (실시간)
+ * 현재 CPU 사용률 조회 (실시간, 각 instance별 최대값)
  * @param {string} jobName - Prometheus Job 이름
- * @returns {Promise<number>} CPU 사용률 (%)
+ * @returns {Promise<number>} CPU 사용률 (%) - 모든 instance 중 최대값
  */
 export async function getCurrentCpuUsage(jobName) {
-  const query = `100 - (avg(rate(node_cpu_seconds_total{mode="idle",job="${jobName}"}[5m])) * 100)`;
+  // 각 instance별로 계산하고 최대값 반환
+  const query = `max(100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle",job="${jobName}"}[5m])) * 100))`;
   
   try {
     const results = await queryPrometheus(query);
@@ -125,12 +149,13 @@ export async function getCurrentCpuUsage(jobName) {
 }
 
 /**
- * 현재 Memory 사용률 조회 (실시간)
+ * 현재 Memory 사용률 조회 (실시간, 각 instance별 최대값)
  * @param {string} jobName - Prometheus Job 이름
- * @returns {Promise<number>} Memory 사용률 (%)
+ * @returns {Promise<number>} Memory 사용률 (%) - 모든 instance 중 최대값
  */
 export async function getCurrentMemoryUsage(jobName) {
-  const query = `(1 - (avg(node_memory_MemAvailable_bytes{job="${jobName}"}) / avg(node_memory_MemTotal_bytes{job="${jobName}"}))) * 100`;
+  // 각 instance별로 계산하고 최대값 반환
+  const query = `max((1 - (avg by (instance) (node_memory_MemAvailable_bytes{job="${jobName}"}) / avg by (instance) (node_memory_MemTotal_bytes{job="${jobName}"}))) * 100)`;
   
   try {
     const results = await queryPrometheus(query);

@@ -33,19 +33,29 @@ async function addPrometheusJob(config) {
     const prometheusConfig = yaml.load(currentConfig);
 
     // 3. 새 Job 추가
+    // 각 target별로 고유한 instance label을 사용하도록 설정
+    // target의 IP:port를 instance로 사용하여 각 서버를 구분
+    const staticConfigs = targets.map(target => {
+      // target 형식: "10.255.48.230:9100"
+      const [ip, port] = target.split(':');
+      const instanceLabel = `${ip}-${port}`;
+      
+      return {
+        targets: [target],
+        labels: {
+          instance: instanceLabel, // 각 target별 고유한 instance
+          service: labels.service || jobName,
+          environment: labels.environment || 'test',
+          ...labels,
+          // 기존 instance label이 있으면 덮어쓰지 않고 추가 정보로 사용
+          originalInstance: labels.instance || jobName
+        }
+      };
+    });
+
     const newJob = {
       job_name: jobName,
-      static_configs: [
-        {
-          targets: targets,
-          labels: {
-            instance: labels.instance || jobName,
-            service: labels.service || jobName,
-            environment: labels.environment || 'test',
-            ...labels
-          }
-        }
-      ]
+      static_configs: staticConfigs
     };
 
     // 4. scrape_configs에 추가 (중복 체크)
@@ -178,10 +188,91 @@ async function getPrometheusTargets(jobName) {
   }
 }
 
+/**
+ * Prometheus Job 삭제
+ * @param {string} jobName - Job 이름
+ * @returns {Promise<object>} 삭제 결과
+ */
+async function deletePrometheusJob(jobName) {
+  try {
+    const sshCommand = `ssh -i "${PLG_STACK_SSH_KEY}" -o StrictHostKeyChecking=no ${PLG_STACK_USER}@${PLG_STACK_SERVER}`;
+
+    // 1. 현재 설정 파일 읽기
+    const readCommand = `${sshCommand} "cat ${PROMETHEUS_CONFIG_PATH}"`;
+    const { stdout: currentConfig } = await execPromise(readCommand);
+
+    // 2. YAML 파싱
+    const prometheusConfig = yaml.load(currentConfig);
+
+    // 3. Job 제거
+    if (!prometheusConfig.scrape_configs) {
+      prometheusConfig.scrape_configs = [];
+    }
+
+    const beforeCount = prometheusConfig.scrape_configs.length;
+    prometheusConfig.scrape_configs = prometheusConfig.scrape_configs.filter(
+      job => job.job_name !== jobName
+    );
+
+    if (prometheusConfig.scrape_configs.length === beforeCount) {
+      throw new Error(`Job을 찾을 수 없습니다: ${jobName}`);
+    }
+
+    // 4. YAML로 변환
+    const newConfigYaml = yaml.dump(prometheusConfig, {
+      lineWidth: -1,
+      noRefs: true
+    });
+
+    // 5. 설정 파일 백업
+    const backupCommand = `${sshCommand} "sudo cp ${PROMETHEUS_CONFIG_PATH} ${PROMETHEUS_CONFIG_PATH}.backup.$(date +%Y%m%d_%H%M%S)"`;
+    await execPromise(backupCommand).catch(() => {});
+
+    // 6. 새 설정 파일 작성
+    const tempFile = `/tmp/prometheus_${Date.now()}.yml`;
+    await fs.writeFile(tempFile, newConfigYaml);
+
+    // 7. 원격 서버로 파일 복사
+    const scpCommand = `scp -i "${PLG_STACK_SSH_KEY}" -o StrictHostKeyChecking=no ${tempFile} ${PLG_STACK_USER}@${PLG_STACK_SERVER}:/tmp/prometheus_new.yml`;
+    await execPromise(scpCommand);
+
+    // 8. 원격 서버에서 파일 이동
+    const moveCommand = `${sshCommand} "sudo mv /tmp/prometheus_new.yml ${PROMETHEUS_CONFIG_PATH}"`;
+    await execPromise(moveCommand);
+
+    // 9. 임시 파일 삭제
+    await fs.unlink(tempFile).catch(() => {});
+
+    // 10. Prometheus 컨테이너 재시작
+    const restartCommand = `${sshCommand} "sudo docker restart prometheus"`;
+    await execPromise(restartCommand);
+
+    // 11. Grafana 대시보드 삭제 (선택사항)
+    try {
+      const { deleteGrafanaDashboard } = require('./grafanaService');
+      const dashboardUid = `dashboard-${jobName.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+      await deleteGrafanaDashboard(dashboardUid);
+      console.log(`[Grafana] 대시보드 삭제 완료: ${dashboardUid}`);
+    } catch (grafanaError) {
+      console.warn(`[Grafana] 대시보드 삭제 실패 (경고): ${grafanaError.message}`);
+    }
+
+    return {
+      success: true,
+      jobName: jobName,
+      message: `Prometheus Job '${jobName}'이 삭제되었습니다.`
+    };
+  } catch (error) {
+    console.error(`[Prometheus] Job 삭제 실패:`, error);
+    throw new Error(`Prometheus Job 삭제 실패: ${error.message}`);
+  }
+}
+
 module.exports = {
   addPrometheusJob,
   getPrometheusJobs,
-  getPrometheusTargets
+  getPrometheusTargets,
+  deletePrometheusJob
 };
 
 

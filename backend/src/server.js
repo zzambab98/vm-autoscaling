@@ -9,7 +9,7 @@ const { addRoutingRule, deleteRoutingRule, getRoutingRules } = require('./servic
 const { createJenkinsJob, deleteJenkinsJob, getJenkinsJobStatus, getJenkinsJobs, triggerJenkinsJob } = require('./services/jenkinsService');
 const { getF5Pools, getF5VirtualServers } = require('./services/f5Service');
 
-const PORT = process.env.PORT || 4410;
+const PORT = process.env.VM_AUTOSCALING_BACKEND_PORT || process.env.PORT || 6010;
 
 function sendJSONResponse(res, status, data, headers = {}) {
   const payload = JSON.stringify(data);
@@ -160,6 +160,22 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Prometheus Job 삭제 API
+  if (req.method === 'DELETE' && parsedUrl.pathname.startsWith('/api/prometheus/jobs/')) {
+    const jobName = decodeURIComponent(parsedUrl.pathname.split('/').pop());
+    
+    (async () => {
+      try {
+        const { deletePrometheusJob } = require('./services/prometheusMonitoringService');
+        const result = await deletePrometheusJob(jobName);
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
   // 템플릿 목록 조회 API
   if (req.method === 'GET' && parsedUrl.pathname === '/api/templates') {
     (async () => {
@@ -234,7 +250,8 @@ const server = http.createServer((req, res) => {
         const vms = await getVmList();
         sendJSONResponse(res, 200, { success: true, vms });
       } catch (error) {
-        sendJSONResponse(res, 500, { error: error.message });
+        console.error('[Server] VM 목록 조회 API 에러:', error);
+        sendJSONResponse(res, 500, { success: false, error: error.message, vms: [] });
       }
     })();
     return;
@@ -612,6 +629,74 @@ const server = http.createServer((req, res) => {
     (async () => {
       try {
         const result = await getF5VirtualServers();
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // 디버깅: Prometheus Alert 상태 확인 API
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/debug/prometheus/alerts') {
+    (async () => {
+      try {
+        const axios = require('axios');
+        const PROMETHEUS_URL = process.env.PROMETHEUS_URL || 'http://10.255.1.254:9090';
+        const response = await axios.get(`${PROMETHEUS_URL}/api/v1/alerts`);
+        sendJSONResponse(res, 200, {
+          success: true,
+          alerts: response.data.data.alerts || []
+        });
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // 디버깅: Alertmanager 상태 확인 API
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/debug/alertmanager/status') {
+    (async () => {
+      try {
+        const axios = require('axios');
+        const ALERTMANAGER_URL = process.env.ALERTMANAGER_URL || 'http://10.255.1.254:9093';
+        const [statusResponse, alertsResponse, silencesResponse] = await Promise.all([
+          axios.get(`${ALERTMANAGER_URL}/api/v2/status`).catch(() => ({ data: null })),
+          axios.get(`${ALERTMANAGER_URL}/api/v2/alerts`).catch(() => ({ data: [] })),
+          axios.get(`${ALERTMANAGER_URL}/api/v2/silences`).catch(() => ({ data: [] }))
+        ]);
+        sendJSONResponse(res, 200, {
+          success: true,
+          status: statusResponse.data,
+          alerts: alertsResponse.data || [],
+          silences: silencesResponse.data || []
+        });
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // 디버깅: Alert Rules 확인 API
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/debug/alert-rules') {
+    (async () => {
+      try {
+        const result = await getAlertRules();
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // 디버깅: Alertmanager 라우팅 규칙 확인 API
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/debug/alertmanager/routes') {
+    (async () => {
+      try {
+        const result = await getRoutingRules();
         sendJSONResponse(res, 200, result);
       } catch (error) {
         sendJSONResponse(res, 500, { error: error.message });

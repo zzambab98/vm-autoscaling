@@ -2,14 +2,19 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-BACKEND_PORT="${PORT:-4410}"
-FRONTEND_PORT="${FRONTEND_PORT:-5520}"
+BACKEND_PORT="6010"
+FRONTEND_PORT="5520"
 
 # F5 환경 변수 (기본값 설정)
 F5_SERVERS="${F5_SERVERS:-10.255.1.80}"
 F5_USER="${F5_USER:-admin}"
 F5_PASSWORD="${F5_PASSWORD:-Netcom123!@#}"
 F5_PARTITION="${F5_PARTITION:-Common}"
+
+# vCenter 환경 변수 (기존 환경 변수 사용, 없으면 기본값)
+VCENTER_URL="${VCENTER_URL:-${GOVC_URL}}"
+VCENTER_USERNAME="${VCENTER_USERNAME:-${GOVC_USERNAME}}"
+VCENTER_PASSWORD="${VCENTER_PASSWORD:-${GOVC_PASSWORD}}"
 
 # 로그 디렉토리 생성
 LOG_DIR="${ROOT_DIR}/logs"
@@ -59,7 +64,7 @@ stop_existing_services() {
     rm -f "${FRONTEND_PID_FILE}"
   fi
   
-  # 포트 기반으로 프로세스 종료 (4410 / 5520만)
+  # 포트 기반으로 프로세스 종료 (하드코딩: 6010 / 5520)
   echo "    포트 ${BACKEND_PORT} 사용 프로세스 종료 중..."
   lsof -ti:${BACKEND_PORT} | xargs kill -9 2>/dev/null || true
   
@@ -95,6 +100,10 @@ pushd "${ROOT_DIR}/backend" >/dev/null
   F5_USER="${F5_USER}" \
   F5_PASSWORD="${F5_PASSWORD}" \
   F5_PARTITION="${F5_PARTITION}" \
+  GOVC_URL="${GOVC_URL:-${VCENTER_URL:-https://10.255.0.10/}}" \
+  GOVC_USERNAME="${GOVC_USERNAME:-${VCENTER_USERNAME:-administrator@vsphere.local}}" \
+  GOVC_PASSWORD="${GOVC_PASSWORD:-${VCENTER_PASSWORD:-VMware1!}}" \
+  GOVC_INSECURE="${GOVC_INSECURE:-1}" \
   nohup npm run dev > "${BACKEND_LOG}" 2>&1 &
   BACKEND_PID=$!
   echo "${BACKEND_PID}" > "${BACKEND_PID_FILE}"

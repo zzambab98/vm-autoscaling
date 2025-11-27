@@ -23,18 +23,89 @@ async function ensureDataFile() {
 }
 
 /**
- * 템플릿 목록 조회
+ * vCenter에서 템플릿 목록 조회
+ * @returns {Promise<Array>} 템플릿 목록
+ */
+async function getTemplatesFromVCenter() {
+  try {
+    if (!VCENTER_URL || !VCENTER_USERNAME || !VCENTER_PASSWORD) {
+      console.warn('[Template Service] vCenter 연결 정보가 설정되지 않았습니다.');
+      return [];
+    }
+
+    // vCenter에서 템플릿 목록 조회 (이름에 "template"이 포함된 VM)
+    const command = `govc find / -type m -name "*template*"`;
+    const { stdout } = await execPromise(command, {
+      env: {
+        ...process.env,
+        GOVC_URL: VCENTER_URL,
+        GOVC_USERNAME: VCENTER_USERNAME,
+        GOVC_PASSWORD: VCENTER_PASSWORD,
+        GOVC_INSECURE: process.env.GOVC_INSECURE || '1'
+      }
+    });
+
+    const lines = stdout.trim().split('\n').filter(line => line.trim());
+    
+    return lines.map(path => {
+      const parts = path.split('/');
+      const name = parts[parts.length - 1];
+      return {
+        name: name,
+        path: path,
+        source: 'vcenter'
+      };
+    });
+  } catch (error) {
+    console.error('[Template Service] vCenter 템플릿 목록 조회 실패:', error);
+    return [];
+  }
+}
+
+/**
+ * 템플릿 목록 조회 (vCenter + 로컬 저장소 병합)
  * @returns {Promise<Array>} 템플릿 목록
  */
 async function getTemplates() {
   await ensureDataFile();
+  
+  // vCenter에서 템플릿 목록 조회
+  const vcenterTemplates = await getTemplatesFromVCenter();
+  
+  // 로컬 저장소에서 템플릿 메타데이터 조회
+  let localTemplates = [];
   try {
     const data = await fs.readFile(TEMPLATES_DATA_PATH, 'utf8');
-    return JSON.parse(data);
+    localTemplates = JSON.parse(data);
   } catch (error) {
-    console.error('[Template Service] 템플릿 목록 조회 실패:', error);
-    return [];
+    console.warn('[Template Service] 로컬 템플릿 목록 조회 실패:', error);
   }
+
+  // vCenter 템플릿과 로컬 메타데이터 병합
+  const mergedTemplates = vcenterTemplates.map(vcTemplate => {
+    // 로컬에 저장된 메타데이터가 있으면 사용
+    const localMeta = localTemplates.find(lt => lt.name === vcTemplate.name);
+    if (localMeta) {
+      return {
+        ...localMeta,
+        path: vcTemplate.path,
+        source: 'vcenter'
+      };
+    }
+    // 없으면 vCenter 정보만 사용
+    return {
+      id: `vcenter-${Date.now()}-${vcTemplate.name}`,
+      name: vcTemplate.name,
+      originalVmName: vcTemplate.name,
+      description: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      path: vcTemplate.path,
+      source: 'vcenter'
+    };
+  });
+
+  return mergedTemplates;
 }
 
 /**
@@ -476,34 +547,84 @@ async function deleteTemplate(templateId) {
 async function getVmList() {
   try {
     if (!VCENTER_URL || !VCENTER_USERNAME || !VCENTER_PASSWORD) {
-      return [];
+      console.warn('[Template Service] vCenter 연결 정보가 설정되지 않았습니다.');
+      throw new Error('vCenter 연결 정보가 설정되지 않았습니다. 환경 변수를 확인하세요.');
     }
 
-    const command = `govc ls /vm`;
+    // VM 목록 조회: /Datacenter/vm 경로 또는 find 명령 사용
+    const command = `govc find / -type m`;
     const { stdout } = await execPromise(command, {
       env: {
         ...process.env,
         GOVC_URL: VCENTER_URL,
         GOVC_USERNAME: VCENTER_USERNAME,
-        GOVC_PASSWORD: VCENTER_PASSWORD
+        GOVC_PASSWORD: VCENTER_PASSWORD,
+        GOVC_INSECURE: process.env.GOVC_INSECURE || '1'
       }
     });
 
-    // govc ls는 한 줄에 하나씩 경로를 반환합니다
+    // govc find는 한 줄에 하나씩 경로를 반환합니다
     const lines = stdout.trim().split('\n').filter(line => line.trim());
     
-    return lines.map(path => {
-      // 경로에서 VM 이름 추출 (마지막 부분)
-      const parts = path.split('/');
-      const name = parts[parts.length - 1];
+    // VM 정보 조회 (IP 주소 포함) - 병렬 처리로 속도 향상
+    const vmPaths = lines
+      .map(path => {
+        const parts = path.split('/');
+        const name = parts[parts.length - 1];
+        return { name, path };
+      })
+      .filter(vm => !vm.name.startsWith('vCLS-')); // vCLS-로 시작하는 VM 제외
+    
+    // 병렬로 IP 조회 (Promise.all 사용)
+    const vmListPromises = vmPaths.map(async ({ name, path }) => {
+      let ips = [];
+      try {
+        const vmIpCommand = `govc vm.ip "${name}"`;
+        const { stdout: ipOutput } = await execPromise(vmIpCommand, {
+          env: {
+            ...process.env,
+            GOVC_URL: VCENTER_URL,
+            GOVC_USERNAME: VCENTER_USERNAME,
+            GOVC_PASSWORD: VCENTER_PASSWORD,
+            GOVC_INSECURE: process.env.GOVC_INSECURE || '1'
+          },
+          timeout: 3000 // 3초 타임아웃 (병렬 처리로 짧게 설정)
+        });
+        
+        // govc vm.ip는 한 줄에 하나씩 IP를 반환 (여러 개일 수 있음)
+        const ipLines = ipOutput.trim().split('\n').filter(line => line.trim());
+        ipLines.forEach(ip => {
+          const ipStr = ip.trim();
+          // IPv4 주소만 추가 (IPv6 제외)
+          if (ipStr && /^\d+\.\d+\.\d+\.\d+$/.test(ipStr) && !ips.includes(ipStr)) {
+            ips.push(ipStr);
+          }
+        });
+      } catch (error) {
+        // IP 조회 실패는 경고만 출력 (VM 목록은 계속 반환)
+        // VM이 꺼져 있거나 Guest Tools가 설치되지 않은 경우 IP를 가져올 수 없음
+        // 타임아웃이나 에러는 무시하고 계속 진행
+      }
+      
       return {
         name: name,
-        path: path
+        path: path,
+        ips: ips
       };
     });
+    
+    // 모든 VM 정보를 병렬로 조회
+    const vmList = await Promise.all(vmListPromises);
+    
+    // 이름 기준으로 정렬
+    vmList.sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true }));
+    
+    return vmList;
   } catch (error) {
     console.error('[Template Service] VM 목록 조회 실패:', error);
-    return [];
+    console.error('[Template Service] 에러 상세:', error.message);
+    console.error('[Template Service] Stack:', error.stack);
+    throw error; // 에러를 다시 throw하여 API에서 에러 메시지를 반환할 수 있도록
   }
 }
 

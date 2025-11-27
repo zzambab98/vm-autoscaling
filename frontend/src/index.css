@@ -188,6 +188,15 @@ select:focus {
   color: #bfdbfe;
 }
 
+.info {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #1e40af;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

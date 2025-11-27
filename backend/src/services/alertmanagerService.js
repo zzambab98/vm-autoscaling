@@ -20,7 +20,8 @@ const JENKINS_WEBHOOK_PASSWORD = process.env.JENKINS_WEBHOOK_PASSWORD || '!danac
 async function addRoutingRule(config) {
   const {
     serviceName,
-    id: configId
+    id: configId,
+    jenkins
   } = config;
 
   try {
@@ -75,11 +76,15 @@ async function addRoutingRule(config) {
       receiver => receiver.name !== `jenkins-webhook-${serviceName}`
     );
 
-    // Jenkins Webhook URL (백엔드를 통해 설정 정보 포함)
-    const webhookToken = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-token`;
-    // 백엔드 webhook 엔드포인트를 통해 설정 정보를 포함하여 Jenkins에 전달
-    const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:4410';
-    const webhookUrl = `${BACKEND_URL}/api/webhook/autoscale/${serviceName}`;
+    // Jenkins Webhook URL (직접 Jenkins로 전송)
+    // 모든 서비스가 같은 plg-autoscale-out 파이프라인을 사용
+    const JENKINS_DEFAULT_WEBHOOK_TOKEN = process.env.JENKINS_DEFAULT_WEBHOOK_TOKEN || '11c729d250790bec23d77c6144053e7b03';
+    const webhookToken = (config.jenkins && config.jenkins.webhookToken)
+      ? config.jenkins.webhookToken
+      : JENKINS_DEFAULT_WEBHOOK_TOKEN;
+    const webhookUrl = (config.jenkins && config.jenkins.webhookUrl)
+      ? config.jenkins.webhookUrl
+      : `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookToken}`;
 
     // 새 수신자 추가
     const newReceiver = {
@@ -87,7 +92,7 @@ async function addRoutingRule(config) {
       webhook_configs: [
         {
           url: webhookUrl,
-          send_resolved: true,
+          send_resolved: false, // Alert 해결 시 webhook 전송 안 함
           http_config: {
             basic_auth: {
               username: JENKINS_WEBHOOK_USER,

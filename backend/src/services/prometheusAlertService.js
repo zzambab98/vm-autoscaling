@@ -57,20 +57,17 @@ async function createAlertRule(config) {
     group.rules = group.rules.filter(rule => rule.alert !== `${serviceName}_HighResourceUsage`);
 
     // 5. 새 Alert Rule 생성
+    // CPU 사용률: 각 instance별로 계산하고, 그 중 최대값이 임계값을 초과하면 Alert 발생
+    // - 2대 서버 중 한 대라도 CPU가 80%를 넘으면 스케일아웃
+    // - max(100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle",job="${prometheusJobName}"}[5m])) * 100))
+    // Memory 사용률: 각 instance별로 계산하고, 그 중 최대값이 임계값을 초과하면 Alert 발생
+    // - max((1 - (avg by (instance) (node_memory_MemAvailable_bytes{job="${prometheusJobName}"}) / avg by (instance) (node_memory_MemTotal_bytes{job="${prometheusJobName}"}))) * 100)
     const alertRule = {
       alert: `${serviceName}_HighResourceUsage`,
       expr: `(
-        (
-          100 - (avg(rate(node_cpu_seconds_total{mode="idle",job="${prometheusJobName}"}[5m])) * 100) > ${cpuThreshold}
-          OR
-          (1 - (avg(node_memory_MemAvailable_bytes{job="${prometheusJobName}"}) / avg(node_memory_MemTotal_bytes{job="${prometheusJobName}"}))) * 100 > ${memoryThreshold}
-        )
-        AND
-        (
-          100 - (avg_over_time(rate(node_cpu_seconds_total{mode="idle",job="${prometheusJobName}"}[5m])[${duration}m:]) * 100) > ${cpuThreshold}
-          OR
-          (1 - (avg_over_time(node_memory_MemAvailable_bytes{job="${prometheusJobName}"}[${duration}m:]) / avg_over_time(node_memory_MemTotal_bytes{job="${prometheusJobName}"}[${duration}m:]))) * 100 > ${memoryThreshold}
-        )
+        max(100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle",job="${prometheusJobName}"}[5m])) * 100)) > ${cpuThreshold}
+        OR
+        max((1 - (avg by (instance) (node_memory_MemAvailable_bytes{job="${prometheusJobName}"}) / avg by (instance) (node_memory_MemTotal_bytes{job="${prometheusJobName}"}))) * 100) > ${memoryThreshold}
       )`,
       for: `${duration}m`,
       labels: {

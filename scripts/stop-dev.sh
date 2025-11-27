@@ -5,8 +5,8 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PID_DIR="${ROOT_DIR}/.pids"
 BACKEND_PID_FILE="${PID_DIR}/backend.pid"
 FRONTEND_PID_FILE="${PID_DIR}/frontend.pid"
-BACKEND_PORT="${PORT:-4410}"
-FRONTEND_PORT="${FRONTEND_PORT:-5520}"
+BACKEND_PORT="6010"
+FRONTEND_PORT="5520"
 
 echo "=== VM 오토스케일링 개발 서버 종료 ==="
 

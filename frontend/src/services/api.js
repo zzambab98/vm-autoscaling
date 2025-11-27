@@ -7,16 +7,17 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  timeout: 30000 // 30초 타임아웃
+  timeout: 60000 // 60초 타임아웃 (VM 목록 조회 시 시간이 걸릴 수 있음)
 });
 
 // 요청 인터셉터
 api.interceptors.request.use(
   (config) => {
+    console.log('[API] 요청:', config.method?.toUpperCase(), config.url, config.baseURL);
     return config;
   },
   (error) => {
-    console.error('Request error:', error);
+    console.error('[API] Request error:', error);
     return Promise.reject(error);
   }
 );
@@ -24,14 +25,29 @@ api.interceptors.request.use(
 // 응답 인터셉터 - 에러 처리
 api.interceptors.response.use(
   (response) => {
+    console.log('[API] 응답 성공:', response.config.url, response.status);
     return response;
   },
   (error) => {
-    console.error('API Error:', error);
+    console.error('[API] Error:', error);
+    console.error('[API] Error details:', {
+      message: error.message,
+      code: error.code,
+      response: error.response ? {
+        status: error.response.status,
+        data: error.response.data
+      } : null,
+      config: error.config ? {
+        url: error.config.url,
+        baseURL: error.config.baseURL,
+        method: error.config.method
+      } : null
+    });
     
     // 네트워크 에러
     if (!error.response) {
-      console.error('Network error:', error.message);
+      console.error('[API] Network error:', error.message);
+      console.error('[API] 요청 URL:', error.config?.baseURL + error.config?.url);
       return Promise.reject(new Error('서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요.'));
     }
     

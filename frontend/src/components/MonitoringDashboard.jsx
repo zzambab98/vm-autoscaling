@@ -152,15 +152,21 @@ function MonitoringDashboard() {
         <>
           <div className="metrics-summary">
             <div className="metric-card">
-              <div className="metric-label">현재 CPU 사용률</div>
-              <div className="metric-value" style={{ color: currentCpu > 80 ? '#e74c3c' : '#27ae60' }}>
+              <div className="metric-label">현재 CPU 사용률 (최대값)</div>
+              <div className="metric-value" style={{ color: currentCpu > (selectedConfig.monitoring?.cpuThreshold || 80) ? '#e74c3c' : '#27ae60' }}>
                 {currentCpu.toFixed(1)}%
+              </div>
+              <div style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '4px' }}>
+                모든 서버 중 최대값
               </div>
             </div>
             <div className="metric-card">
-              <div className="metric-label">현재 Memory 사용률</div>
-              <div className="metric-value" style={{ color: currentMemory > 80 ? '#e74c3c' : '#27ae60' }}>
+              <div className="metric-label">현재 Memory 사용률 (최대값)</div>
+              <div className="metric-value" style={{ color: currentMemory > (selectedConfig.monitoring?.memoryThreshold || 80) ? '#e74c3c' : '#27ae60' }}>
                 {currentMemory.toFixed(1)}%
+              </div>
+              <div style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '4px' }}>
+                모든 서버 중 최대값
               </div>
             </div>
             <div className="metric-card">
@@ -190,7 +196,19 @@ function MonitoringDashboard() {
                     <YAxis domain={[0, 100]} label={{ value: '사용률 (%)', angle: -90, position: 'insideLeft' }} />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="cpu" stroke="#3498db" strokeWidth={2} name="CPU 사용률 (%)" />
+                    {Object.keys(cpuData[0] || {}).filter(key => key !== 'time').map((instance, index) => {
+                      const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6'];
+                      return (
+                        <Line
+                          key={instance}
+                          type="monotone"
+                          dataKey={instance}
+                          stroke={colors[index % colors.length]}
+                          strokeWidth={2}
+                          name={`${instance} CPU (%)`}
+                        />
+                      );
+                    })}
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
@@ -210,7 +228,19 @@ function MonitoringDashboard() {
                     <YAxis domain={[0, 100]} label={{ value: '사용률 (%)', angle: -90, position: 'insideLeft' }} />
                     <Tooltip />
                     <Legend />
-                    <Line type="monotone" dataKey="memory" stroke="#e74c3c" strokeWidth={2} name="Memory 사용률 (%)" />
+                    {Object.keys(memoryData[0] || {}).filter(key => key !== 'time').map((instance, index) => {
+                      const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6'];
+                      return (
+                        <Line
+                          key={instance}
+                          type="monotone"
+                          dataKey={instance}
+                          stroke={colors[index % colors.length]}
+                          strokeWidth={2}
+                          name={`${instance} Memory (%)`}
+                        />
+                      );
+                    })}
                   </LineChart>
                 </ResponsiveContainer>
               ) : (

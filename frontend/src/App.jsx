@@ -158,14 +158,14 @@ function App() {
         <ErrorBoundary>
           <TemplateForm key={refreshTemplates} onSuccess={handleTemplateCreated} />
           <ErrorBoundary>
-            <TemplateList key={`template-list-${refreshTemplates}`} />
+            <TemplateList key={`template-list-${refreshTemplates}-${activeTab}`} />
           </ErrorBoundary>
         </ErrorBoundary>
       )}
 
       {activeTab === 'node-exporter' && (
         <ErrorBoundary>
-          <NodeExporterInstall />
+          <NodeExporterInstall key={`node-exporter-${activeTab}`} />
         </ErrorBoundary>
       )}
 
