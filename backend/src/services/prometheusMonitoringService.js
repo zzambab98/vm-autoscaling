@@ -95,11 +95,23 @@ async function addPrometheusJob(config) {
     const restartCommand = `${sshCommand} "sudo docker restart prometheus"`;
     await execPromise(restartCommand);
 
+    // 12. Grafana 대시보드 자동 생성
+    let grafanaResult = null;
+    try {
+      const { createGrafanaDashboard } = require('./grafanaService');
+      grafanaResult = await createGrafanaDashboard(jobName, labels);
+      console.log(`[Grafana] 대시보드 생성 완료: ${grafanaResult.dashboardUrl}`);
+    } catch (grafanaError) {
+      // Grafana 대시보드 생성 실패해도 Prometheus Job 등록은 성공으로 처리
+      console.warn(`[Grafana] 대시보드 생성 실패 (경고): ${grafanaError.message}`);
+    }
+
     return {
       success: true,
       jobName: jobName,
       targets: targets,
-      message: 'Prometheus Job이 추가되었습니다.'
+      message: 'Prometheus Job이 추가되었습니다.',
+      grafana: grafanaResult
     };
   } catch (error) {
     console.error(`[Prometheus] Job 추가 실패:`, error);

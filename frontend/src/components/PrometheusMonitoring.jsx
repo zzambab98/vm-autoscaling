@@ -57,7 +57,14 @@ function PrometheusMonitoring() {
       const result = await prometheusApi.addJob(jobName, targetList, labels);
 
       if (result.success) {
-        setMessage({ type: 'success', text: 'Prometheus Job이 추가되었습니다.' });
+        let messageText = 'Prometheus Job이 추가되었습니다.';
+        if (result.grafana && result.grafana.success) {
+          messageText += ` Grafana 대시보드가 생성되었습니다.`;
+          if (result.grafana.dashboardUrl) {
+            messageText += ` <a href="${result.grafana.dashboardUrl}" target="_blank" style="color: #546bff; text-decoration: underline;">대시보드 보기</a>`;
+          }
+        }
+        setMessage({ type: 'success', text: messageText });
         await loadJobs();
         // 잠시 후 Target 상태 확인
         setTimeout(() => checkTargetStatus(), 3000);
@@ -128,9 +135,10 @@ function PrometheusMonitoring() {
       <h2>PLG Stack 모니터링 등록</h2>
 
       {message && (
-        <div className={message.type === 'success' ? 'success' : 'error'}>
-          {message.text}
-        </div>
+        <div 
+          className={message.type === 'success' ? 'success' : 'error'}
+          dangerouslySetInnerHTML={{ __html: message.text }}
+        />
       )}
 
       <div style={{ marginBottom: '20px' }}>
@@ -323,5 +331,3 @@ function PrometheusMonitoring() {
 }
 
 export default PrometheusMonitoring;
-
-
