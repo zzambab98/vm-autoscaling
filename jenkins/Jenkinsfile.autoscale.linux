@@ -39,7 +39,7 @@ pipeline {
         
         // 기본 vCenter 설정 (오토스케일링 설정에서 덮어쓸 수 있음)
         VCENTER_RESOURCE_POOL = 'APP-RP'
-        VCENTER_DATASTORE = 'PowerStore-DS1'
+        VCENTER_DATASTORE = 'OS-Datastore-Power-Store'
         
         // F5 설정 (오토스케일링 설정에서 덮어쓸 수 있음)
         F5_SERVER = '10.255.1.80'
@@ -49,7 +49,7 @@ pipeline {
         F5_PASSWORD = ''
         
         // 백엔드 API URL (오토스케일링 설정 조회용)
-        BACKEND_API_URL = 'http://192.168.200.30:6010'
+        BACKEND_API_URL = 'http://10.255.48.253:6010'
         
         // 타임아웃 설정
         VM_IP_TIMEOUT = '300'  // 5분
@@ -155,7 +155,7 @@ pipeline {
                                 returnStdout: true
                             ).trim()
                             
-                            def configResponse = readJSON text: configResponseText
+                            def configResponse = new groovy.json.JsonSlurper().parseText(configResponseText)
                             def configData = configResponse.config ?: configResponse
                             
                             if (!configData.serviceName) {
@@ -169,7 +169,7 @@ pipeline {
                                         script: """curl -sf -H "Content-Type: application/json" "${env.BACKEND_API_URL}/api/templates/${configData.templateId}" """,
                                         returnStdout: true
                                     ).trim()
-                                    def templateJson = readJSON text: templateResponseText
+                                    def templateJson = new groovy.json.JsonSlurper().parseText(templateResponseText)
                                     env.VCENTER_TEMPLATE = templateJson.template?.name ?: templateJson.name ?: 'app-template'
                                 } catch (Exception tmplErr) {
                                     echo "경고: Template 정보를 찾을 수 없습니다. 기본값 사용: app-template (${tmplErr.message})"
@@ -237,15 +237,15 @@ pipeline {
                     def ipStartParts = ipStart.split('\\.')
                     def ipEndParts = ipEnd.split('\\.')
                     
-                    def startLong = Long.parseLong(ipStartParts[0]) * 256 * 256 * 256 +
-                                   Long.parseLong(ipStartParts[1]) * 256 * 256 +
-                                   Long.parseLong(ipStartParts[2]) * 256 +
-                                   Long.parseLong(ipStartParts[3])
+                    def startLong = ipStartParts[0].toLong() * 256 * 256 * 256 +
+                                   ipStartParts[1].toLong() * 256 * 256 +
+                                   ipStartParts[2].toLong() * 256 +
+                                   ipStartParts[3].toLong()
                     
-                    def endLong = Long.parseLong(ipEndParts[0]) * 256 * 256 * 256 +
-                                 Long.parseLong(ipEndParts[1]) * 256 * 256 +
-                                 Long.parseLong(ipEndParts[2]) * 256 +
-                                 Long.parseLong(ipEndParts[3])
+                    def endLong = ipEndParts[0].toLong() * 256 * 256 * 256 +
+                                 ipEndParts[1].toLong() * 256 * 256 +
+                                 ipEndParts[2].toLong() * 256 +
+                                 ipEndParts[3].toLong()
                     
                     // IP Pool 범위에서 사용 가능한 IP 찾기 (ping 테스트)
                     for (long ip = startLong; ip <= endLong; ip++) {
@@ -283,101 +283,108 @@ pipeline {
         stage('VM Clone') {
             steps {
                 script {
-                    echo "=========================================="
-                    echo "vCenter VM 클론 시작 (govc 사용)"
-                    echo "=========================================="
-                    
-                    def templateName = env.VCENTER_TEMPLATE
-                    def vmName = env.NEW_VM_NAME
-                    def vmIP = env.NEW_VM_IP
-                    def subnet = env.SUBNET
-                    def gateway = env.GATEWAY
-                    def vlan = env.VLAN
-                    def datastore = env.VCENTER_DATASTORE
-                    def resourcePool = env.VCENTER_RESOURCE_POOL
-                    
-                    try {
-                        // govc를 사용하여 VM 클론
-                        // 주의: govc vm.clone은 IP 설정을 직접 지원하지 않으므로,
-                        // 클론 후 customization spec을 사용하거나 별도로 설정해야 함
+                    withCredentials([
+                        string(credentialsId: 'vcenter-server', variable: 'VCENTER_SERVER_CRED'),
+                        string(credentialsId: 'vcenter-user', variable: 'VCENTER_USER_CRED'),
+                        string(credentialsId: 'vcenter-password', variable: 'VCENTER_PASSWORD_CRED')
+                    ]) {
+                        echo "=========================================="
+                        echo "vCenter VM 클론 시작 (govc 사용)"
+                        echo "=========================================="
                         
-                        def cloneCommand = """
-                            export GOVC_URL="${env.GOVC_URL}"
-                            export GOVC_USERNAME="${env.GOVC_USERNAME}"
-                            export GOVC_PASSWORD="${env.GOVC_PASSWORD}"
-                            export GOVC_INSECURE="${env.GOVC_INSECURE}"
-                            
-                            govc vm.clone \\
-                                -vm="${templateName}" \\
-                                -name="${vmName}" \\
-                                -on=false
-                        """
+                        def templateName = env.VCENTER_TEMPLATE
+                        def vmName = env.NEW_VM_NAME
+                        def vmIP = env.NEW_VM_IP
+                        def subnet = env.SUBNET
+                        def gateway = env.GATEWAY
+                        def vlan = env.VLAN
+                        def datastore = env.VCENTER_DATASTORE
+                        def resourcePool = env.VCENTER_RESOURCE_POOL
                         
-                        // Datastore 지정
-                        if (datastore) {
-                            cloneCommand += """ \\
-                                -ds="${datastore}"
-                            """
+                        // vCenter Credentials 재확인
+                        def govcUrl = env.GOVC_URL ?: VCENTER_SERVER_CRED ?: 'https://vc.danacloud.local'
+                        def govcUser = env.GOVC_USERNAME ?: VCENTER_USER_CRED ?: 'svc-auto'
+                        def govcPass = env.GOVC_PASSWORD ?: VCENTER_PASSWORD_CRED
+                        
+                        if (!govcPass || govcPass == 'null' || govcPass.trim() == '') {
+                            error("vCenter 비밀번호가 설정되지 않았습니다.")
                         }
                         
-                        // Resource Pool 지정
-                        if (resourcePool) {
-                            cloneCommand += """ \\
-                                -pool="${resourcePool}"
-                            """
-                        }
-                        
-                        // Network/VLAN 지정
-                        if (vlan) {
-                            cloneCommand += """ \\
-                                -net="${vlan}"
-                            """
-                        }
-                        
-                        cloneCommand += """ \\
-                            "${vmName}"
-                        """
-                        
-                        echo "VM 클론 명령어 실행 중..."
-                        sh cloneCommand
-                        
-                        echo "VM 클론 완료: ${vmName}"
-                        
-                        // IP 주소 설정 (govc vm.customize 또는 별도 스크립트 필요)
-                        // 주의: govc는 IP 설정을 직접 지원하지 않으므로,
-                        // vCenter Customization Spec을 사용하거나 별도 스크립트가 필요할 수 있음
-                        
-                        // VM 전원 켜기
-                        def powerOnCommand = """
-                            export GOVC_URL="${env.GOVC_URL}"
-                            export GOVC_USERNAME="${env.GOVC_USERNAME}"
-                            export GOVC_PASSWORD="${env.GOVC_PASSWORD}"
-                            export GOVC_INSECURE="${env.GOVC_INSECURE}"
+                        try {
+                            // govc를 사용하여 VM 클론
+                            // 주의: govc vm.clone은 IP 설정을 직접 지원하지 않으므로,
+                            // 클론 후 customization spec을 사용하거나 별도로 설정해야 함
                             
-                            govc vm.power -on "${vmName}"
-                        """
-                        
-                        sh powerOnCommand
-                        echo "VM 전원 켜기 완료: ${vmName}"
-                        
-                        // VM IP 주소 확인 대기
-                        echo "VM IP 주소 확인 대기 중..."
-                        def maxWait = 300  // 5분
-                        def waitTime = 0
-                        def vmIPConfirmed = false
-                        
-                        while (waitTime < maxWait && !vmIPConfirmed) {
-                            sleep(time: 10, unit: 'SECONDS')
-                            waitTime += 10
+                            // govc 명령어 옵션 구성
+                            def cloneOptions = "-vm=\"${templateName}\" -on=false"
                             
-                            def ipCheckCommand = """
-                                export GOVC_URL="${env.GOVC_URL}"
-                                export GOVC_USERNAME="${env.GOVC_USERNAME}"
-                                export GOVC_PASSWORD="${env.GOVC_PASSWORD}"
+                            // Datastore 지정
+                            if (datastore && datastore != 'null' && datastore.trim() != '') {
+                                cloneOptions += " -ds=\"${datastore}\""
+                            }
+                            
+                            // Resource Pool 지정
+                            if (resourcePool && resourcePool != 'null' && resourcePool.trim() != '') {
+                                cloneOptions += " -pool=\"${resourcePool}\""
+                            }
+                            
+                            // Network/VLAN 지정
+                            if (vlan && vlan != 'null' && vlan.trim() != '') {
+                                cloneOptions += " -net=\"${vlan}\""
+                            }
+                            
+                            def cloneCommand = """
+                                export GOVC_URL="${govcUrl}"
+                                export GOVC_USERNAME="${govcUser}"
+                                export GOVC_PASSWORD="${govcPass}"
                                 export GOVC_INSECURE="${env.GOVC_INSECURE}"
                                 
-                                govc vm.ip "${vmName}" | head -1
+                                govc vm.clone ${cloneOptions} "${vmName}"
                             """
+                            
+                            echo "VM 클론 명령어 실행 중..."
+                            echo "Template: ${templateName}"
+                            echo "VM Name: ${vmName}"
+                            echo "Command: govc vm.clone ${cloneOptions} ${vmName}"
+                            sh cloneCommand
+                        
+                            echo "VM 클론 완료: ${vmName}"
+                            
+                            // IP 주소 설정 (govc vm.customize 또는 별도 스크립트 필요)
+                            // 주의: govc는 IP 설정을 직접 지원하지 않으므로,
+                            // vCenter Customization Spec을 사용하거나 별도 스크립트가 필요할 수 있음
+                            
+                            // VM 전원 켜기
+                            def powerOnCommand = """
+                                export GOVC_URL="${govcUrl}"
+                                export GOVC_USERNAME="${govcUser}"
+                                export GOVC_PASSWORD="${govcPass}"
+                                export GOVC_INSECURE="${env.GOVC_INSECURE}"
+                                
+                                govc vm.power -on "${vmName}"
+                            """
+                            
+                            sh powerOnCommand
+                            echo "VM 전원 켜기 완료: ${vmName}"
+                            
+                            // VM IP 주소 확인 대기
+                            echo "VM IP 주소 확인 대기 중..."
+                            def maxWait = 300  // 5분
+                            def waitTime = 0
+                            def vmIPConfirmed = false
+                            
+                            while (waitTime < maxWait && !vmIPConfirmed) {
+                                sleep(time: 10, unit: 'SECONDS')
+                                waitTime += 10
+                                
+                                def ipCheckCommand = """
+                                    export GOVC_URL="${govcUrl}"
+                                    export GOVC_USERNAME="${govcUser}"
+                                    export GOVC_PASSWORD="${govcPass}"
+                                    export GOVC_INSECURE="${env.GOVC_INSECURE}"
+                                    
+                                    govc vm.ip "${vmName}" | head -1
+                                """
                             
                             def ipOutput = sh(
                                 script: ipCheckCommand,
@@ -397,9 +404,10 @@ pipeline {
                             echo "경고: VM IP 주소를 확인하지 못했습니다. 할당된 IP (${vmIP})를 사용합니다."
                         }
                         
-                    } catch (Exception e) {
-                        echo "VM 클론 실패: ${e.getMessage()}"
-                        error("VM 클론 중 오류 발생: ${e.getMessage()}")
+                        } catch (Exception e) {
+                            echo "VM 클론 실패: ${e.getMessage()}"
+                            error("VM 클론 중 오류 발생: ${e.getMessage()}")
+                        }
                     }
                 }
             }
@@ -510,4 +518,3 @@ pipeline {
         }
     }
 }
-

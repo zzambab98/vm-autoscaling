@@ -4,6 +4,7 @@ import { autoscalingApi } from '../services/autoscalingApi';
 function AutoscalingConfigList({ onEdit, onView }) {
   const [configs, setConfigs] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [togglingConfigs, setTogglingConfigs] = useState(new Set());
   const [message, setMessage] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
@@ -11,7 +12,7 @@ function AutoscalingConfigList({ onEdit, onView }) {
     loadConfigs();
   }, []);
 
-  const loadConfigs = async () => {
+  const loadConfigs = async (preserveOnError = false) => {
     setLoading(true);
     setMessage(null);
     try {
@@ -19,12 +20,16 @@ function AutoscalingConfigList({ onEdit, onView }) {
       if (result && result.success) {
         setConfigs(result.configs || []);
       } else {
-        setConfigs([]);
+        if (!preserveOnError) {
+          setConfigs([]);
+        }
         setMessage({ type: 'error', text: '설정 목록을 불러올 수 없습니다.' });
       }
     } catch (error) {
       console.error('설정 목록 조회 실패:', error);
-      setConfigs([]);
+      if (!preserveOnError) {
+        setConfigs([]);
+      }
       setMessage({ type: 'error', text: `설정 목록 조회 실패: ${error.message || '알 수 없는 오류'}` });
     } finally {
       setLoading(false);
@@ -55,7 +60,21 @@ function AutoscalingConfigList({ onEdit, onView }) {
   };
 
   const handleToggleEnabled = async (configId, currentEnabled) => {
-    setLoading(true);
+    // 이미 처리 중이면 무시
+    if (togglingConfigs.has(configId)) {
+      return;
+    }
+
+    // Optimistic update: 로컬 상태를 먼저 업데이트
+    const newEnabled = !currentEnabled;
+    setConfigs(prevConfigs => 
+      prevConfigs.map(config => 
+        config.id === configId ? { ...config, enabled: newEnabled } : config
+      )
+    );
+
+    // 개별 버튼 로딩 상태 설정
+    setTogglingConfigs(prev => new Set(prev).add(configId));
     setMessage(null);
 
     try {
@@ -68,12 +87,33 @@ function AutoscalingConfigList({ onEdit, onView }) {
           type: 'success', 
           text: `설정이 ${currentEnabled ? '비활성화' : '활성화'}되었습니다.` 
         });
-        await loadConfigs();
+        // 백그라운드에서 목록 갱신 (실패해도 기존 목록 유지)
+        loadConfigs(true).catch(err => {
+          console.error('목록 갱신 실패 (기존 목록 유지):', err);
+        });
+      } else {
+        // 실패 시 원래 상태로 복원
+        setConfigs(prevConfigs => 
+          prevConfigs.map(config => 
+            config.id === configId ? { ...config, enabled: currentEnabled } : config
+          )
+        );
+        setMessage({ type: 'error', text: result.error || '설정 상태 변경 실패' });
       }
     } catch (error) {
+      // 에러 발생 시 원래 상태로 복원
+      setConfigs(prevConfigs => 
+        prevConfigs.map(config => 
+          config.id === configId ? { ...config, enabled: currentEnabled } : config
+        )
+      );
       setMessage({ type: 'error', text: `설정 상태 변경 실패: ${error.message}` });
     } finally {
-      setLoading(false);
+      setTogglingConfigs(prev => {
+        const next = new Set(prev);
+        next.delete(configId);
+        return next;
+      });
     }
   };
 
@@ -162,9 +202,9 @@ function AutoscalingConfigList({ onEdit, onView }) {
                     <button
                       className={`button ${config.enabled ? 'button-warning' : 'button-success'} button-compact`}
                       onClick={() => handleToggleEnabled(config.id, config.enabled)}
-                      disabled={loading}
+                      disabled={loading || togglingConfigs.has(config.id)}
                     >
-                      {config.enabled ? '비활성화' : '활성화'}
+                      {togglingConfigs.has(config.id) ? '처리 중...' : (config.enabled ? '비활성화' : '활성화')}
                     </button>
                     {deleteConfirm?.id === config.id ? (
                       <>

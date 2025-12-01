@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { autoscalingApi } from '../services/autoscalingApi';
 import { templateApi } from '../services/templateApi';
 import f5Api from '../services/f5Api';
+import { prometheusApi } from '../services/api';
 
 function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
   const [templates, setTemplates] = useState([]);
   const [f5Pools, setF5Pools] = useState([]);
   const [f5Vips, setF5Vips] = useState([]);
   const [f5Error, setF5Error] = useState(null);
+  const [prometheusJobs, setPrometheusJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [formData, setFormData] = useState({
@@ -39,12 +41,17 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
       subnet: '255.255.255.0',
       gateway: '',
       vlan: ''
+    },
+    vcenter: {
+      resourcePool: '/Datacenter/host/Cluster-01/Resources',
+      datastore: 'OS-Datastore-Power-Store'
     }
   });
 
   useEffect(() => {
     loadTemplates();
     loadF5Data();
+    loadPrometheusJobs();
     // configId가 있고 'new'가 아닐 때만 설정 조회
     if (configId && configId !== 'new') {
       loadConfig();
@@ -59,6 +66,21 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
       }
     } catch (error) {
       console.error('템플릿 목록 조회 실패:', error);
+    }
+  };
+
+  const loadPrometheusJobs = async () => {
+    try {
+      const result = await prometheusApi.getJobs();
+      if (result.success) {
+        // 시스템 Job 제외 (prometheus, alertmanager, loki)
+        const systemJobs = ['prometheus', 'alertmanager', 'loki'];
+        const filteredJobs = result.jobs.filter(job => !systemJobs.includes(job.jobName));
+        setPrometheusJobs(filteredJobs);
+      }
+    } catch (error) {
+      console.error('Prometheus Job 목록 조회 실패:', error);
+      setPrometheusJobs([]);
     }
   };
 
@@ -118,7 +140,15 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
     try {
       const result = await autoscalingApi.getConfigById(configId);
       if (result.success && result.config) {
-        setFormData(result.config);
+        const config = result.config;
+        // vCenter 설정이 없으면 기본값 설정
+        if (!config.vcenter) {
+          config.vcenter = {
+            resourcePool: '/Datacenter/host/Cluster-01/Resources',
+            datastore: 'OS-Datastore-Power-Store'
+          };
+        }
+        setFormData(config);
       } else {
         setMessage({ type: 'error', text: '설정을 찾을 수 없습니다.' });
       }
@@ -238,14 +268,33 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
         />
 
         <label className="label">Prometheus Job 이름 *</label>
-        <input
-          type="text"
-          className="input"
-          value={formData.monitoring.prometheusJobName}
-          onChange={(e) => updateNestedField('monitoring', 'prometheusJobName', e.target.value)}
-          placeholder="예: auto-vm-test-service"
-          required
-        />
+        {prometheusJobs.length > 0 ? (
+          <select
+            className="input"
+            value={formData.monitoring.prometheusJobName}
+            onChange={(e) => updateNestedField('monitoring', 'prometheusJobName', e.target.value)}
+            required
+          >
+            <option value="">Job 선택 (PLG Stack 모니터링 등록에서 등록한 Job)</option>
+            {prometheusJobs.map(job => (
+              <option key={job.jobName} value={job.jobName}>
+                {job.jobName} ({job.targets?.length || 0}개 target)
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="text"
+            className="input"
+            value={formData.monitoring.prometheusJobName}
+            onChange={(e) => updateNestedField('monitoring', 'prometheusJobName', e.target.value)}
+            placeholder="PLG Stack 모니터링 등록에서 등록한 Job 이름을 정확히 입력하세요 (예: auto-vm-test-service-job)"
+            required
+          />
+        )}
+        <div style={{ fontSize: '12px', color: '#666', marginTop: '4px', marginBottom: '12px' }}>
+          ⚠️ 중요: PLG Stack 모니터링 등록 메뉴에서 등록한 Job 이름과 정확히 일치해야 합니다.
+        </div>
 
         {/* 스케일링 설정 */}
         <h3 style={{ marginTop: '30px', marginBottom: '12px', color: '#2c3e50' }}>스케일링 설정</h3>
@@ -406,6 +455,34 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
           onChange={(e) => updateNestedField('f5', 'healthCheckPath', e.target.value)}
           placeholder="예: /health"
         />
+
+        {/* vCenter 설정 */}
+        <h3 style={{ marginTop: '30px', marginBottom: '12px', color: '#2c3e50' }}>vCenter 설정</h3>
+        <label className="label">Resource Pool *</label>
+        <input
+          type="text"
+          className="input"
+          value={formData.vcenter.resourcePool}
+          onChange={(e) => updateNestedField('vcenter', 'resourcePool', e.target.value)}
+          placeholder="예: /Datacenter/host/Cluster-01/Resources"
+          required
+        />
+        <div style={{ fontSize: '12px', color: '#666', marginTop: '4px', marginBottom: '12px' }}>
+          vCenter 리소스 풀 경로를 입력하세요. (예: /Datacenter/host/Cluster-01/Resources)
+        </div>
+
+        <label className="label">Datastore *</label>
+        <input
+          type="text"
+          className="input"
+          value={formData.vcenter.datastore}
+          onChange={(e) => updateNestedField('vcenter', 'datastore', e.target.value)}
+          placeholder="예: OS-Datastore-Power-Store"
+          required
+        />
+        <div style={{ fontSize: '12px', color: '#666', marginTop: '4px', marginBottom: '12px' }}>
+          vCenter 데이터스토어 이름을 입력하세요.
+        </div>
 
         {/* 네트워크 설정 */}
         <h3 style={{ marginTop: '30px', marginBottom: '12px', color: '#2c3e50' }}>네트워크 설정</h3>

@@ -29,6 +29,7 @@ function validateConfig(config) {
   if (!config.scaling) errors.push('scaling 설정이 필요합니다.');
   if (!config.f5) errors.push('f5 설정이 필요합니다.');
   if (!config.network) errors.push('network 설정이 필요합니다.');
+  if (!config.vcenter) errors.push('vcenter 설정이 필요합니다.');
 
   if (errors.length > 0) {
     return { valid: false, errors };
@@ -76,6 +77,13 @@ function validateConfig(config) {
     if (vipPort !== undefined && (vipPort < 1 || vipPort > 65535)) {
       errors.push('VIP 포트는 1-65535 사이여야 합니다.');
     }
+  }
+
+  // vCenter 설정 검증
+  if (config.vcenter) {
+    const { resourcePool, datastore } = config.vcenter;
+    if (!resourcePool) errors.push('vCenter Resource Pool은 필수입니다.');
+    if (!datastore) errors.push('vCenter Datastore는 필수입니다.');
   }
 
   // 네트워크 설정 검증

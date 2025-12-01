@@ -6,7 +6,7 @@ const yaml = require('js-yaml');
 
 const PLG_STACK_SERVER = process.env.PLG_STACK_SERVER || '10.255.1.254';
 const PLG_STACK_USER = process.env.PLG_STACK_USER || 'ubuntu';
-const PLG_STACK_SSH_KEY = process.env.PLG_STACK_SSH_KEY || '/Users/jhlee/Desktop/Work/Dana-Cloud-Oper/DanaIX-신규 VM 생성/00. SSH-PemKey-List/danainfra';
+const PLG_STACK_SSH_KEY = process.env.PLG_STACK_SSH_KEY || '/home/ubuntu/workspace/vm-autoscaling/pemkey/danainfra';
 const ALERTMANAGER_CONFIG_PATH = '/mnt/plg-stack/alertmanager/config/alertmanager.yml';
 const JENKINS_URL = process.env.JENKINS_URL || 'http://10.255.0.103:8080';
 const JENKINS_WEBHOOK_USER = process.env.JENKINS_WEBHOOK_USER || 'danacloud';

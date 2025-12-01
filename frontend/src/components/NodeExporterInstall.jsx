@@ -6,11 +6,11 @@ function NodeExporterInstall() {
   const sshKeyOptions = [
     {
       label: 'danainfra',
-      value: '/Users/jhlee/Desktop/Work/Dana-Cloud-Oper/DanaIX-신규 VM 생성/00. SSH-PemKey-List/danainfra'
+      value: '/home/ubuntu/workspace/vm-autoscaling/pemkey/danainfra'
     },
     {
       label: 'dana-cocktail',
-      value: '/Users/jhlee/Desktop/Work/Dana-Cloud-Oper/DanaIX-신규 VM 생성/00. SSH-PemKey-List/dana-cocktail'
+      value: '/home/ubuntu/workspace/vm-autoscaling/pemkey/dana-cocktail'
     },
     { label: '직접 입력', value: 'custom' }
   ];
