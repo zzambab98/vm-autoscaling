@@ -158,25 +158,54 @@ pipeline {
                             def configResponse = new groovy.json.JsonSlurper().parseText(configResponseText)
                             def configData = configResponse.config ?: configResponse
                             
+                            // 디버깅: vCenter 정보 확인
+                            echo "디버깅: configData.vcenter = ${configData.vcenter}"
+                            if (configData.vcenter) {
+                                echo "디버깅: vcenter.resourcePool = ${configData.vcenter.resourcePool}"
+                                echo "디버깅: vcenter.datastore = ${configData.vcenter.datastore}"
+                            }
+                            
                             if (!configData.serviceName) {
                                 error("오토스케일링 설정 응답이 올바르지 않습니다: ${configResponseText}")
                             }
                             
                             if (configData.templateId) {
-                                echo "Template 정보 조회: ${configData.templateId}"
+                                echo "📝 Template 정보 조회: ${configData.templateId}"
                                 try {
                                     def templateResponseText = sh(
-                                        script: """curl -sf -H "Content-Type: application/json" "${env.BACKEND_API_URL}/api/templates/${configData.templateId}" """,
+                                        script: """curl -s -w "\\n%{http_code}" -H "Content-Type: application/json" "${env.BACKEND_API_URL}/api/templates/${configData.templateId}" """,
                                         returnStdout: true
                                     ).trim()
-                                    def templateJson = new groovy.json.JsonSlurper().parseText(templateResponseText)
-                                    env.VCENTER_TEMPLATE = templateJson.template?.name ?: templateJson.name ?: 'app-template'
+
+                                    def lines = templateResponseText.split('\n')
+                                    def httpCode = lines[-1]
+                                    def responseBody = lines[0..-2].join('\n')
+
+                                    echo "🔍 Template API HTTP 응답 코드: ${httpCode}"
+
+                                    if (httpCode == '200') {
+                                        def templateJson = new groovy.json.JsonSlurper().parseText(responseBody)
+                                        def templateName = templateJson.template?.name ?: templateJson.name
+
+                                        if (templateName && templateName != '' && templateName != 'null') {
+                                            env.VCENTER_TEMPLATE = templateName
+                                            echo "✅ Template 이름: ${env.VCENTER_TEMPLATE}"
+                                        } else {
+                                            echo "⚠️ Template 이름이 비어있습니다. 기본값 사용: auto-vm-test-template"
+                                            env.VCENTER_TEMPLATE = 'auto-vm-test-template'
+                                        }
+                                    } else {
+                                        echo "⚠️ Template API 호출 실패 (HTTP ${httpCode}). 기본값 사용: auto-vm-test-template"
+                                        env.VCENTER_TEMPLATE = 'auto-vm-test-template'
+                                    }
                                 } catch (Exception tmplErr) {
-                                    echo "경고: Template 정보를 찾을 수 없습니다. 기본값 사용: app-template (${tmplErr.message})"
-                                    env.VCENTER_TEMPLATE = 'app-template'
+                                    echo "⚠️ Template 조회 중 예외 발생: ${tmplErr.class.name}"
+                                    echo "기본값 사용: auto-vm-test-template"
+                                    env.VCENTER_TEMPLATE = 'auto-vm-test-template'
                                 }
                             } else {
-                                env.VCENTER_TEMPLATE = 'app-template'
+                                echo "⚠️ templateId가 없습니다. 기본값 사용: auto-vm-test-template"
+                                env.VCENTER_TEMPLATE = 'auto-vm-test-template'
                             }
                             
                             env.VM_NAME_PREFIX = "${configData.serviceName}-auto" ?: 'app-auto'
@@ -194,8 +223,38 @@ pipeline {
                             env.F5_VIP = configData.f5?.vip ?: ''
                             env.F5_HEALTH_CHECK_PATH = configData.f5?.healthCheckPath ?: '/'
                             
-                            env.VCENTER_RESOURCE_POOL = configData.vcenter?.resourcePool ?: env.VCENTER_RESOURCE_POOL
-                            env.VCENTER_DATASTORE = configData.vcenter?.datastore ?: env.VCENTER_DATASTORE
+                            // vCenter 정보 설정 (LazyMap 직접 접근)
+                            def vcenterInfo = configData.vcenter
+                            def vcenterResourcePool = null
+                            def vcenterDatastore = null
+                            
+                            if (vcenterInfo) {
+                                // LazyMap에서 직접 값 가져오기
+                                vcenterResourcePool = vcenterInfo.get('resourcePool')
+                                vcenterDatastore = vcenterInfo.get('datastore')
+                                echo "디버깅: vcenterInfo에서 추출 - resourcePool=${vcenterResourcePool}, datastore=${vcenterDatastore}"
+                            }
+                            
+                            // vCenter 설정을 스크립트 변수로 저장 (환경 변수는 변경 불가)
+                            def finalResourcePool = vcenterResourcePool?.toString()?.trim()
+                            if (!finalResourcePool || finalResourcePool == '' || finalResourcePool == 'null') {
+                                finalResourcePool = env.VCENTER_RESOURCE_POOL
+                                echo "⚠ vCenter Resource Pool: 기본값 사용 (${finalResourcePool})"
+                            } else {
+                                echo "✓ vCenter Resource Pool: ${finalResourcePool}"
+                            }
+
+                            def finalDatastore = vcenterDatastore?.toString()?.trim()
+                            if (!finalDatastore || finalDatastore == '' || finalDatastore == 'null') {
+                                finalDatastore = env.VCENTER_DATASTORE
+                                echo "⚠ vCenter Datastore: 기본값 사용 (${finalDatastore})"
+                            } else {
+                                echo "✓ vCenter Datastore: ${finalDatastore}"
+                            }
+
+                            // 스크립트 변수를 환경 변수에도 저장 (다른 스테이지에서 사용)
+                            env.FINAL_RESOURCE_POOL = finalResourcePool
+                            env.FINAL_DATASTORE = finalDatastore
                             
                             echo "오토스케일링 설정 조회 완료:"
                             echo "  Template: ${env.VCENTER_TEMPLATE}"
@@ -203,8 +262,8 @@ pipeline {
                             echo "  IP Pool: ${env.IP_POOL_START} - ${env.IP_POOL_END}"
                             echo "  F5 Pool: ${env.F5_POOL_NAME}"
                             echo "  F5 VIP: ${env.F5_VIP}"
-                            echo "  Resource Pool: ${env.VCENTER_RESOURCE_POOL}"
-                            echo "  Datastore: ${env.VCENTER_DATASTORE}"
+                            echo "  Resource Pool: ${finalResourcePool}"
+                            echo "  Datastore: ${finalDatastore}"
                             
                         } catch (Exception e) {
                             error("오토스케일링 설정 조회 실패: ${e.getMessage()}")
@@ -298,8 +357,8 @@ pipeline {
                         def subnet = env.SUBNET
                         def gateway = env.GATEWAY
                         def vlan = env.VLAN
-                        def datastore = env.VCENTER_DATASTORE
-                        def resourcePool = env.VCENTER_RESOURCE_POOL
+                        def datastore = env.FINAL_DATASTORE ?: env.VCENTER_DATASTORE
+                        def resourcePool = env.FINAL_RESOURCE_POOL ?: env.VCENTER_RESOURCE_POOL
                         
                         // vCenter Credentials 재확인
                         def govcUrl = env.GOVC_URL ?: VCENTER_SERVER_CRED ?: 'https://vc.danacloud.local'
@@ -442,17 +501,14 @@ pipeline {
                             echo "Linux 환경에서 F5 API 호출..."
                             
                             // F5 API를 사용하여 Pool Member 추가
-                            // 예시: Python 스크립트 사용
+                            // Python 스크립트 사용 (워크스페이스 경로)
                             sh """
-                                python3 /opt/scripts/f5-pool-add.py \
-                                    ${poolName} \
-                                    ${memberIP} \
-                                    ${port} \
-                                    --f5-server ${env.F5_SERVER} \
-                                    --f5-user ${env.F5_USERNAME} \
-                                    --f5-password '${env.F5_PASSWORD}' \
-                                    --partition ${env.F5_PARTITION} \
-                                    --health-monitor ${env.F5_HEALTH_MONITOR}
+                                python3 ${WORKSPACE}/scripts/add-f5-pool-member.py \
+                                    --pool ${poolName} \
+                                    --member ${memberIP}:${port} \
+                                    --server ${env.F5_SERVER} \
+                                    --username ${env.F5_USERNAME} \
+                                    --password '${env.F5_PASSWORD}'
                             """
                             
                             echo "F5 Pool Member 추가 완료: ${memberIP}:${port}"

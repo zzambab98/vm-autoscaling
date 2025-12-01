@@ -1,0 +1,28 @@
+{
+  "receiver": "jenkins-autoscale",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "vm_autoscale_high_cpu",
+        "service": "auto-vm-test-service",
+        "instance": "auto-vm-instance",
+        "severity": "warning",
+        "autoscaleConfigId": "config-1764568169505"
+      },
+      "annotations": {
+        "summary": "CPU usage exceeded threshold",
+        "description": "Average CPU usage > 80% for 1m"
+      }
+    }
+  ],
+  "groupLabels": {
+    "alertname": "vm_autoscale_high_cpu"
+  },
+  "commonLabels": {
+    "alertname": "vm_autoscale_high_cpu",
+    "service": "auto-vm-test-service",
+    "severity": "warning"
+  }
+}

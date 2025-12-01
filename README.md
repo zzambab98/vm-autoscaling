@@ -1009,6 +1009,121 @@ Jenkins Webhook 수신 (Alertmanager에서 호출)
 
 ---
 
-**작성자**: Dana Cloud Automation Team  
-**최종 수정일**: 2025-11-20
+## 🚀 개발 진행 상황
+
+**최종 업데이트**: 2025-12-01
+
+### Phase 1: 기본 인프라 구축 ✅
+- [x] Backend API 서버 구축 (Node.js + Express)
+- [x] Frontend UI 구축 (React + Vite)
+- [x] 템플릿 관리 기능
+- [x] 오토스케일링 설정 관리 UI
+- [x] PLG Stack 연동 (Prometheus, Alertmanager, Grafana)
+- [x] F5 BIG-IP 연동
+
+### Phase 2: Scale-Out 기본 기능 ✅
+- [x] Alertmanager Webhook 수신
+- [x] Jenkins Pipeline 구축
+- [x] vCenter VM 클론 기능 (govc)
+- [x] Resource Pool 및 Datastore 설정
+- [x] VLAN 네트워크 설정
+- [x] Template 조회 및 적용
+
+### Phase 3: IP 관리 및 F5 연동 🚧
+- [x] IP Pool 설정 (Backend)
+- [x] IP 할당 로직 (ping 테스트)
+- [ ] **IP 자동 설정 (VM Customization)** ⚠️ 작업 중
+- [x] F5 Pool Member 추가 스크립트
+- [ ] **F5 Pool Member 자동 등록** ⚠️ 경로 수정 필요
+
+### Phase 4: VM 라이프사이클 관리 📝
+- [ ] **VM 목록 추적 기능** - 예정
+  - [ ] Backend에 VM 목록 저장
+  - [ ] VM 상태 관리 (running, stopped, deleted)
+  - [ ] 생성/삭제 이력 추적
+- [ ] **현재 VM 수 조회 API** - 예정
+- [ ] **VM 삭제 로직** - 예정
+  - [ ] F5 Pool Member 제거
+  - [ ] vCenter VM 전원 끄기
+  - [ ] vCenter VM 삭제
+  - [ ] IP 반환
+
+### Phase 5: 완전한 Auto Scaling 📝
+- [ ] **Scale-In 기능** - 예정
+  - [ ] Prometheus Scale-In Alert Rule
+  - [ ] Scale-In Jenkins Pipeline
+  - [ ] 최소 VM 수 제한 (minVms)
+  - [ ] 안전한 VM 선택 로직 (최근 생성된 VM 우선)
+- [ ] **점진적 Scale-Out** - 예정
+  - [ ] 현재 VM 수 확인
+  - [ ] 최대 VM 수 제한 (maxVms)
+  - [ ] scaleOutStep 적용
+- [ ] **Cooldown Period** - 예정
+  - [ ] 마지막 스케일링 시간 추적
+  - [ ] Cooldown 기간 동안 스케일링 방지
+  - [ ] 중복 실행 방지 로직
+
+### Phase 6: 모니터링 및 알림 📝
+- [ ] **스케일링 이벤트 로깅** - 예정
+- [ ] **Slack/Email 알림** - 예정
+- [ ] **Grafana 대시보드** - 예정
+  - [ ] 현재 VM 수 표시
+  - [ ] 스케일링 이력 그래프
+  - [ ] 리소스 사용률 추세
+
+### Phase 7: 고급 기능 📝
+- [ ] **vCenter 네트워크 목록 조회** - 예정
+- [ ] **IP Pool 자동 검증** - 예정
+- [ ] **Multi-Service 지원** - 예정
+- [ ] **비용 추적** - 예정
+
+---
+
+## 🐛 알려진 이슈
+
+### 🔴 Critical
+1. **IP 설정 미적용** ⚠️
+   - 현상: Jenkins가 IP Pool에서 IP를 선택하지만 VM에 설정되지 않음
+   - 결과: VM이 DHCP로 다른 IP 받음
+   - 해결책: `govc vm.customize`로 IP 설정 추가 필요
+
+2. **F5 스크립트 경로 오류** ⚠️
+   - 현상: Jenkins에서 `/opt/scripts/f5-pool-add.py` 찾을 수 없음
+   - 해결책: `${WORKSPACE}/scripts/add-f5-pool-member.py` 경로로 수정 필요
+   - 상태: 코드 수정 완료, Jenkins UI 업데이트 대기 중
+
+### 🟡 Warning
+3. **Template API 조회 실패**
+   - 현상: HTTP 응답 파싱 중 예외 발생
+   - 임시 해결: 하드코딩된 기본값 사용 (`auto-vm-test-template`)
+   - 개선 필요: 에러 처리 로직 강화
+
+### 🟢 Resolved
+- ✅ Resource Pool 경로 문제 (해결: LazyMap 처리 개선)
+- ✅ VLAN 이름 불일치 (해결: `vlan_1048` → `Vlan-1048`)
+- ✅ F5 스크립트 인자 형식 (해결: `--pool`, `--member` 형식으로 수정)
+
+---
+
+## 📝 다음 작업 (우선순위)
+
+### 즉시 (This Week)
+1. ✅ **IP 자동 설정 구현** - `govc vm.customize` 추가
+2. ✅ **F5 Pool 등록 완성** - Jenkins 스크립트 경로 수정
+3. 🔄 **End-to-End 테스트** - 전체 워크플로우 검증
+
+### 단기 (Next 2 Weeks)
+4. **VM 목록 추적** - Backend에 VM 데이터 저장
+5. **Scale-In 기본 구현** - VM 삭제 로직
+6. **Cooldown Period** - 중복 실행 방지
+
+### 중기 (Next Month)
+7. **점진적 Scale-Out** - 2대 → 4대 → 6대...
+8. **모니터링 대시보드** - Grafana 연동
+9. **알림 시스템** - Slack/Email
+
+---
+
+**작성자**: Dana Cloud Automation Team
+**최종 수정일**: 2025-12-01
 
