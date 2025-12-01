@@ -408,11 +408,35 @@ pipeline {
                             sh cloneCommand
                         
                             echo "VM 클론 완료: ${vmName}"
-                            
-                            // IP 주소 설정 (govc vm.customize 또는 별도 스크립트 필요)
-                            // 주의: govc는 IP 설정을 직접 지원하지 않으므로,
-                            // vCenter Customization Spec을 사용하거나 별도 스크립트가 필요할 수 있음
-                            
+
+                            // IP 주소 설정 (govc vm.customize 사용)
+                            echo "=========================================="
+                            echo "VM에 고정 IP 설정 중..."
+                            echo "=========================================="
+                            echo "할당된 IP: ${vmIP}"
+                            echo "서브넷: ${subnet}"
+                            echo "게이트웨이: ${gateway}"
+
+                            def customizeCommand = """
+                                export GOVC_URL="${govcUrl}"
+                                export GOVC_USERNAME="${govcUser}"
+                                export GOVC_PASSWORD="${govcPass}"
+                                export GOVC_INSECURE="${env.GOVC_INSECURE}"
+
+                                govc vm.customize -vm="${vmName}" \
+                                    -ip="${vmIP}" \
+                                    -netmask="${subnet}" \
+                                    -gateway="${gateway}"
+                            """
+
+                            try {
+                                sh customizeCommand
+                                echo "✅ VM IP 설정 완료: ${vmIP}"
+                            } catch (Exception customizeErr) {
+                                echo "⚠️ VM Customization 실패: ${customizeErr.message}"
+                                echo "VM이 DHCP로 IP를 받을 수 있습니다."
+                            }
+
                             // VM 전원 켜기
                             def powerOnCommand = """
                                 export GOVC_URL="${govcUrl}"
