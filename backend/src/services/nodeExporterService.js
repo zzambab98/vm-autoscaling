@@ -205,11 +205,17 @@ async function checkNodeExporterStatus(serverIp, options = {}) {
       throw new Error('SSH Key 또는 Password가 필요합니다.');
     }
 
-    // 상태 확인 스크립트
+    // 상태 확인 스크립트 (Node Exporter + Promtail)
     const checkScript = `#!/bin/bash
+# Node Exporter 상태
 systemctl is-active node_exporter 2>/dev/null || echo "inactive"
 systemctl is-enabled node_exporter 2>/dev/null || echo "disabled"
 curl -s http://localhost:9100/metrics | head -1 2>/dev/null || echo "not_responding"
+
+# Promtail 상태
+systemctl is-active promtail 2>/dev/null || echo "inactive"
+systemctl is-enabled promtail 2>/dev/null || echo "disabled"
+curl -s http://localhost:9080/ready 2>/dev/null | head -1 || echo "not_responding"
 `;
 
     // 스크립트를 base64로 인코딩하여 전송
@@ -218,24 +224,50 @@ curl -s http://localhost:9100/metrics | head -1 2>/dev/null || echo "not_respond
     const { stdout } = await execPromise(command, { timeout: 10000 });
 
     const lines = stdout.trim().split('\n');
-    const isActive = lines[0] === 'active';
-    const isEnabled = lines[1] === 'enabled';
-    const isResponding = lines[2] && !lines[2].includes('not_responding');
+    
+    // Node Exporter 상태
+    const nodeExporterActive = lines[0] === 'active';
+    const nodeExporterEnabled = lines[1] === 'enabled';
+    const nodeExporterResponding = lines[2] && !lines[2].includes('not_responding');
+    const nodeExporterInstalled = nodeExporterActive || nodeExporterEnabled || nodeExporterResponding;
+    
+    // Promtail 상태
+    const promtailActive = lines[3] === 'active';
+    const promtailEnabled = lines[4] === 'enabled';
+    const promtailResponding = lines[5] && !lines[5].includes('not_responding');
+    const promtailInstalled = promtailActive || promtailEnabled || promtailResponding;
 
     return {
       success: true,
       serverIp: serverIp,
-      installed: isActive || isEnabled || isResponding,
-      isActive: isActive,
-      isEnabled: isEnabled,
-      isResponding: isResponding,
-      status: isActive ? 'running' : (isEnabled ? 'installed' : 'not_installed')
+      nodeExporter: {
+        installed: nodeExporterInstalled,
+        isActive: nodeExporterActive,
+        isEnabled: nodeExporterEnabled,
+        isResponding: nodeExporterResponding,
+        status: nodeExporterActive ? 'running' : (nodeExporterEnabled ? 'installed' : 'not_installed')
+      },
+      promtail: {
+        installed: promtailInstalled,
+        isActive: promtailActive,
+        isEnabled: promtailEnabled,
+        isResponding: promtailResponding,
+        status: promtailActive ? 'running' : (promtailEnabled ? 'installed' : 'not_installed')
+      },
+      // 하위 호환성을 위한 필드
+      installed: nodeExporterInstalled,
+      isActive: nodeExporterActive,
+      isEnabled: nodeExporterEnabled,
+      isResponding: nodeExporterResponding,
+      status: nodeExporterActive ? 'running' : (nodeExporterEnabled ? 'installed' : 'not_installed')
     };
   } catch (error) {
     console.error(`[Node Exporter] 상태 확인 실패 (${serverIp}):`, error);
     return {
       success: false,
       serverIp: serverIp,
+      nodeExporter: { installed: false },
+      promtail: { installed: false },
       installed: false,
       error: error.message
     };

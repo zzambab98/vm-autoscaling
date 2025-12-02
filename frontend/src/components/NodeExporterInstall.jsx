@@ -51,7 +51,9 @@ function NodeExporterInstall() {
               ips: ips, // 모든 IP 목록
               name: vm.name,
               status: 'unknown',
-              installing: false
+              installing: false,
+              nodeExporterInstalled: false,
+              promtailInstalled: false
             };
           })
           .sort((a, b) => a.name.localeCompare(b.name, 'ko', { numeric: true })); // 이름 기준 정렬
@@ -88,9 +90,30 @@ function NodeExporterInstall() {
         sshKey: getEffectiveSshKey()
       });
       
+      // Node Exporter와 Promtail 상태 모두 확인
+      const nodeExporterStatus = result.nodeExporter?.installed ? 'installed' : 'not_installed';
+      const promtailStatus = result.promtail?.installed ? 'installed' : 'not_installed';
+      
+      // 상태 문자열 생성
+      let statusText = '';
+      if (nodeExporterStatus === 'installed' && promtailStatus === 'installed') {
+        statusText = 'both_installed';
+      } else if (nodeExporterStatus === 'installed') {
+        statusText = 'node_exporter_only';
+      } else if (promtailStatus === 'installed') {
+        statusText = 'promtail_only';
+      } else {
+        statusText = 'not_installed';
+      }
+      
       setServers(prev => prev.map(s => 
         s.ip === serverIp 
-          ? { ...s, status: result.installed ? (result.isActive ? 'installed' : 'installed') : 'not_installed' }
+          ? { 
+              ...s, 
+              status: statusText,
+              nodeExporterInstalled: result.nodeExporter?.installed || false,
+              promtailInstalled: result.promtail?.installed || false
+            }
           : s
       ));
     } catch (error) {
@@ -445,15 +468,27 @@ function NodeExporterInstall() {
                   )}
                 </td>
               <td>
-                <span className={`status-badge ${
-                  server.status === 'installed' ? 'status-success' :
-                  server.status === 'not_installed' ? 'status-error' :
-                  'status-info'
-                }`}>
-                  {server.status === 'installed' ? '설치됨' :
-                   server.status === 'not_installed' ? '미설치' :
-                   '확인 필요'}
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {installNodeExporter && (
+                    <span className={`status-badge ${
+                      server.nodeExporterInstalled ? 'status-success' : 'status-error'
+                    }`} style={{ fontSize: '12px', padding: '2px 8px' }}>
+                      Node Exporter: {server.nodeExporterInstalled ? '설치됨' : '미설치'}
+                    </span>
+                  )}
+                  {installPromtail && (
+                    <span className={`status-badge ${
+                      server.promtailInstalled ? 'status-success' : 'status-error'
+                    }`} style={{ fontSize: '12px', padding: '2px 8px' }}>
+                      Promtail: {server.promtailInstalled ? '설치됨' : '미설치'}
+                    </span>
+                  )}
+                  {!installNodeExporter && !installPromtail && (
+                    <span className="status-badge status-info" style={{ fontSize: '12px', padding: '2px 8px' }}>
+                      확인 필요
+                    </span>
+                  )}
+                </div>
               </td>
               <td>
                 <button
