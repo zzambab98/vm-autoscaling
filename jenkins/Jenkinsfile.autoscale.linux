@@ -208,9 +208,60 @@ pipeline {
                                 env.VCENTER_TEMPLATE = 'auto-vm-test-template'
                             }
                             
-                            env.VM_NAME_PREFIX = "${configData.serviceName}-auto" ?: 'app-auto'
-                            env.NEW_VM_NAME = "${env.VM_NAME_PREFIX}-${BUILD_NUMBER}-${System.currentTimeMillis()}"
-                            env.NEW_VM_NAME = env.NEW_VM_NAME.toLowerCase().replaceAll(/[^a-z0-9-]/, '-')
+                            // VM 이름 생성: 기존 VM 목록 확인 후 다음 순차 번호 생성
+                            def serviceName = configData.serviceName ?: 'app'
+                            def vmNameBase = "${serviceName}".toLowerCase().replaceAll(/[^a-z0-9-]/, '-')
+                            
+                            // vCenter에서 기존 VM 목록 조회하여 다음 번호 결정
+                            def nextVMNumber = 1
+                            try {
+                                def govcUrl = env.GOVC_URL ?: VCENTER_SERVER_CRED ?: 'https://vc.danacloud.local'
+                                def govcUser = env.GOVC_USERNAME ?: VCENTER_USER_CRED ?: 'svc-auto'
+                                def govcPass = env.GOVC_PASSWORD ?: VCENTER_PASSWORD_CRED
+                                
+                                if (govcPass && govcPass != 'null' && govcPass.trim() != '') {
+                                    def listVMsCommand = """
+                                        export GOVC_URL="${govcUrl}"
+                                        export GOVC_USERNAME="${govcUser}"
+                                        export GOVC_PASSWORD="${govcPass}"
+                                        export GOVC_INSECURE="${env.GOVC_INSECURE}"
+                                        
+                                        govc find / -type m -name "${vmNameBase}-*" 2>/dev/null | grep -E "${vmNameBase}-[0-9]+\$" || true
+                                    """
+                                    
+                                    def existingVMs = sh(
+                                        script: listVMsCommand,
+                                        returnStdout: true
+                                    ).trim()
+                                    
+                                    if (existingVMs) {
+                                        def vmNumbers = []
+                                        existingVMs.split('\n').each { vmPath ->
+                                            // VM 경로에서 이름 추출 (예: /Datacenter/vm/auto-vm-test-01)
+                                            def vmName = vmPath.split('/').last()
+                                            def matcher = vmName =~ /${vmNameBase}-([0-9]+)\$/
+                                            if (matcher) {
+                                                def num = matcher[0][1].toInteger()
+                                                vmNumbers.add(num)
+                                            }
+                                        }
+                                        
+                                        if (vmNumbers.size() > 0) {
+                                            nextVMNumber = vmNumbers.max() + 1
+                                            echo "기존 VM 발견: 최대 번호 = ${vmNumbers.max()}, 다음 번호 = ${nextVMNumber}"
+                                        }
+                                    }
+                                }
+                            } catch (Exception vmListErr) {
+                                echo "⚠️ 기존 VM 목록 조회 실패: ${vmListErr.message}. 번호 1부터 시작합니다."
+                            }
+                            
+                            // VM 이름 생성 (예: auto-vm-test-01, auto-vm-test-02)
+                            env.NEW_VM_NAME = "${vmNameBase}-${String.format('%02d', nextVMNumber)}"
+                            env.VM_HOSTNAME = env.NEW_VM_NAME  // 호스트네임도 동일하게 설정
+                            
+                            echo "생성할 VM 이름: ${env.NEW_VM_NAME}"
+                            echo "호스트네임: ${env.VM_HOSTNAME}"
                             
                             env.IP_POOL_START = configData.network?.ipPoolStart ?: ''
                             env.IP_POOL_END = configData.network?.ipPoolEnd ?: ''
@@ -409,14 +460,16 @@ pipeline {
                         
                             echo "VM 클론 완료: ${vmName}"
 
-                            // IP 주소 설정 (govc vm.customize 사용)
+                            // IP 주소 및 호스트네임 설정 (govc vm.customize 사용)
                             echo "=========================================="
-                            echo "VM에 고정 IP 설정 중..."
+                            echo "VM에 고정 IP 및 호스트네임 설정 중..."
                             echo "=========================================="
                             echo "할당된 IP: ${vmIP}"
                             echo "서브넷: ${subnet}"
                             echo "게이트웨이: ${gateway}"
+                            echo "호스트네임: ${env.VM_HOSTNAME ?: vmName}"
 
+                            def vmHostname = env.VM_HOSTNAME ?: vmName
                             def customizeCommand = """
                                 export GOVC_URL="${govcUrl}"
                                 export GOVC_USERNAME="${govcUser}"
@@ -426,7 +479,8 @@ pipeline {
                                 govc vm.customize -vm="${vmName}" \
                                     -ip="${vmIP}" \
                                     -netmask="${subnet}" \
-                                    -gateway="${gateway}"
+                                    -gateway="${gateway}" \
+                                    -hostname="${vmHostname}"
                             """
 
                             try {

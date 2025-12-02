@@ -22,6 +22,13 @@ function NodeExporterInstall() {
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingVms, setLoadingVms] = useState(false);
+  
+  // 자동 연동 옵션
+  const [autoRegisterPrometheus, setAutoRegisterPrometheus] = useState(false);
+  const [prometheusJobName, setPrometheusJobName] = useState('');
+  const [prometheusServiceLabel, setPrometheusServiceLabel] = useState('');
+  const [prometheusEnvironmentLabel, setPrometheusEnvironmentLabel] = useState('production');
+  const [groupByJob, setGroupByJob] = useState(true);
 
   // 컴포넌트 마운트 시 vCenter에서 모든 VM 조회
   useEffect(() => {
@@ -101,13 +108,25 @@ function NodeExporterInstall() {
     setMessage(null);
 
     try {
-      const result = await nodeExporterApi.install(serverIp, {
+      const installOptions = {
         sshUser,
-        sshKey: getEffectiveSshKey()
-      });
+        sshKey: getEffectiveSshKey(),
+        autoRegisterPrometheus,
+        prometheusJobName: prometheusJobName || null,
+        prometheusLabels: {
+          service: prometheusServiceLabel || undefined,
+          environment: prometheusEnvironmentLabel || undefined
+        }
+      };
+
+      const result = await nodeExporterApi.install(serverIp, installOptions);
 
       if (result.success) {
-        setMessage({ type: 'success', text: `${serverIp}: Node Exporter 설치 완료` });
+        let successMsg = `${serverIp}: Node Exporter 설치 완료`;
+        if (result.prometheusRegistered) {
+          successMsg += ` (Prometheus Job '${result.prometheusJobName}'에 자동 등록됨)`;
+        }
+        setMessage({ type: 'success', text: successMsg });
         await checkStatus(serverIp);
       } else {
         const errorMsg = result.error || result.details || '알 수 없는 오류';
@@ -139,15 +158,28 @@ function NodeExporterInstall() {
 
     try {
       const serverIps = servers.map(s => s.ip);
-      const result = await nodeExporterApi.installMultiple(serverIps, {
+      const installOptions = {
         sshUser,
-        sshKey: getEffectiveSshKey()
-      });
+        sshKey: getEffectiveSshKey(),
+        autoRegisterPrometheus,
+        prometheusJobName: prometheusJobName || null,
+        prometheusLabels: {
+          service: prometheusServiceLabel || undefined,
+          environment: prometheusEnvironmentLabel || undefined
+        },
+        groupByJob
+      };
+
+      const result = await nodeExporterApi.installMultiple(serverIps, installOptions);
 
       if (result.success) {
+        let successMsg = `설치 완료: ${result.summary.success}/${result.summary.total}개 서버`;
+        if (result.summary.prometheusRegistered > 0) {
+          successMsg += ` (${result.summary.prometheusRegistered}개 서버 Prometheus 자동 등록됨)`;
+        }
         setMessage({ 
           type: 'success', 
-          text: `설치 완료: ${result.summary.success}/${result.summary.total}개 서버` 
+          text: successMsg
         });
         
         // 모든 서버 상태 확인
@@ -242,6 +274,79 @@ function NodeExporterInstall() {
         <p style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '8px' }}>
           선택된 SSH Key로 모든 서버에 접속합니다. 사용자별 키 추가가 필요하면 "직접 입력"을 사용하세요.
         </p>
+      </div>
+
+      {/* Prometheus 자동 등록 옵션 */}
+      <div style={{ marginBottom: '20px', padding: '16px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #dee2e6' }}>
+        <h3 style={{ marginTop: '0', marginBottom: '12px', fontSize: '16px', color: '#2c3e50' }}>
+          🔗 Prometheus 자동 등록 (선택)
+        </h3>
+        
+        <label style={{ display: 'flex', alignItems: 'center', marginBottom: '12px', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={autoRegisterPrometheus}
+            onChange={(e) => setAutoRegisterPrometheus(e.target.checked)}
+            style={{ marginRight: '8px', width: '18px', height: '18px', cursor: 'pointer' }}
+          />
+          <span style={{ fontSize: '14px', fontWeight: '500' }}>
+            Node Exporter 설치 후 Prometheus에 자동 등록
+          </span>
+        </label>
+
+        {autoRegisterPrometheus && (
+          <div style={{ marginLeft: '26px', marginTop: '12px' }}>
+            <label className="label">Prometheus Job 이름 (선택)</label>
+            <input
+              type="text"
+              className="input"
+              value={prometheusJobName}
+              onChange={(e) => setPrometheusJobName(e.target.value)}
+              placeholder="비워두면 자동 생성 (예: node-exporter-230 또는 node-exporter-10.255.48)"
+              style={{ marginBottom: '10px' }}
+            />
+            <div style={{ fontSize: '12px', color: '#666', marginBottom: '12px' }}>
+              💡 여러 서버를 설치할 경우, Job 이름을 지정하면 하나의 Job으로 그룹화됩니다.
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+              <div>
+                <label className="label">Service Label (선택)</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={prometheusServiceLabel}
+                  onChange={(e) => setPrometheusServiceLabel(e.target.value)}
+                  placeholder="예: web-server"
+                />
+              </div>
+              <div>
+                <label className="label">Environment Label</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={prometheusEnvironmentLabel}
+                  onChange={(e) => setPrometheusEnvironmentLabel(e.target.value)}
+                  placeholder="예: production"
+                />
+              </div>
+            </div>
+
+            {servers.length > 1 && (
+              <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={groupByJob}
+                  onChange={(e) => setGroupByJob(e.target.checked)}
+                  style={{ marginRight: '8px', width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '14px' }}>
+                  여러 서버를 하나의 Job으로 그룹화
+                </span>
+              </label>
+            )}
+          </div>
+        )}
       </div>
 
       <div style={{ marginBottom: '20px' }}>

@@ -1,6 +1,12 @@
 const http = require('http');
 const url = require('url');
-const { installNodeExporter, checkNodeExporterStatus, installNodeExporterOnMultipleServers } = require('./services/nodeExporterService');
+const { 
+  installNodeExporter, 
+  checkNodeExporterStatus, 
+  installNodeExporterOnMultipleServers,
+  installPromtail,
+  installPromtailOnMultipleServers
+} = require('./services/nodeExporterService');
 const { addPrometheusJob, getPrometheusJobs, getPrometheusTargets } = require('./services/prometheusMonitoringService');
 const { getTemplates, getTemplateById, convertVmToTemplate, deleteTemplate, getVmList } = require('./services/templateService');
 const { saveConfig, getConfigs, getConfigById, updateConfig, deleteConfig, setConfigEnabled } = require('./services/autoscalingService');
@@ -48,23 +54,69 @@ const server = http.createServer((req, res) => {
     req.on('end', async () => {
       try {
         const payload = JSON.parse(body);
-        const { serverIp, serverIps, sshUser, sshKey, sshPassword } = payload;
+        const { 
+          serverIp, 
+          serverIps, 
+          sshUser, 
+          sshKey, 
+          sshPassword,
+          autoRegisterPrometheus,
+          prometheusJobName,
+          prometheusLabels,
+          groupByJob
+        } = payload;
+
+        const installOptions = {
+          sshUser,
+          sshKey,
+          sshPassword,
+          autoRegisterPrometheus: autoRegisterPrometheus || false,
+          prometheusJobName: prometheusJobName || null,
+          prometheusLabels: prometheusLabels || {},
+          groupByJob: groupByJob !== false // 기본값 true
+        };
 
         if (serverIps && Array.isArray(serverIps)) {
           // 여러 서버에 설치
-          const result = await installNodeExporterOnMultipleServers(serverIps, {
-            sshUser,
-            sshKey,
-            sshPassword
-          });
+          const result = await installNodeExporterOnMultipleServers(serverIps, installOptions);
           sendJSONResponse(res, 200, result);
         } else if (serverIp) {
           // 단일 서버에 설치
-          const result = await installNodeExporter(serverIp, {
-            sshUser,
-            sshKey,
-            sshPassword
-          });
+          const result = await installNodeExporter(serverIp, installOptions);
+          sendJSONResponse(res, result.success ? 200 : 500, result);
+        } else {
+          sendJSONResponse(res, 400, { error: 'serverIp 또는 serverIps가 필요합니다.' });
+        }
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    });
+    return;
+  }
+
+  // Promtail 설치 API
+  if (req.method === 'POST' && parsedUrl.pathname === '/api/promtail/install') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body);
+        const { serverIp, serverIps, sshUser, sshKey, sshPassword, lokiUrl } = payload;
+
+        const installOptions = {
+          sshUser,
+          sshKey,
+          sshPassword,
+          lokiUrl: lokiUrl || null
+        };
+
+        if (serverIps && Array.isArray(serverIps)) {
+          // 여러 서버에 설치
+          const result = await installPromtailOnMultipleServers(serverIps, installOptions);
+          sendJSONResponse(res, 200, result);
+        } else if (serverIp) {
+          // 단일 서버에 설치
+          const result = await installPromtail(serverIp, installOptions);
           sendJSONResponse(res, result.success ? 200 : 500, result);
         } else {
           sendJSONResponse(res, 400, { error: 'serverIp 또는 serverIps가 필요합니다.' });

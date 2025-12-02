@@ -95,6 +95,26 @@ export const nodeExporterApi = {
   }
 };
 
+// Promtail API
+export const promtailApi = {
+  // Promtail 설치
+  install: async (serverIp, options = {}) => {
+    const response = await api.post('/api/promtail/install', {
+      serverIp,
+      ...options
+    });
+    return response.data;
+  },
+  // 여러 서버에 Promtail 설치
+  installMultiple: async (serverIps, options = {}) => {
+    const response = await api.post('/api/promtail/install', {
+      serverIps,
+      ...options
+    });
+    return response.data;
+  }
+};
+
 // Prometheus API
 export const prometheusApi = {
   // Job 추가
