@@ -719,11 +719,11 @@ sudo rm -f /usr/local/bin/promtail
 sudo cp promtail-linux-amd64 /usr/local/bin/promtail
 sudo chmod +x /usr/local/bin/promtail
 
-# Promtail 설정 파일 생성 (heredoc을 작은따옴표로 감싸서 안전하게 생성)
+# Promtail 설정 파일 생성 (heredoc을 작은따옴표 없이 사용하여 변수 확장)
 sudo mkdir -p /etc/promtail
 HOSTNAME=\$(hostname)
 LOKI_URL="${finalLokiUrl}"
-sudo bash -c 'cat > /etc/promtail/config.yml <<'EOF'
+sudo bash -c "cat > /etc/promtail/config.yml <<EOF
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
