@@ -714,28 +714,38 @@ CONFIGEOF
 # wtmp, btmp, lastlog는 바이너리 파일이므로 cron으로 주기적으로 텍스트 변환
 sudo tee /usr/local/bin/export-login-history.sh > /dev/null <<'SCRIPTEOF'
 #!/bin/bash
+set -euo pipefail
+
 # 접속 기록을 텍스트 파일로 변환
 LOG_FILE="/var/log/login_history.log"
 DATE=$(date '+%Y-%m-%d %H:%M:%S')
 
-echo "=== Login History Export at $DATE ===" >> $LOG_FILE
-echo "--- Successful Logins (wtmp) ---" >> $LOG_FILE
-last -F -w >> $LOG_FILE 2>/dev/null || echo "wtmp not available" >> $LOG_FILE
-echo "" >> $LOG_FILE
+# LOG_FILE 변수 확인
+if [ -z "$LOG_FILE" ]; then
+  echo "ERROR: LOG_FILE is not defined" >&2
+  exit 1
+fi
 
-echo "--- Failed Login Attempts (btmp) ---" >> $LOG_FILE
-lastb -F -w >> $LOG_FILE 2>/dev/null || echo "btmp not available" >> $LOG_FILE
-echo "" >> $LOG_FILE
-
-echo "--- Last Login per User (lastlog) ---" >> $LOG_FILE
-lastlog >> $LOG_FILE 2>/dev/null || echo "lastlog not available" >> $LOG_FILE
-echo "" >> $LOG_FILE
-echo "=== End of Export ===" >> $LOG_FILE
-echo "" >> $LOG_FILE
+{
+  echo "=== Login History Export at $DATE ==="
+  echo "--- Successful Logins (wtmp) ---"
+  last -F -w 2>/dev/null || echo "wtmp not available"
+  echo ""
+  
+  echo "--- Failed Login Attempts (btmp) ---"
+  lastb -F -w 2>/dev/null || echo "btmp not available"
+  echo ""
+  
+  echo "--- Last Login per User (lastlog) ---"
+  lastlog 2>/dev/null || echo "lastlog not available"
+  echo ""
+  echo "=== End of Export ==="
+  echo ""
+} >> "$LOG_FILE" 2>&1
 
 # 로그 파일 크기 제한 (최대 10MB)
 if [ -f "$LOG_FILE" ]; then
-  FILE_SIZE=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null)
+  FILE_SIZE=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo "0")
   MAX_SIZE=10485760  # 10MB
   if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
     tail -n 1000 "$LOG_FILE" > "${LOG_FILE}.tmp"

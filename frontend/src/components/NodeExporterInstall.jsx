@@ -62,6 +62,7 @@ function NodeExporterInstall() {
               name: vm.name,
               status: 'unknown',
               installing: false,
+              uninstalling: false,
               nodeExporterInstalled: false,
               promtailInstalled: false
             };
@@ -326,7 +327,7 @@ function NodeExporterInstall() {
     }
 
     setServers(prev => prev.map(s => 
-      s.ip === serverIp ? { ...s, installing: true } : s
+      s.ip === serverIp ? { ...s, uninstalling: true } : s
     ));
     setMessage(null);
 
@@ -380,7 +381,7 @@ function NodeExporterInstall() {
       setMessage({ type: 'error', text: `${serverIp}: 삭제 실패 - ${error.message}` });
     } finally {
       setServers(prev => prev.map(s => 
-        s.ip === serverIp ? { ...s, installing: false } : s
+        s.ip === serverIp ? { ...s, uninstalling: false } : s
       ));
     }
   };
@@ -657,11 +658,11 @@ function NodeExporterInstall() {
                         uninstallOnServer(server.ip, 'promtail');
                       }
                     }}
-                    disabled={server.installing || loading}
+                    disabled={server.installing || server.uninstalling || loading}
                     style={{ backgroundColor: '#f44336', color: '#fff' }}
                     title="설치된 도구 삭제"
                   >
-                    삭제
+                    {server.uninstalling ? '삭제 중...' : '삭제'}
                   </button>
                 )}
               </td>
