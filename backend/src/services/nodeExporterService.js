@@ -738,12 +738,10 @@ CONFIGEOF
 
 # 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (선택사항)
 # wtmp, btmp, lastlog는 바이너리 파일이므로 cron으로 주기적으로 텍스트 변환
-sudo tee /usr/local/bin/export-login-history.sh > /dev/null <<'SCRIPTEOF'
+sudo bash -c 'cat > /usr/local/bin/export-login-history.sh << '\''SCRIPTEOF'\''
 #!/bin/bash
-set -e
-
-readonly LOG_FILE="/var/log/login_history.log"
-DATE=$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "unknown")
+LOG_FILE="/var/log/login_history.log"
+DATE=$(date "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "unknown")
 
 {
   echo "=== Login History Export at $DATE ==="
@@ -765,13 +763,14 @@ DATE=$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "unknown")
 # 로그 파일 크기 제한 (최대 10MB)
 if [ -f "$LOG_FILE" ]; then
   FILE_SIZE=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo "0")
-  MAX_SIZE=10485760  # 10MB
+  MAX_SIZE=10485760
   if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
     tail -n 1000 "$LOG_FILE" > "${LOG_FILE}.tmp"
     mv "${LOG_FILE}.tmp" "$LOG_FILE"
   fi
 fi
 SCRIPTEOF
+'
 
 sudo chmod +x /usr/local/bin/export-login-history.sh
 
