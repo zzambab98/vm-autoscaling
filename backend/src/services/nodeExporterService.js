@@ -247,13 +247,20 @@ curl -s http://localhost:9080/ready 2>&1 | head -1 || echo "not_responding"
                                promtailResponse !== 'not_responding' && 
                                promtailResponse !== 'disabled' &&
                                promtailResponse !== 'inactive' &&
+                               promtailResponse !== 'binary_not_found' &&
+                               promtailResponse !== 'config_not_found' &&
                                !promtailResponse.includes('Connection refused') &&
                                !promtailResponse.includes('curl:') &&
                                !promtailResponse.includes('could not resolve') &&
                                !promtailResponse.includes('Failed to connect');
-    // 바이너리와 설정 파일이 모두 존재하거나, 서비스가 활성화되어 있거나, 실제로 응답하는 경우만 설치됨으로 판단
-    // (바이너리만 있거나 설정만 있는 경우는 불완전한 설치로 간주)
-    const promtailInstalled = (promtailBinaryExists && promtailConfigExists) || promtailActive || promtailEnabled || promtailResponding;
+    
+    // 설치됨 판단: 바이너리와 설정 파일이 모두 존재해야 함 (가장 엄격한 기준)
+    // 또는 서비스가 실제로 active 상태이거나 enabled 상태이거나 실제로 응답하는 경우
+    // 단, 바이너리나 설정 파일이 없으면 미설치로 판단 (불완전한 설치 방지)
+    const promtailInstalled = (promtailBinaryExists && promtailConfigExists) || 
+                              (promtailActive && promtailBinaryExists) || 
+                              (promtailEnabled && promtailBinaryExists) ||
+                              (promtailResponding && promtailBinaryExists);
 
     return {
       success: true,
