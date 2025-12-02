@@ -503,7 +503,7 @@ sudo chmod +x /usr/local/bin/promtail
 sudo mkdir -p /etc/promtail
 # 호스트명을 변수로 가져오기
 HOSTNAME=\$(hostname)
-sudo tee /etc/promtail/config.yml > /dev/null <<CONFIGEOF
+sudo tee /etc/promtail/config.yml > /dev/null <<'CONFIGEOF'
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
