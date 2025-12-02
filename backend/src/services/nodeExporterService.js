@@ -451,62 +451,8 @@ async function installPromtail(serverIp, options = {}) {
   // Loki URL이 없으면 환경 변수에서 가져오기
   const finalLokiUrl = lokiUrl || process.env.LOKI_URL || 'http://10.255.1.254:3100/loki/api/v1/push';
 
-  try {
-    let sshCommand = '';
-    if (sshKey) {
-      sshCommand = `ssh -i "${sshKey}" -o StrictHostKeyChecking=no ${sshUser}@${serverIp}`;
-    } else if (sshPassword) {
-      sshCommand = `sshpass -p '${sshPassword}' ssh -o StrictHostKeyChecking=no ${sshUser}@${serverIp}`;
-    } else {
-      throw new Error('SSH Key 또는 Password가 필요합니다.');
-    }
-
-    // Promtail 설치 스크립트
-    const installScript = `#!/bin/bash
-set -eo pipefail
-
-# 기존 Promtail 서비스 중지
-sudo systemctl stop promtail 2>/dev/null || true
-sudo systemctl disable promtail 2>/dev/null || true
-sudo pkill -f promtail 2>/dev/null || true
-sleep 2
-
-# Promtail 다운로드 (tar.gz 형식 사용 - unzip 불필요)
-cd /tmp
-# unzip이 없을 수 있으므로 tar.gz 형식 사용
-wget -q https://github.com/grafana/loki/releases/download/v${promtailVersion}/promtail-linux-amd64.zip -O promtail-linux-amd64.zip
-
-# unzip 설치 시도 (없으면 설치)
-if ! command -v unzip &> /dev/null; then
-  sudo apt-get update -qq > /dev/null 2>&1
-  sudo apt-get install -y unzip > /dev/null 2>&1 || {
-    # unzip 설치 실패 시 Python으로 압축 해제 시도
-    python3 -c "import zipfile; zipfile.ZipFile('promtail-linux-amd64.zip').extractall('.')" 2>/dev/null || {
-      # Python도 없으면 에러
-      echo "ERROR: unzip 또는 python3가 필요합니다."
-      exit 1
-    }
-  }
-fi
-
-unzip -q promtail-linux-amd64.zip 2>/dev/null || {
-  # unzip 실패 시 Python으로 재시도
-  python3 -c "import zipfile; zipfile.ZipFile('promtail-linux-amd64.zip').extractall('.')" 2>/dev/null || exit 1
-}
-
-# 실행 파일 복사
-sudo rm -f /usr/local/bin/promtail
-sudo cp promtail-linux-amd64 /usr/local/bin/promtail
-sudo chmod +x /usr/local/bin/promtail
-
-# Promtail 설정 파일 생성
-sudo mkdir -p /etc/promtail
-# 호스트명을 변수로 가져오기
-HOSTNAME=\$(hostname)
-# Loki URL을 변수로 설정
-LOKI_URL="${finalLokiUrl}"
-sudo tee /etc/promtail/config.yml > /dev/null <<CONFIGEOF
-server:
+  // Promtail 설정 파일 내용 생성
+  const promtailConfig = `server:
   http_listen_port: 9080
   grpc_listen_port: 0
 
@@ -514,13 +460,11 @@ positions:
   filename: /tmp/positions.yaml
 
 clients:
-  - url: \${LOKI_URL}
+  - url: ${finalLokiUrl}
 
 scrape_configs:
-  # 1. 계정 및 인증 관련 로그 (최우선 점검)
   - job_name: auth
     static_configs:
-      # Debian/Ubuntu 계열
       - targets:
           - localhost
         labels:
@@ -529,7 +473,6 @@ scrape_configs:
           hostname: \${HOSTNAME}
           instance: \${HOSTNAME}
           __path__: /var/log/auth.log
-      # RHEL/CentOS/Rocky 계열
       - targets:
           - localhost
         labels:
@@ -539,10 +482,8 @@ scrape_configs:
           instance: \${HOSTNAME}
           __path__: /var/log/secure
 
-  # 2. 전체 시스템 로그
   - job_name: system
     static_configs:
-      # Debian/Ubuntu 계열
       - targets:
           - localhost
         labels:
@@ -551,7 +492,6 @@ scrape_configs:
           hostname: \${HOSTNAME}
           instance: \${HOSTNAME}
           __path__: /var/log/syslog
-      # RHEL/CentOS/Rocky 계열
       - targets:
           - localhost
         labels:
@@ -561,8 +501,6 @@ scrape_configs:
           instance: \${HOSTNAME}
           __path__: /var/log/messages
 
-  # 3. 접속 기록 (바이너리 파일은 텍스트 변환 필요 - last, lastb 명령어 출력)
-  # 주의: 바이너리 파일은 직접 수집 불가, cron으로 텍스트 변환 후 수집 권장
   - job_name: login_history
     static_configs:
       - targets:
@@ -574,7 +512,6 @@ scrape_configs:
           instance: \${HOSTNAME}
           __path__: /var/log/login_history.log
 
-  # 4. 주요 서비스 및 작업 스케줄 로그
   - job_name: cron
     static_configs:
       - targets:
@@ -586,10 +523,8 @@ scrape_configs:
           instance: \${HOSTNAME}
           __path__: /var/log/cron
 
-  # 5. 웹 서버 로그
   - job_name: web_server
     static_configs:
-      # Apache (RHEL/CentOS)
       - targets:
           - localhost
         labels:
@@ -606,7 +541,6 @@ scrape_configs:
           hostname: \${HOSTNAME}
           instance: \${HOSTNAME}
           __path__: /var/log/httpd/error_log
-      # Apache (Debian/Ubuntu)
       - targets:
           - localhost
         labels:
@@ -623,7 +557,6 @@ scrape_configs:
           hostname: \${HOSTNAME}
           instance: \${HOSTNAME}
           __path__: /var/log/apache2/error.log
-      # Nginx
       - targets:
           - localhost
         labels:
@@ -641,7 +574,6 @@ scrape_configs:
           instance: \${HOSTNAME}
           __path__: /var/log/nginx/error.log
 
-  # 6. 사용자 명령어 기록 (Shell History)
   - job_name: shell_history
     static_configs:
       - targets:
@@ -669,7 +601,6 @@ scrape_configs:
           instance: \${HOSTNAME}
           __path__: /home/*/.zsh_history
 
-  # 7. 기타 시스템 로그
   - job_name: system_logs
     static_configs:
       - targets:
@@ -735,8 +666,64 @@ scrape_configs:
           log_type: general
           hostname: \${HOSTNAME}
           instance: \${HOSTNAME}
-          __path__: /var/log/*.log
-CONFIGEOF
+          __path__: /var/log/*.log`;
+
+  // 설정 파일을 base64로 인코딩
+  const configBase64 = Buffer.from(promtailConfig).toString('base64');
+
+  try {
+    let sshCommand = '';
+    if (sshKey) {
+      sshCommand = `ssh -i "${sshKey}" -o StrictHostKeyChecking=no ${sshUser}@${serverIp}`;
+    } else if (sshPassword) {
+      sshCommand = `sshpass -p '${sshPassword}' ssh -o StrictHostKeyChecking=no ${sshUser}@${serverIp}`;
+    } else {
+      throw new Error('SSH Key 또는 Password가 필요합니다.');
+    }
+
+    // Promtail 설치 스크립트
+    const installScript = `#!/bin/bash
+set -eo pipefail
+
+# 기존 Promtail 서비스 중지
+sudo systemctl stop promtail 2>/dev/null || true
+sudo systemctl disable promtail 2>/dev/null || true
+sudo pkill -f promtail 2>/dev/null || true
+sleep 2
+
+# Promtail 다운로드 (tar.gz 형식 사용 - unzip 불필요)
+cd /tmp
+# unzip이 없을 수 있으므로 tar.gz 형식 사용
+wget -q https://github.com/grafana/loki/releases/download/v${promtailVersion}/promtail-linux-amd64.zip -O promtail-linux-amd64.zip
+
+# unzip 설치 시도 (없으면 설치)
+if ! command -v unzip &> /dev/null; then
+  sudo apt-get update -qq > /dev/null 2>&1
+  sudo apt-get install -y unzip > /dev/null 2>&1 || {
+    # unzip 설치 실패 시 Python으로 압축 해제 시도
+    python3 -c "import zipfile; zipfile.ZipFile('promtail-linux-amd64.zip').extractall('.')" 2>/dev/null || {
+      # Python도 없으면 에러
+      echo "ERROR: unzip 또는 python3가 필요합니다."
+      exit 1
+    }
+  }
+fi
+
+unzip -q promtail-linux-amd64.zip 2>/dev/null || {
+  # unzip 실패 시 Python으로 재시도
+  python3 -c "import zipfile; zipfile.ZipFile('promtail-linux-amd64.zip').extractall('.')" 2>/dev/null || exit 1
+}
+
+# 실행 파일 복사
+sudo rm -f /usr/local/bin/promtail
+sudo cp promtail-linux-amd64 /usr/local/bin/promtail
+sudo chmod +x /usr/local/bin/promtail
+
+# Promtail 설정 파일 생성 (base64로 인코딩하여 안전하게 전송)
+sudo mkdir -p /etc/promtail
+HOSTNAME=\$(hostname)
+CONFIG_B64="${configBase64}"
+echo "\$CONFIG_B64" | base64 -d | sed "s/\\\${HOSTNAME}/\$HOSTNAME/g" | sudo tee /etc/promtail/config.yml > /dev/null
 
 # 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (선택사항)
 # wtmp, btmp, lastlog는 바이너리 파일이므로 cron으로 주기적으로 텍스트 변환
