@@ -23,12 +23,9 @@ function NodeExporterInstall() {
   const [loading, setLoading] = useState(false);
   const [loadingVms, setLoadingVms] = useState(false);
   
-  // 자동 연동 옵션
-  const [autoRegisterPrometheus, setAutoRegisterPrometheus] = useState(false);
-  const [prometheusJobName, setPrometheusJobName] = useState('');
-  const [prometheusServiceLabel, setPrometheusServiceLabel] = useState('');
-  const [prometheusEnvironmentLabel, setPrometheusEnvironmentLabel] = useState('production');
-  const [groupByJob, setGroupByJob] = useState(true);
+  // 설치 옵션
+  const [installNodeExporter, setInstallNodeExporter] = useState(true);
+  const [installPromtail, setInstallPromtail] = useState(true);
 
   // 컴포넌트 마운트 시 vCenter에서 모든 VM 조회
   useEffect(() => {
@@ -108,29 +105,44 @@ function NodeExporterInstall() {
     setMessage(null);
 
     try {
+      if (!installNodeExporter && !installPromtail) {
+        setMessage({ type: 'error', text: '최소 하나 이상의 도구를 선택해야 합니다.' });
+        setServers(prev => prev.map(s => 
+          s.ip === serverIp ? { ...s, installing: false } : s
+        ));
+        return;
+      }
+
+      // Promtail만 설치하는 경우는 별도 API 필요 (현재는 Node Exporter API 사용)
+      if (!installNodeExporter && installPromtail) {
+        setMessage({ type: 'error', text: 'Promtail만 설치하는 기능은 준비 중입니다. Node Exporter와 함께 설치해주세요.' });
+        setServers(prev => prev.map(s => 
+          s.ip === serverIp ? { ...s, installing: false } : s
+        ));
+        return;
+      }
+
       const installOptions = {
         sshUser,
         sshKey: getEffectiveSshKey(),
-        autoRegisterPrometheus,
-        prometheusJobName: prometheusJobName || null,
-        prometheusLabels: {
-          service: prometheusServiceLabel || undefined,
-          environment: prometheusEnvironmentLabel || undefined
-        }
+        installPromtail: installPromtail
       };
 
       const result = await nodeExporterApi.install(serverIp, installOptions);
 
       if (result.success) {
-        let successMsg = `${serverIp}: Node Exporter 설치 완료`;
-        if (result.promtailInstalled) {
-          successMsg += ` + Promtail 설치 완료`;
-        }
-        if (result.prometheusRegistered) {
-          successMsg += ` (Prometheus Job '${result.prometheusJobName}'에 자동 등록됨)`;
+        let successMsg = '';
+        if (installNodeExporter && installPromtail) {
+          successMsg = `${serverIp}: Node Exporter + Promtail 설치 완료`;
+        } else if (installNodeExporter) {
+          successMsg = `${serverIp}: Node Exporter 설치 완료`;
+        } else if (installPromtail) {
+          successMsg = `${serverIp}: Promtail 설치 완료`;
         }
         setMessage({ type: 'success', text: successMsg });
-        await checkStatus(serverIp);
+        if (installNodeExporter) {
+          await checkStatus(serverIp);
+        }
       } else {
         const errorMsg = result.error || result.details || '알 수 없는 오류';
         let displayMsg = errorMsg;
@@ -160,28 +172,34 @@ function NodeExporterInstall() {
     setMessage(null);
 
     try {
+      if (!installNodeExporter && !installPromtail) {
+        setMessage({ type: 'error', text: '최소 하나 이상의 도구를 선택해야 합니다.' });
+        setLoading(false);
+        return;
+      }
+
+      // Promtail만 설치하는 경우는 별도 API 필요
+      if (!installNodeExporter && installPromtail) {
+        setMessage({ type: 'error', text: 'Promtail만 설치하는 기능은 준비 중입니다. Node Exporter와 함께 설치해주세요.' });
+        setLoading(false);
+        return;
+      }
+
       const serverIps = servers.map(s => s.ip);
       const installOptions = {
         sshUser,
         sshKey: getEffectiveSshKey(),
-        autoRegisterPrometheus,
-        prometheusJobName: prometheusJobName || null,
-        prometheusLabels: {
-          service: prometheusServiceLabel || undefined,
-          environment: prometheusEnvironmentLabel || undefined
-        },
-        groupByJob
+        installPromtail: installPromtail
       };
 
       const result = await nodeExporterApi.installMultiple(serverIps, installOptions);
 
       if (result.success) {
-        let successMsg = `설치 완료: ${result.summary.success}/${result.summary.total}개 서버`;
-        if (result.summary.promtailInstalled > 0) {
-          successMsg += ` (Node Exporter + Promtail 설치: ${result.summary.promtailInstalled}개 서버)`;
-        }
-        if (result.summary.prometheusRegistered > 0) {
-          successMsg += ` (Prometheus 자동 등록: ${result.summary.prometheusRegistered}개 서버)`;
+        let successMsg = '';
+        if (installNodeExporter && installPromtail) {
+          successMsg = `설치 완료: ${result.summary.success}/${result.summary.total}개 서버 (Node Exporter + Promtail)`;
+        } else if (installNodeExporter) {
+          successMsg = `설치 완료: ${result.summary.success}/${result.summary.total}개 서버 (Node Exporter)`;
         }
         setMessage({ 
           type: 'success', 
@@ -231,30 +249,53 @@ function NodeExporterInstall() {
     <div className="card">
       <h2>Node Exporter 설치</h2>
       
-      <div style={{ 
-        padding: '12px 16px', 
-        marginBottom: '20px', 
-        backgroundColor: '#e7f3ff', 
-        border: '1px solid #2196F3', 
-        borderRadius: '6px',
-        fontSize: '14px',
-        lineHeight: '1.6'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-          <span style={{ fontSize: '18px' }}>ℹ️</span>
-          <div>
-            <strong style={{ color: '#1976D2' }}>자동 설치 안내</strong>
-            <div style={{ marginTop: '6px', color: '#424242' }}>
-              Node Exporter 설치 시 <strong>Promtail (Loki 로그 수집)</strong>도 함께 자동으로 설치됩니다.
-              <br />
-              <span style={{ fontSize: '12px', color: '#666', marginTop: '4px', display: 'block' }}>
-                • Node Exporter: 메트릭 수집 (포트 9100)
-                <br />
-                • Promtail: 로그 수집 및 Loki 전송 (포트 9080)
-              </span>
+      {/* 설치 옵션 선택 */}
+      <div style={{ marginBottom: '20px', padding: '16px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #dee2e6' }}>
+        <h3 style={{ marginTop: '0', marginBottom: '12px', fontSize: '16px', color: '#2c3e50' }}>
+          📦 설치할 도구 선택
+        </h3>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '10px', backgroundColor: '#fff', borderRadius: '6px', border: '1px solid #dee2e6' }}>
+            <input
+              type="checkbox"
+              checked={installNodeExporter}
+              onChange={(e) => setInstallNodeExporter(e.target.checked)}
+              style={{ marginRight: '12px', width: '20px', height: '20px', cursor: 'pointer' }}
+            />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '15px', fontWeight: '500', marginBottom: '4px' }}>
+                Node Exporter
+              </div>
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                메트릭 수집 (포트 9100)
+              </div>
             </div>
-          </div>
+          </label>
+
+          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', padding: '10px', backgroundColor: '#fff', borderRadius: '6px', border: '1px solid #dee2e6' }}>
+            <input
+              type="checkbox"
+              checked={installPromtail}
+              onChange={(e) => setInstallPromtail(e.target.checked)}
+              style={{ marginRight: '12px', width: '20px', height: '20px', cursor: 'pointer' }}
+            />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '15px', fontWeight: '500', marginBottom: '4px' }}>
+                Promtail
+              </div>
+              <div style={{ fontSize: '12px', color: '#666' }}>
+                로그 수집 및 Loki 전송 (포트 9080)
+              </div>
+            </div>
+          </label>
         </div>
+
+        {!installNodeExporter && !installPromtail && (
+          <div style={{ marginTop: '12px', padding: '10px', backgroundColor: '#fff3cd', border: '1px solid #ffc107', borderRadius: '6px', fontSize: '13px', color: '#856404' }}>
+            ⚠️ 최소 하나 이상의 도구를 선택해야 합니다.
+          </div>
+        )}
       </div>
       
       {message && (
@@ -308,79 +349,6 @@ function NodeExporterInstall() {
         </p>
       </div>
 
-      {/* Prometheus 자동 등록 옵션 */}
-      <div style={{ marginBottom: '20px', padding: '16px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #dee2e6' }}>
-        <h3 style={{ marginTop: '0', marginBottom: '12px', fontSize: '16px', color: '#2c3e50' }}>
-          🔗 Prometheus 자동 등록 (선택)
-        </h3>
-        
-        <label style={{ display: 'flex', alignItems: 'center', marginBottom: '12px', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={autoRegisterPrometheus}
-            onChange={(e) => setAutoRegisterPrometheus(e.target.checked)}
-            style={{ marginRight: '8px', width: '18px', height: '18px', cursor: 'pointer' }}
-          />
-          <span style={{ fontSize: '14px', fontWeight: '500' }}>
-            Node Exporter 설치 후 Prometheus에 자동 등록
-          </span>
-        </label>
-
-        {autoRegisterPrometheus && (
-          <div style={{ marginLeft: '26px', marginTop: '12px' }}>
-            <label className="label">Prometheus Job 이름 (선택)</label>
-            <input
-              type="text"
-              className="input"
-              value={prometheusJobName}
-              onChange={(e) => setPrometheusJobName(e.target.value)}
-              placeholder="비워두면 자동 생성 (예: node-exporter-230 또는 node-exporter-10.255.48)"
-              style={{ marginBottom: '10px' }}
-            />
-            <div style={{ fontSize: '12px', color: '#666', marginBottom: '12px' }}>
-              💡 여러 서버를 설치할 경우, Job 이름을 지정하면 하나의 Job으로 그룹화됩니다.
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-              <div>
-                <label className="label">Service Label (선택)</label>
-                <input
-                  type="text"
-                  className="input"
-                  value={prometheusServiceLabel}
-                  onChange={(e) => setPrometheusServiceLabel(e.target.value)}
-                  placeholder="예: web-server"
-                />
-              </div>
-              <div>
-                <label className="label">Environment Label</label>
-                <input
-                  type="text"
-                  className="input"
-                  value={prometheusEnvironmentLabel}
-                  onChange={(e) => setPrometheusEnvironmentLabel(e.target.value)}
-                  placeholder="예: production"
-                />
-              </div>
-            </div>
-
-            {servers.length > 1 && (
-              <label style={{ display: 'flex', alignItems: 'center', marginTop: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={groupByJob}
-                  onChange={(e) => setGroupByJob(e.target.checked)}
-                  style={{ marginRight: '8px', width: '18px', height: '18px', cursor: 'pointer' }}
-                />
-                <span style={{ fontSize: '14px' }}>
-                  여러 서버를 하나의 Job으로 그룹화
-                </span>
-              </label>
-            )}
-          </div>
-        )}
-      </div>
-
       <div style={{ marginBottom: '20px' }}>
         <button 
           className="button" 
@@ -400,10 +368,10 @@ function NodeExporterInstall() {
         <button 
           className="button button-success" 
           onClick={installOnAll}
-          disabled={loading || servers.length === 0}
+          disabled={loading || servers.length === 0 || (!installNodeExporter && !installPromtail)}
           style={{ marginLeft: '10px' }}
         >
-          전체 설치
+          전체 설치 {installNodeExporter && installPromtail ? '(Node Exporter + Promtail)' : installNodeExporter ? '(Node Exporter)' : '(Promtail)'}
         </button>
       </div>
 
@@ -499,7 +467,7 @@ function NodeExporterInstall() {
                 <button
                   className="button button-success"
                   onClick={() => installOnServer(server.ip)}
-                  disabled={server.installing}
+                  disabled={server.installing || (!installNodeExporter && !installPromtail)}
                 >
                   {server.installing ? '설치 중...' : '설치'}
                 </button>
