@@ -234,7 +234,16 @@ curl -s http://localhost:9080/ready 2>/dev/null | head -1 || echo "not_respondin
     // Promtail 상태
     const promtailActive = lines[3] === 'active';
     const promtailEnabled = lines[4] === 'enabled';
-    const promtailResponding = lines[5] && !lines[5].includes('not_responding');
+    // curl 응답 확인: 실제로 응답이 있고 'not_responding'이 아닌 경우만 true
+    // 빈 문자열이나 'disabled'는 false로 처리
+    const promtailResponse = lines[5] ? lines[5].trim() : '';
+    const promtailResponding = promtailResponse !== '' && 
+                               promtailResponse !== 'not_responding' && 
+                               promtailResponse !== 'disabled' &&
+                               promtailResponse !== 'inactive' &&
+                               !promtailResponse.includes('Connection refused') &&
+                               !promtailResponse.includes('curl:');
+    // active이거나 enabled이거나 실제로 응답하는 경우만 설치됨으로 판단
     const promtailInstalled = promtailActive || promtailEnabled || promtailResponding;
 
     return {
