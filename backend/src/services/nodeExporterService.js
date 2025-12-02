@@ -506,7 +506,7 @@ HOSTNAME=\$(hostname)
 # Loki URL을 변수로 설정
 export LOKI_URL="${finalLokiUrl}"
 export HOSTNAME
-sudo tee /etc/promtail/config.yml > /dev/null <<'CONFIGEOF' | envsubst
+cat <<'CONFIGEOF' | envsubst | sudo tee /etc/promtail/config.yml > /dev/null
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
