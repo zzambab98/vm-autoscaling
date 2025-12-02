@@ -504,8 +504,9 @@ sudo mkdir -p /etc/promtail
 # 호스트명을 변수로 가져오기
 HOSTNAME=\$(hostname)
 # Loki URL을 변수로 설정
-LOKI_URL="${finalLokiUrl}"
-sudo tee /etc/promtail/config.yml > /dev/null <<'CONFIGEOF'
+export LOKI_URL="${finalLokiUrl}"
+export HOSTNAME
+sudo tee /etc/promtail/config.yml > /dev/null <<'CONFIGEOF' | envsubst
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
