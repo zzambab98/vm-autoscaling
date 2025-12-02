@@ -274,6 +274,16 @@ grep -E "^\\s*url:" /etc/promtail/config.yml 2>/dev/null | head -1 || echo "loki
                               (promtailActive && promtailBinaryExists) || 
                               (promtailEnabled && promtailBinaryExists) ||
                               (promtailResponding && promtailBinaryExists);
+    
+    // Promtail 서비스 상태 상세 정보 (디버깅용)
+    // lines[9]부터 systemctl status 출력이 시작됨 (최대 20줄)
+    const promtailStatusDetail = lines.length > 9 ? lines.slice(9, 29).join('\n') : '';
+    // Loki URL은 마지막 줄에 있음 (lines[29] 또는 그 이후)
+    const promtailLokiUrl = lines.length > 29 && !lines[29].includes('loki_url_not_found') 
+      ? lines[29].trim() 
+      : (lines.length > 9 && lines[lines.length - 1] && !lines[lines.length - 1].includes('loki_url_not_found')
+        ? lines[lines.length - 1].trim() 
+        : null);
 
     return {
       success: true,
