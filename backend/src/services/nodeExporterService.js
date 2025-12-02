@@ -475,7 +475,9 @@ sudo chmod +x /usr/local/bin/promtail
 
 # Promtail 설정 파일 생성
 sudo mkdir -p /etc/promtail
-sudo tee /etc/promtail/config.yml > /dev/null <<'CONFIGEOF'
+# 호스트명을 변수로 가져오기
+HOSTNAME=\$(hostname)
+sudo tee /etc/promtail/config.yml > /dev/null <<CONFIGEOF
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
@@ -493,22 +495,79 @@ scrape_configs:
           - localhost
         labels:
           job: varlogs
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
           __path__: /var/log/*log
       - targets:
           - localhost
         labels:
           job: syslog
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
           __path__: /var/log/syslog
       - targets:
           - localhost
         labels:
           job: auth
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
           __path__: /var/log/auth.log
       - targets:
           - localhost
         labels:
           job: messages
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
           __path__: /var/log/messages
+      - targets:
+          - localhost
+        labels:
+          job: kern
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/kern.log
+      - targets:
+          - localhost
+        labels:
+          job: daemon
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/daemon.log
+      - targets:
+          - localhost
+        labels:
+          job: mail
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/mail.log
+      - targets:
+          - localhost
+        labels:
+          job: user
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/user.log
+      - targets:
+          - localhost
+        labels:
+          job: dpkg
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/dpkg.log
+      - targets:
+          - localhost
+        labels:
+          job: apt
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/apt/*.log
+      - targets:
+          - localhost
+        labels:
+          job: journal
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/journal/**/*.log
 CONFIGEOF
 
 # systemd 서비스 파일 생성
