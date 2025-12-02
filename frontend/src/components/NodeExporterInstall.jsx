@@ -83,7 +83,7 @@ function NodeExporterInstall() {
   const getEffectiveSshKey = () =>
     selectedSshKey === 'custom' ? customSshKey.trim() : selectedSshKey;
 
-  const checkStatus = async (serverIp) => {
+  const checkStatus = async (serverIp, showMessage = false) => {
     try {
       const result = await nodeExporterApi.checkStatus(serverIp, {
         sshUser,
@@ -116,8 +116,20 @@ function NodeExporterInstall() {
             }
           : s
       ));
+      
+      // 개별 확인 시에만 메시지 표시
+      if (showMessage) {
+        const serverName = servers.find(s => s.ip === serverIp)?.name || serverIp;
+        setMessage({ 
+          type: 'success', 
+          text: `${serverName} (${serverIp}) 상태 확인 완료` 
+        });
+      }
     } catch (error) {
       console.error('Status check failed:', error);
+      if (showMessage) {
+        setMessage({ type: 'error', text: `${serverIp} 상태 확인 실패: ${error.message}` });
+      }
     }
   };
 
@@ -262,10 +274,23 @@ function NodeExporterInstall() {
 
   const checkAllStatus = async () => {
     setLoading(true);
-    for (const server of servers) {
-      await checkStatus(server.ip);
+    setMessage(null);
+    
+    try {
+      // 모든 서버의 상태를 순차적으로 확인
+      for (const server of servers) {
+        if (server.ip) {
+          await checkStatus(server.ip);
+          // 부하를 줄이기 위해 약간의 딜레이 추가
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+      setMessage({ type: 'success', text: `전체 ${servers.length}개 서버 상태 확인 완료` });
+    } catch (error) {
+      setMessage({ type: 'error', text: `상태 확인 중 오류 발생: ${error.message}` });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -493,8 +518,8 @@ function NodeExporterInstall() {
               <td>
                 <button
                   className="button"
-                  onClick={() => checkStatus(server.ip)}
-                  disabled={server.installing}
+                  onClick={() => checkStatus(server.ip, true)}
+                  disabled={server.installing || loading}
                   style={{ marginRight: '8px' }}
                 >
                   확인
