@@ -738,7 +738,8 @@ CONFIGEOF
 
 # 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (선택사항)
 # wtmp, btmp, lastlog는 바이너리 파일이므로 cron으로 주기적으로 텍스트 변환
-sudo bash -c 'cat > /usr/local/bin/export-login-history.sh << '\''EOFSCRIPT'\''
+# heredoc 없이 직접 스크립트 작성
+sudo tee /usr/local/bin/export-login-history.sh > /dev/null <<'ENDOFSCRIPT'
 #!/bin/bash
 LOG_FILE="/var/log/login_history.log"
 DATE=$(date "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "unknown")
@@ -769,8 +770,7 @@ if [ -f "$LOG_FILE" ]; then
     mv "${LOG_FILE}.tmp" "$LOG_FILE"
   fi
 fi
-EOFSCRIPT
-'
+ENDOFSCRIPT
 
 sudo chmod +x /usr/local/bin/export-login-history.sh
 
