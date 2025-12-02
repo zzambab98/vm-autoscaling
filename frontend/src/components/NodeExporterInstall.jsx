@@ -72,7 +72,7 @@ function NodeExporterInstall() {
         if (vmServers.length === 0) {
           setMessage({ type: 'info', text: 'VM 목록이 비어있습니다.' });
         } else {
-          setMessage({ type: 'success', text: `${vmServers.length}개의 VM을 불러왔습니다.` });
+          setMessage({ type: 'success', text: `${vmServers.length}개의 VM을 불러왔습니다. 상태 확인 버튼을 클릭하여 설치 상태를 확인하세요.` });
         }
       } else {
         console.warn('[NodeExporterInstall] 응답 형식 오류:', result);
