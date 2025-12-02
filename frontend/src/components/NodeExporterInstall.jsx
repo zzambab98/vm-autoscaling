@@ -320,6 +320,48 @@ function NodeExporterInstall() {
     }
   };
 
+  const updatePromtailConfigOnAll = async () => {
+    setLoading(true);
+    setMessage(null);
+
+    try {
+      // Promtail이 설치된 서버만 필터링
+      const serverIps = servers
+        .filter(s => s.ip && s.promtailInstalled)
+        .map(s => s.ip);
+
+      if (serverIps.length === 0) {
+        setMessage({ type: 'info', text: 'Promtail이 설치된 서버가 없습니다.' });
+        setLoading(false);
+        return;
+      }
+
+      const result = await promtailApi.updateConfigMultiple(serverIps, {
+        sshUser,
+        sshKey: getEffectiveSshKey()
+      });
+
+      if (result.success) {
+        setMessage({ 
+          type: 'success', 
+          text: `Promtail 설정 업데이트 완료: ${result.summary.success}/${result.summary.total}개 서버` 
+        });
+        // 전체 업데이트는 상태 확인 생략 (부하 방지)
+      } else {
+        const failedServers = result.results?.filter(r => !r.success) || [];
+        const errorMessages = failedServers.map(r => `${r.serverIp}: ${r.error || '알 수 없는 오류'}`);
+        setMessage({ 
+          type: 'error', 
+          text: `일부 서버 설정 업데이트 실패:\n${errorMessages.join('\n')}` 
+        });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: `설정 업데이트 실패: ${error.message}` });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const checkAllStatus = async () => {
     setLoading(true);
     setMessage(null);
@@ -469,6 +511,17 @@ function NodeExporterInstall() {
         >
           전체 설치 {installNodeExporter && installPromtail ? '(Node Exporter + Promtail)' : installNodeExporter ? '(Node Exporter)' : '(Promtail)'}
         </button>
+        {installPromtail && (
+          <button 
+            className="button" 
+            onClick={updatePromtailConfigOnAll}
+            disabled={loading || servers.length === 0}
+            style={{ marginLeft: '10px', backgroundColor: '#ff9800', color: '#fff' }}
+            title="기존에 설치된 Promtail의 설정 파일만 업데이트합니다"
+          >
+            Promtail 설정 업데이트
+          </button>
+        )}
       </div>
 
       {loadingVms ? (
@@ -576,9 +629,45 @@ function NodeExporterInstall() {
                   className="button button-success"
                   onClick={() => installOnServer(server.ip)}
                   disabled={server.installing || (!installNodeExporter && !installPromtail)}
+                  style={{ marginRight: '8px' }}
                 >
                   {server.installing ? '설치 중...' : '설치'}
                 </button>
+                {installPromtail && server.promtailInstalled && (
+                  <button
+                    className="button"
+                    onClick={async () => {
+                      setServers(prev => prev.map(s => 
+                        s.ip === server.ip ? { ...s, installing: true } : s
+                      ));
+                      setMessage(null);
+                      try {
+                        const result = await promtailApi.updateConfig(server.ip, {
+                          sshUser,
+                          sshKey: getEffectiveSshKey()
+                        });
+                        if (result.success) {
+                          setMessage({ type: 'success', text: `${server.ip}: Promtail 설정 업데이트 완료` });
+                          // 개별 업데이트는 해당 서버만 상태 확인
+                          await checkStatus(server.ip, true);
+                        } else {
+                          setMessage({ type: 'error', text: `${server.ip}: 설정 업데이트 실패 - ${result.error}` });
+                        }
+                      } catch (error) {
+                        setMessage({ type: 'error', text: `${server.ip}: 설정 업데이트 실패 - ${error.message}` });
+                      } finally {
+                        setServers(prev => prev.map(s => 
+                          s.ip === server.ip ? { ...s, installing: false } : s
+                        ));
+                      }
+                    }}
+                    disabled={server.installing || loading}
+                    style={{ backgroundColor: '#ff9800', color: '#fff', fontSize: '12px', padding: '4px 8px' }}
+                    title="Promtail 설정 파일만 업데이트 (재설치 불필요)"
+                  >
+                    설정 업데이트
+                  </button>
+                )}
               </td>
             </tr>
           ))}
