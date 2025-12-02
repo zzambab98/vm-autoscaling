@@ -768,6 +768,11 @@ echo "\$CONFIG_B64" | base64 -d | sed "s/__HOSTNAME__/\$HOSTNAME/g" | sudo tee /
 EXPORT_SCRIPT_B64="${exportScriptBase64}"
 echo "\$EXPORT_SCRIPT_B64" | base64 -d | sudo tee /usr/local/bin/export-login-history.sh > /dev/null
 sudo chmod +x /usr/local/bin/export-login-history.sh
+# 스크립트가 제대로 생성되었는지 확인
+if [ ! -f /usr/local/bin/export-login-history.sh ]; then
+  echo "ERROR: export-login-history.sh 파일 생성 실패"
+  exit 1
+fi
 
 # 매 5분마다 접속 기록을 텍스트로 변환하는 cron 작업 추가 (기존 cron 작업 유지)
 (crontab -l 2>/dev/null | grep -v "export-login-history"; echo "*/5 * * * * /usr/local/bin/export-login-history.sh > /dev/null 2>&1") | crontab -
