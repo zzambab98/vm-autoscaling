@@ -210,6 +210,8 @@ async function checkNodeExporterStatus(serverIp, options = {}) {
 # Node Exporter 상태
 systemctl is-active node_exporter 2>/dev/null || echo "inactive"
 systemctl is-enabled node_exporter 2>/dev/null || echo "disabled"
+# Node Exporter 바이너리 파일 존재 확인
+test -f /usr/local/bin/node_exporter && echo "binary_exists" || echo "binary_not_found"
 curl -s http://localhost:9100/metrics | head -1 2>/dev/null || echo "not_responding"
 
 # Promtail 상태
@@ -233,16 +235,23 @@ curl -s http://localhost:9080/ready 2>&1 | head -1 || echo "not_responding"
     // Node Exporter 상태
     const nodeExporterActive = lines[0] === 'active';
     const nodeExporterEnabled = lines[1] === 'enabled';
-    const nodeExporterResponding = lines[2] && !lines[2].includes('not_responding');
-    const nodeExporterInstalled = nodeExporterActive || nodeExporterEnabled || nodeExporterResponding;
+    const nodeExporterBinaryExists = lines[2] === 'binary_exists';
+    const nodeExporterResponding = lines[3] && !lines[3].includes('not_responding');
+    // 설치됨 판단: 바이너리가 존재해야 함 (가장 엄격한 기준)
+    // 또는 서비스가 실제로 active 상태이거나 enabled 상태이거나 실제로 응답하는 경우
+    // 단, 바이너리가 없으면 미설치로 판단 (불완전한 설치 방지)
+    const nodeExporterInstalled = (nodeExporterBinaryExists && (nodeExporterActive || nodeExporterEnabled || nodeExporterResponding)) ||
+                                   (nodeExporterActive && nodeExporterBinaryExists) ||
+                                   (nodeExporterEnabled && nodeExporterBinaryExists) ||
+                                   (nodeExporterResponding && nodeExporterBinaryExists);
     
     // Promtail 상태
-    const promtailActive = lines[3] === 'active';
-    const promtailEnabled = lines[4] === 'enabled';
-    const promtailBinaryExists = lines[5] === 'binary_exists';
-    const promtailConfigExists = lines[6] === 'config_exists';
+    const promtailActive = lines[4] === 'active';
+    const promtailEnabled = lines[5] === 'enabled';
+    const promtailBinaryExists = lines[6] === 'binary_exists';
+    const promtailConfigExists = lines[7] === 'config_exists';
     // curl 응답 확인: 실제로 응답이 있고 'not_responding'이 아닌 경우만 true
-    const promtailResponse = lines[7] ? lines[7].trim() : '';
+    const promtailResponse = lines[8] ? lines[8].trim() : '';
     const promtailResponding = promtailResponse !== '' && 
                                promtailResponse !== 'not_responding' && 
                                promtailResponse !== 'disabled' &&
@@ -270,6 +279,7 @@ curl -s http://localhost:9080/ready 2>&1 | head -1 || echo "not_responding"
         isActive: nodeExporterActive,
         isEnabled: nodeExporterEnabled,
         isResponding: nodeExporterResponding,
+        binaryExists: nodeExporterBinaryExists,
         status: nodeExporterActive ? 'running' : (nodeExporterEnabled ? 'installed' : 'not_installed')
       },
       promtail: {
@@ -712,13 +722,12 @@ CONFIGEOF
 
 # 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (선택사항)
 # wtmp, btmp, lastlog는 바이너리 파일이므로 cron으로 주기적으로 텍스트 변환
-sudo tee /usr/local/bin/export-login-history.sh > /dev/null <<'SCRIPTEOF'
+cat > /tmp/export-login-history.sh <<'SCRIPTEOF'
 #!/bin/bash
 set -eo pipefail
 
-# 접속 기록을 텍스트 파일로 변환
-readonly LOG_FILE="/var/log/login_history.log"
-DATE=$(date '+%Y-%m-%d %H:%M:%S' || echo "unknown")
+LOG_FILE="/var/log/login_history.log"
+DATE=$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "unknown")
 
 {
   echo "=== Login History Export at $DATE ==="
@@ -748,6 +757,7 @@ if [ -f "$LOG_FILE" ]; then
 fi
 SCRIPTEOF
 
+sudo mv /tmp/export-login-history.sh /usr/local/bin/export-login-history.sh
 sudo chmod +x /usr/local/bin/export-login-history.sh
 
 # 매 5분마다 접속 기록을 텍스트로 변환하는 cron 작업 추가 (기존 cron 작업 유지)
