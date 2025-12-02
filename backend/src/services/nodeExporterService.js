@@ -719,11 +719,227 @@ sudo rm -f /usr/local/bin/promtail
 sudo cp promtail-linux-amd64 /usr/local/bin/promtail
 sudo chmod +x /usr/local/bin/promtail
 
-# Promtail 설정 파일 생성 (base64로 인코딩하여 안전하게 전송)
+# Promtail 설정 파일 생성 (heredoc을 작은따옴표로 감싸서 안전하게 생성)
 sudo mkdir -p /etc/promtail
 HOSTNAME=\$(hostname)
-CONFIG_B64="${configBase64}"
-echo "\$CONFIG_B64" | base64 -d | sed "s/\\\${HOSTNAME}/\$HOSTNAME/g" | sudo tee /etc/promtail/config.yml > /dev/null
+LOKI_URL="${finalLokiUrl}"
+sudo bash -c 'cat > /etc/promtail/config.yml <<'EOF'
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: ${LOKI_URL}
+
+scrape_configs:
+  - job_name: auth
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: auth
+          log_type: authentication
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/auth.log
+      - targets:
+          - localhost
+        labels:
+          job: secure
+          log_type: authentication
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/secure
+
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          log_type: system
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/syslog
+      - targets:
+          - localhost
+        labels:
+          job: messages
+          log_type: system
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/messages
+
+  - job_name: login_history
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: login_history
+          log_type: access
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/login_history.log
+
+  - job_name: cron
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: cron
+          log_type: scheduled_task
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/cron
+
+  - job_name: web_server
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: apache_access
+          log_type: web_access
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/httpd/access_log
+      - targets:
+          - localhost
+        labels:
+          job: apache_error
+          log_type: web_error
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/httpd/error_log
+      - targets:
+          - localhost
+        labels:
+          job: apache2_access
+          log_type: web_access
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/apache2/access.log
+      - targets:
+          - localhost
+        labels:
+          job: apache2_error
+          log_type: web_error
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/apache2/error.log
+      - targets:
+          - localhost
+        labels:
+          job: nginx_access
+          log_type: web_access
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/nginx/access.log
+      - targets:
+          - localhost
+        labels:
+          job: nginx_error
+          log_type: web_error
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/nginx/error.log
+
+  - job_name: shell_history
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: bash_history
+          log_type: command_history
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /home/*/.bash_history
+      - targets:
+          - localhost
+        labels:
+          job: root_history
+          log_type: command_history
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /root/.bash_history
+      - targets:
+          - localhost
+        labels:
+          job: zsh_history
+          log_type: command_history
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /home/*/.zsh_history
+
+  - job_name: system_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: kern
+          log_type: kernel
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/kern.log
+      - targets:
+          - localhost
+        labels:
+          job: daemon
+          log_type: daemon
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/daemon.log
+      - targets:
+          - localhost
+        labels:
+          job: mail
+          log_type: mail
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/mail.log
+      - targets:
+          - localhost
+        labels:
+          job: user
+          log_type: user
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/user.log
+      - targets:
+          - localhost
+        labels:
+          job: dpkg
+          log_type: package
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/dpkg.log
+      - targets:
+          - localhost
+        labels:
+          job: apt
+          log_type: package
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/apt/*.log
+      - targets:
+          - localhost
+        labels:
+          job: journal
+          log_type: systemd
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/journal/**/*.log
+      - targets:
+          - localhost
+        labels:
+          job: varlogs
+          log_type: general
+          hostname: ${HOSTNAME}
+          instance: ${HOSTNAME}
+          __path__: /var/log/*.log
+EOF'
 
 # 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (선택사항)
 # wtmp, btmp, lastlog는 바이너리 파일이므로 cron으로 주기적으로 텍스트 변환
