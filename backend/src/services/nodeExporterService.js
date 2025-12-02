@@ -463,7 +463,7 @@ async function installPromtail(serverIp, options = {}) {
 
     // Promtail 설치 스크립트
     const installScript = `#!/bin/bash
-set -e
+set -eo pipefail
 
 # 기존 Promtail 서비스 중지
 sudo systemctl stop promtail 2>/dev/null || true
@@ -738,7 +738,7 @@ CONFIGEOF
 
 # 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (선택사항)
 # wtmp, btmp, lastlog는 바이너리 파일이므로 cron으로 주기적으로 텍스트 변환
-sudo bash -c 'cat > /usr/local/bin/export-login-history.sh << '\''SCRIPTEOF'\''
+sudo bash -c 'cat > /usr/local/bin/export-login-history.sh << '\''EOFSCRIPT'\''
 #!/bin/bash
 LOG_FILE="/var/log/login_history.log"
 DATE=$(date "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "unknown")
@@ -769,7 +769,7 @@ if [ -f "$LOG_FILE" ]; then
     mv "${LOG_FILE}.tmp" "$LOG_FILE"
   fi
 fi
-SCRIPTEOF
+EOFSCRIPT
 '
 
 sudo chmod +x /usr/local/bin/export-login-history.sh
