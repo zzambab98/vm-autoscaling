@@ -724,7 +724,7 @@ sudo chmod +x /usr/local/bin/promtail
 sudo mkdir -p /etc/promtail
 HOSTNAME=\$(hostname)
 CONFIG_B64="${configBase64}"
-echo "\$CONFIG_B64" | base64 -d | sed "s/\\\$HOSTNAME/\$HOSTNAME/g" | sudo tee /etc/promtail/config.yml > /dev/null
+echo "\$CONFIG_B64" | base64 -d | sed "s/__HOSTNAME__/\$HOSTNAME/g" | sudo tee /etc/promtail/config.yml > /dev/null
 
 # 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (선택사항)
 # wtmp, btmp, lastlog는 바이너리 파일이므로 cron으로 주기적으로 텍스트 변환
