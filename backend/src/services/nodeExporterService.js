@@ -726,36 +726,37 @@ HOSTNAME=\$(hostname)
 CONFIG_B64="${configBase64}"
 echo "\$CONFIG_B64" | base64 -d | sed "s/__HOSTNAME__/\$HOSTNAME/g" | sudo tee /etc/promtail/config.yml > /dev/null
 
-# 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (선택사항)
-# wtmp, btmp, lastlog는 바이너리 파일이므로 cron으로 주기적으로 텍스트 변환
-# heredoc 없이 echo로 직접 스크립트 작성
-sudo bash -c 'echo "#!/bin/bash" > /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "LOG_FILE=\"/var/log/login_history.log\"" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "DATE=\$(date \"+%Y-%m-%d %H:%M:%S\" 2>/dev/null || echo \"unknown\")" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "{" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "  echo \"=== Login History Export at \$DATE ===\"" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "  echo \"--- Successful Logins (wtmp) ---\"" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "  last -F -w 2>/dev/null || echo \"wtmp not available\"" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "  echo \"\"" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "  echo \"--- Failed Login Attempts (btmp) ---\"" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "  lastb -F -w 2>/dev/null || echo \"btmp not available\"" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "  echo \"\"" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "  echo \"--- Last Login per User (lastlog) ---\"" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "  lastlog 2>/dev/null || echo \"lastlog not available\"" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "  echo \"\"" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "  echo \"=== End of Export ===\"" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "  echo \"\"" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "} >> \\\"\$LOG_FILE\\\" 2>&1" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "if [ -f \"\$LOG_FILE\" ]; then" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "  FILE_SIZE=\$(stat -f%z \"\$LOG_FILE\" 2>/dev/null || stat -c%s \"\$LOG_FILE\" 2>/dev/null || echo \"0\")" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "  MAX_SIZE=10485760" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "  if [ \"\$FILE_SIZE\" -gt \"\$MAX_SIZE\" ]; then" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "    tail -n 1000 \"\$LOG_FILE\" > \"\${LOG_FILE}.tmp\"" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "    mv \"\${LOG_FILE}.tmp\" \"\$LOG_FILE\"" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "  fi" >> /usr/local/bin/export-login-history.sh'
-sudo bash -c 'echo "fi" >> /usr/local/bin/export-login-history.sh'
+# 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (base64로 인코딩하여 안전하게 전송)
+EXPORT_SCRIPT_B64="$(Buffer.from(`#!/bin/bash
+set -eo pipefail
+
+LOG_FILE="/var/log/login_history.log"
+DATE=$(date "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "unknown")
+
+{
+  echo "=== Login History Export at $DATE ==="
+  echo "--- Successful Logins (wtmp) ---"
+  last -F -w 2>/dev/null || echo "wtmp not available"
+  echo ""
+  echo "--- Failed Login Attempts (btmp) ---"
+  lastb -F -w 2>/dev/null || echo "btmp not available"
+  echo ""
+  echo "--- Last Login per User (lastlog) ---"
+  lastlog 2>/dev/null || echo "lastlog not available"
+  echo ""
+  echo "=== End of Export ==="
+  echo ""
+} >> "$LOG_FILE" 2>&1
+
+if [ -f "$LOG_FILE" ]; then
+  FILE_SIZE=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo "0")
+  MAX_SIZE=10485760
+  if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
+    tail -n 1000 "$LOG_FILE" > "${LOG_FILE}.tmp"
+    mv "${LOG_FILE}.tmp" "$LOG_FILE"
+  fi
+fi`).toString('base64')}"
+echo "\$EXPORT_SCRIPT_B64" | base64 -d | sudo tee /usr/local/bin/export-login-history.sh > /dev/null
 sudo chmod +x /usr/local/bin/export-login-history.sh
 
 # 매 5분마다 접속 기록을 텍스트로 변환하는 cron 작업 추가 (기존 cron 작업 유지)
