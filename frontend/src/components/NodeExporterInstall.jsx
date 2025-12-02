@@ -12,6 +12,10 @@ function NodeExporterInstall() {
       label: 'dana-cocktail',
       value: '/home/ubuntu/workspace/vm-autoscaling/pemkey/dana-cocktail'
     },
+    {
+      label: 'jenkins',
+      value: '/home/ubuntu/workspace/vm-autoscaling/pemkey/jenkins'
+    },
     { label: '직접 입력', value: 'custom' }
   ];
 
