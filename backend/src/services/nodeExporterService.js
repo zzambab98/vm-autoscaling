@@ -729,8 +729,8 @@ HOSTNAME=\$(hostname)
 CONFIG_B64="${configBase64}"
 echo "\$CONFIG_B64" | base64 -d | sed "s/__HOSTNAME__/\$HOSTNAME/g" | sudo tee /etc/promtail/config.yml > /dev/null
 
-# 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (heredoc 사용)
-sudo tee /usr/local/bin/export-login-history.sh > /dev/null <<'EXPORTSCRIPTEOF'
+# 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (heredoc 사용, 변수는 이스케이프)
+sudo bash -c 'cat > /usr/local/bin/export-login-history.sh <<'\''EXPORTSCRIPTEOF'\''
 #!/bin/bash
 set -eo pipefail
 
@@ -766,7 +766,7 @@ if [ -f "$LOG_FILE" ]; then
     mv "${LOG_FILE}.tmp" "$LOG_FILE"
   fi
 fi
-EXPORTSCRIPTEOF
+EXPORTSCRIPTEOF'
 sudo chmod +x /usr/local/bin/export-login-history.sh
 
 # 매 5분마다 접속 기록을 텍스트로 변환하는 cron 작업 추가 (기존 cron 작업 유지)
