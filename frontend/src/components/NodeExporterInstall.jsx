@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { nodeExporterApi } from '../services/api';
+import { nodeExporterApi, promtailApi } from '../services/api';
 import { templateApi } from '../services/templateApi';
 
 function NodeExporterInstall() {
@@ -31,6 +31,16 @@ function NodeExporterInstall() {
   useEffect(() => {
     loadVmList();
   }, []);
+
+  // VM 목록 로드 후 상태 확인 (초기 로드 시)
+  useEffect(() => {
+    if (servers.length > 0 && servers.some(s => s.ip && s.status === 'unknown')) {
+      // IP가 있고 상태가 unknown인 서버들만 자동 확인 (부하 방지)
+      // 자동 확인은 하지 않고, 사용자가 수동으로 확인하도록 변경
+      // 필요시 아래 주석을 해제하여 자동 확인 가능
+      // checkAllStatus();
+    }
+  }, [servers.length]);
 
   const loadVmList = async () => {
     setLoadingVms(true);
@@ -148,13 +158,28 @@ function NodeExporterInstall() {
         return;
       }
 
-      // Promtail만 설치하는 경우는 별도 API 필요 (현재는 Node Exporter API 사용)
+      // Promtail만 설치하는 경우
       if (!installNodeExporter && installPromtail) {
-        setMessage({ type: 'error', text: 'Promtail만 설치하는 기능은 준비 중입니다. Node Exporter와 함께 설치해주세요.' });
+        const promtailResult = await promtailApi.install(serverIp, {
+          sshUser,
+          sshKey: getEffectiveSshKey()
+        });
+        
+        if (promtailResult.success) {
+          setMessage({ type: 'success', text: `${serverIp}: Promtail 설치 완료` });
+          await checkStatus(serverIp, true);
+        } else {
+          setMessage({ type: 'error', text: `${serverIp}: Promtail 설치 실패 - ${promtailResult.error || '알 수 없는 오류'}` });
+        }
         setServers(prev => prev.map(s => 
           s.ip === serverIp ? { ...s, installing: false } : s
         ));
         return;
+      }
+      
+      // Node Exporter만 설치하는 경우
+      if (installNodeExporter && !installPromtail) {
+        installOptions.installPromtail = false;
       }
 
       const installOptions = {
@@ -213,11 +238,34 @@ function NodeExporterInstall() {
         return;
       }
 
-      // Promtail만 설치하는 경우는 별도 API 필요
+      // Promtail만 설치하는 경우
       if (!installNodeExporter && installPromtail) {
-        setMessage({ type: 'error', text: 'Promtail만 설치하는 기능은 준비 중입니다. Node Exporter와 함께 설치해주세요.' });
+        const promtailResult = await promtailApi.installMultiple(serverIps, {
+          sshUser,
+          sshKey: getEffectiveSshKey()
+        });
+        
+        if (promtailResult.success) {
+          let successMsg = `Promtail 설치 완료: ${promtailResult.summary.success}/${promtailResult.summary.total}개 서버`;
+          setMessage({ type: 'success', text: successMsg });
+          
+          // 모든 서버 상태 확인
+          for (const serverIp of serverIps) {
+            await checkStatus(serverIp);
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        } else {
+          const failedServers = promtailResult.results?.filter(r => !r.success) || [];
+          const errorMessages = failedServers.map(r => `${r.serverIp}: ${r.error || '알 수 없는 오류'}`);
+          setMessage({ type: 'error', text: `일부 서버 Promtail 설치 실패:\n${errorMessages.join('\n')}` });
+        }
         setLoading(false);
         return;
+      }
+      
+      // Node Exporter만 설치하는 경우
+      if (installNodeExporter && !installPromtail) {
+        installOptions.installPromtail = false;
       }
 
       const serverIps = servers.map(s => s.ip);
