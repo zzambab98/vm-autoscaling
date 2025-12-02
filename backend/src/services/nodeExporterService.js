@@ -736,8 +736,10 @@ set -eo pipefail
 LOG_FILE="/var/log/login_history.log"
 DATE=$(date "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "unknown")
 
-mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+# /var/log 디렉토리 생성 (sudo 필요)
+sudo mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
 
+# 로그 파일에 쓰기 (sudo 필요)
 {
   echo "=== Login History Export at $DATE ==="
   echo "--- Successful Logins (wtmp) ---"
@@ -751,14 +753,15 @@ mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
   echo ""
   echo "=== End of Export ==="
   echo ""
-} >> "$LOG_FILE" 2>&1
+} | sudo tee -a "$LOG_FILE" > /dev/null 2>&1
 
-if [ -f "$LOG_FILE" ]; then
-  FILE_SIZE=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo "0")
+# 로그 파일 크기 관리 (sudo 필요)
+if sudo test -f "$LOG_FILE"; then
+  FILE_SIZE=$(sudo stat -f%z "$LOG_FILE" 2>/dev/null || sudo stat -c%s "$LOG_FILE" 2>/dev/null || echo "0")
   MAX_SIZE=10485760
   if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
-    tail -n 1000 "$LOG_FILE" > "${LOG_FILE}.tmp"
-    mv "${LOG_FILE}.tmp" "$LOG_FILE"
+    sudo tail -n 1000 "$LOG_FILE" > "${LOG_FILE}.tmp"
+    sudo mv "${LOG_FILE}.tmp" "$LOG_FILE"
   fi
 fi
 EXPORTSCRIPTEOF
