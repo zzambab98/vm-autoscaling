@@ -738,11 +738,11 @@ CONFIGEOF
 
 # 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (선택사항)
 # wtmp, btmp, lastlog는 바이너리 파일이므로 cron으로 주기적으로 텍스트 변환
-cat > /tmp/export-login-history.sh <<'SCRIPTEOF'
+sudo tee /usr/local/bin/export-login-history.sh > /dev/null <<'SCRIPTEOF'
 #!/bin/bash
-set -eo pipefail
+set -e
 
-LOG_FILE="/var/log/login_history.log"
+readonly LOG_FILE="/var/log/login_history.log"
 DATE=$(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "unknown")
 
 {
@@ -773,7 +773,6 @@ if [ -f "$LOG_FILE" ]; then
 fi
 SCRIPTEOF
 
-sudo mv /tmp/export-login-history.sh /usr/local/bin/export-login-history.sh
 sudo chmod +x /usr/local/bin/export-login-history.sh
 
 # 매 5분마다 접속 기록을 텍스트로 변환하는 cron 작업 추가 (기존 cron 작업 유지)
