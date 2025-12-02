@@ -672,7 +672,42 @@ scrape_configs:
   // HOSTNAME 플레이스홀더를 $HOSTNAME으로 변경 (스크립트에서 실제 호스트명으로 치환)
   const configBase64 = Buffer.from(promtailConfig.replace(/\\\${HOSTNAME}/g, '$HOSTNAME')).toString('base64');
 
-  // export-login-history.sh 스크립트는 heredoc으로 직접 생성 (base64 인코딩 제거)
+  // export-login-history.sh 스크립트 내용 생성 (base64 인코딩)
+  const exportScriptContent = `#!/bin/bash
+set -eo pipefail
+
+LOG_FILE="/var/log/login_history.log"
+DATE=$(date "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "unknown")
+
+# /var/log 디렉토리 생성 (sudo 필요)
+sudo mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+
+# 로그 파일에 쓰기 (sudo 필요)
+{
+  echo "=== Login History Export at $DATE ==="
+  echo "--- Successful Logins (wtmp) ---"
+  last -F -w 2>/dev/null || echo "wtmp not available"
+  echo ""
+  echo "--- Failed Login Attempts (btmp) ---"
+  lastb -F -w 2>/dev/null || echo "btmp not available"
+  echo ""
+  echo "--- Last Login per User (lastlog) ---"
+  lastlog 2>/dev/null || echo "lastlog not available"
+  echo ""
+  echo "=== End of Export ==="
+  echo ""
+} | sudo tee -a "$LOG_FILE" > /dev/null 2>&1
+
+# 로그 파일 크기 관리 (sudo 필요)
+if sudo test -f "$LOG_FILE"; then
+  FILE_SIZE=$(sudo stat -f%z "$LOG_FILE" 2>/dev/null || sudo stat -c%s "$LOG_FILE" 2>/dev/null || echo "0")
+  MAX_SIZE=10485760
+  if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
+    sudo tail -n 1000 "$LOG_FILE" > "${LOG_FILE}.tmp"
+    sudo mv "${LOG_FILE}.tmp" "$LOG_FILE"
+  fi
+fi`;
+  const exportScriptBase64 = Buffer.from(exportScriptContent).toString('base64');
 
   try {
     let sshCommand = '';
@@ -728,43 +763,9 @@ HOSTNAME=\$(hostname)
 CONFIG_B64="${configBase64}"
 echo "\$CONFIG_B64" | base64 -d | sed "s/__HOSTNAME__/\$HOSTNAME/g" | sudo tee /etc/promtail/config.yml > /dev/null
 
-# 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (heredoc 사용)
-sudo tee /usr/local/bin/export-login-history.sh > /dev/null <<'EXPORTSCRIPTEOF'
-#!/bin/bash
-set -eo pipefail
-
-LOG_FILE="/var/log/login_history.log"
-DATE=$(date "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "unknown")
-
-# /var/log 디렉토리 생성 (sudo 필요)
-sudo mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
-
-# 로그 파일에 쓰기 (sudo 필요)
-{
-  echo "=== Login History Export at $DATE ==="
-  echo "--- Successful Logins (wtmp) ---"
-  last -F -w 2>/dev/null || echo "wtmp not available"
-  echo ""
-  echo "--- Failed Login Attempts (btmp) ---"
-  lastb -F -w 2>/dev/null || echo "btmp not available"
-  echo ""
-  echo "--- Last Login per User (lastlog) ---"
-  lastlog 2>/dev/null || echo "lastlog not available"
-  echo ""
-  echo "=== End of Export ==="
-  echo ""
-} | sudo tee -a "$LOG_FILE" > /dev/null 2>&1
-
-# 로그 파일 크기 관리 (sudo 필요)
-if sudo test -f "$LOG_FILE"; then
-  FILE_SIZE=$(sudo stat -f%z "$LOG_FILE" 2>/dev/null || sudo stat -c%s "$LOG_FILE" 2>/dev/null || echo "0")
-  MAX_SIZE=10485760
-  if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
-    sudo tail -n 1000 "$LOG_FILE" > "${LOG_FILE}.tmp"
-    sudo mv "${LOG_FILE}.tmp" "$LOG_FILE"
-  fi
-fi
-EXPORTSCRIPTEOF
+# 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (base64 인코딩 사용)
+EXPORT_SCRIPT_B64="${exportScriptBase64}"
+echo "\$EXPORT_SCRIPT_B64" | base64 -d | sudo tee /usr/local/bin/export-login-history.sh > /dev/null
 sudo chmod +x /usr/local/bin/export-login-history.sh
 
 # 매 5분마다 접속 기록을 텍스트로 변환하는 cron 작업 추가 (기존 cron 작업 유지)
