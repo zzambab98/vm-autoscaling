@@ -215,6 +215,11 @@ curl -s http://localhost:9100/metrics | head -1 2>/dev/null || echo "not_respond
 # Promtail 상태
 systemctl is-active promtail 2>/dev/null || echo "inactive"
 systemctl is-enabled promtail 2>/dev/null || echo "disabled"
+# Promtail 바이너리 파일 존재 확인
+test -f /usr/local/bin/promtail && echo "binary_exists" || echo "binary_not_found"
+# Promtail 설정 파일 존재 확인
+test -f /etc/promtail/config.yml && echo "config_exists" || echo "config_not_found"
+# Promtail HTTP 엔드포인트 확인
 curl -s http://localhost:9080/ready 2>&1 | head -1 || echo "not_responding"
 `;
 
