@@ -714,17 +714,11 @@ CONFIGEOF
 # wtmp, btmp, lastlog는 바이너리 파일이므로 cron으로 주기적으로 텍스트 변환
 sudo tee /usr/local/bin/export-login-history.sh > /dev/null <<'SCRIPTEOF'
 #!/bin/bash
-set -euo pipefail
+set -eo pipefail
 
 # 접속 기록을 텍스트 파일로 변환
-LOG_FILE="/var/log/login_history.log"
-DATE=$(date '+%Y-%m-%d %H:%M:%S')
-
-# LOG_FILE 변수 확인
-if [ -z "$LOG_FILE" ]; then
-  echo "ERROR: LOG_FILE is not defined" >&2
-  exit 1
-fi
+readonly LOG_FILE="/var/log/login_history.log"
+DATE=$(date '+%Y-%m-%d %H:%M:%S' || echo "unknown")
 
 {
   echo "=== Login History Export at $DATE ==="
