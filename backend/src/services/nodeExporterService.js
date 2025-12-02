@@ -669,22 +669,20 @@ scrape_configs:
           __path__: /var/log/*.log`;
 
   // 설정 파일을 base64로 인코딩 (HOSTNAME은 스크립트에서 치환)
-  // HOSTNAME 플레이스홀더를 $HOSTNAME으로 변경 (스크립트에서 실제 호스트명으로 치환)
-  const configBase64 = Buffer.from(promtailConfig.replace(/\\\${HOSTNAME}/g, '$HOSTNAME')).toString('base64');
+  // HOSTNAME 플레이스홀더를 __HOSTNAME__으로 변경 (스크립트에서 실제 호스트명으로 치환)
+  const configBase64 = Buffer.from(promtailConfig.replace(/\\\${HOSTNAME}/g, '__HOSTNAME__')).toString('base64');
 
-  // export-login-history.sh 스크립트 내용 생성 (base64 인코딩)
+  // export-login-history.sh script content
   const exportScriptContent = `#!/bin/bash
-set -eo pipefail
+set -e
 
 LOG_FILE="/var/log/login_history.log"
-DATE=$(date "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "unknown")
+DATE=\$(date "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "unknown")
 
-# /var/log 디렉토리 생성 (sudo 필요)
-sudo mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+/usr/bin/sudo /bin/mkdir -p "\$(dirname "\$LOG_FILE")" 2>/dev/null || true
 
-# 로그 파일에 쓰기 (sudo 필요)
 {
-  echo "=== Login History Export at $DATE ==="
+  echo "=== Login History Export at \$DATE ==="
   echo "--- Successful Logins (wtmp) ---"
   last -F -w 2>/dev/null || echo "wtmp not available"
   echo ""
@@ -696,15 +694,14 @@ sudo mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
   echo ""
   echo "=== End of Export ==="
   echo ""
-} | sudo tee -a "$LOG_FILE" > /dev/null 2>&1
+} | /usr/bin/sudo /usr/bin/tee -a "\$LOG_FILE" > /dev/null 2>&1
 
-# 로그 파일 크기 관리 (sudo 필요)
-if sudo test -f "$LOG_FILE"; then
-  FILE_SIZE=$(sudo stat -f%z "$LOG_FILE" 2>/dev/null || sudo stat -c%s "$LOG_FILE" 2>/dev/null || echo "0")
+if /usr/bin/sudo /usr/bin/test -f "\$LOG_FILE"; then
+  FILE_SIZE=\$(/usr/bin/sudo /usr/bin/stat -f%z "\$LOG_FILE" 2>/dev/null || /usr/bin/sudo /usr/bin/stat -c%s "\$LOG_FILE" 2>/dev/null || echo "0")
   MAX_SIZE=10485760
-  if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
-    sudo tail -n 1000 "$LOG_FILE" > "${LOG_FILE}.tmp"
-    sudo mv "${LOG_FILE}.tmp" "$LOG_FILE"
+  if [ "\$FILE_SIZE" -gt "\$MAX_SIZE" ]; then
+    /usr/bin/sudo /usr/bin/tail -n 1000 "\$LOG_FILE" > "\${LOG_FILE}.tmp"
+    /usr/bin/sudo /bin/mv "\${LOG_FILE}.tmp" "\$LOG_FILE"
   fi
 fi`;
   const exportScriptBase64 = Buffer.from(exportScriptContent).toString('base64');
@@ -721,58 +718,77 @@ fi`;
 
     // Promtail 설치 스크립트
     const installScript = `#!/bin/bash
-set -eo pipefail
 
-# 기존 Promtail 서비스 중지
-sudo systemctl stop promtail 2>/dev/null || true
-sudo systemctl disable promtail 2>/dev/null || true
-sudo pkill -f promtail 2>/dev/null || true
-sleep 2
+echo "=== Starting Promtail installation ==="
+echo "=== Stopping existing Promtail ==="
+/usr/bin/sudo /bin/systemctl stop promtail 2>/dev/null || true
+echo "Stopped promtail service"
+/usr/bin/sudo /bin/systemctl disable promtail 2>/dev/null || true
+echo "Disabled promtail service"
+# Skip pkill as systemctl stop should handle process termination
+sleep 1
+echo "Waited for processes to terminate"
 
-# Promtail 다운로드 (tar.gz 형식 사용 - unzip 불필요)
-cd /tmp
-# unzip이 없을 수 있으므로 tar.gz 형식 사용
-wget -q https://github.com/grafana/loki/releases/download/v${promtailVersion}/promtail-linux-amd64.zip -O promtail-linux-amd64.zip
-
-# unzip 설치 시도 (없으면 설치)
-if ! command -v unzip &> /dev/null; then
-  sudo apt-get update -qq > /dev/null 2>&1
-  sudo apt-get install -y unzip > /dev/null 2>&1 || {
-    # unzip 설치 실패 시 Python으로 압축 해제 시도
-    python3 -c "import zipfile; zipfile.ZipFile('promtail-linux-amd64.zip').extractall('.')" 2>/dev/null || {
-      # Python도 없으면 에러
-      echo "ERROR: unzip 또는 python3가 필요합니다."
-      exit 1
-    }
-  }
+echo "=== Downloading Promtail ==="
+cd /tmp || { echo "ERROR: Cannot cd to /tmp"; exit 1; }
+echo "Changed to /tmp directory"
+rm -f promtail-linux-amd64.zip promtail-linux-amd64 2>/dev/null || true
+echo "Cleaned old files"
+if wget https://github.com/grafana/loki/releases/download/v${promtailVersion}/promtail-linux-amd64.zip -O promtail-linux-amd64.zip 2>&1; then
+  echo "Download completed successfully"
+else
+  echo "ERROR: Failed to download Promtail"
+  exit 1
 fi
 
-unzip -q promtail-linux-amd64.zip 2>/dev/null || {
-  # unzip 실패 시 Python으로 재시도
-  python3 -c "import zipfile; zipfile.ZipFile('promtail-linux-amd64.zip').extractall('.')" 2>/dev/null || exit 1
-}
+echo "=== Extracting Promtail ==="
+if ! command -v unzip &> /dev/null; then
+  echo "unzip not found, installing..."
+  /usr/bin/sudo /usr/bin/apt-get update -qq > /dev/null 2>&1
+  /usr/bin/sudo /usr/bin/apt-get install -y unzip > /dev/null 2>&1 || {
+    echo "apt-get failed, using python3..."
+    python3 -c "import zipfile; zipfile.ZipFile('promtail-linux-amd64.zip').extractall('.')" 2>/dev/null || {
+      echo "ERROR: unzip or python3 required"
+      exit 1
+    }
+    echo "Extracted with python3"
+  }
+else
+  echo "unzip found, extracting..."
+  if unzip -q promtail-linux-amd64.zip 2>/dev/null; then
+    echo "Extracted successfully"
+  else
+    echo "unzip failed, using python3..."
+    python3 -c "import zipfile; zipfile.ZipFile('promtail-linux-amd64.zip').extractall('.')" 2>/dev/null || {
+      echo "ERROR: Failed to extract Promtail"
+      exit 1
+    }
+    echo "Extracted with python3"
+  fi
+fi
 
-# 실행 파일 복사
-sudo rm -f /usr/local/bin/promtail
-sudo cp promtail-linux-amd64 /usr/local/bin/promtail
-sudo chmod +x /usr/local/bin/promtail
+echo "=== Installing Promtail binary ==="
+/usr/bin/sudo /bin/rm -f /usr/local/bin/promtail
+/usr/bin/sudo /bin/cp promtail-linux-amd64 /usr/local/bin/promtail
+/usr/bin/sudo /bin/chmod +x /usr/local/bin/promtail
 
-# Promtail 설정 파일 생성 (base64로 인코딩된 설정 파일 디코딩 및 HOSTNAME 치환)
-sudo mkdir -p /etc/promtail
-HOSTNAME=\$(hostname)
-CONFIG_B64="${configBase64}"
-echo "\$CONFIG_B64" | base64 -d | sed "s/__HOSTNAME__/\$HOSTNAME/g" | sudo tee /etc/promtail/config.yml > /dev/null
+echo "=== Creating Promtail config ==="
+/usr/bin/sudo /bin/mkdir -p /etc/promtail
+HOSTNAME_VALUE=\$(hostname)
+echo "${configBase64}" | base64 -d | sed "s/__HOSTNAME__/\$HOSTNAME_VALUE/g" | /usr/bin/sudo /usr/bin/tee /etc/promtail/config.yml > /dev/null
 
-# 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (base64 인코딩 사용)
-EXPORT_SCRIPT_B64="${exportScriptBase64}"
-echo "\$EXPORT_SCRIPT_B64" | base64 -d | sudo tee /usr/local/bin/export-login-history.sh > /dev/null
-sudo chmod +x /usr/local/bin/export-login-history.sh
+echo "=== Installing export-login-history.sh ==="
+/usr/bin/sudo /bin/mv /tmp/export-login-history.sh /usr/local/bin/export-login-history.sh
+/usr/bin/sudo /bin/chmod +x /usr/local/bin/export-login-history.sh
 
-# 매 5분마다 접속 기록을 텍스트로 변환하는 cron 작업 추가 (기존 cron 작업 유지)
-(crontab -l 2>/dev/null | grep -v "export-login-history"; echo "*/5 * * * * /usr/local/bin/export-login-history.sh > /dev/null 2>&1") | crontab -
+echo "=== Adding cron job ==="
+crontab -l 2>/dev/null | grep -v "export-login-history" > /tmp/crontab.tmp || true
+echo "*/5 * * * * /usr/local/bin/export-login-history.sh > /dev/null 2>&1" >> /tmp/crontab.tmp
+crontab /tmp/crontab.tmp
+rm -f /tmp/crontab.tmp
 
-# systemd 서비스 파일 생성
-sudo tee /etc/systemd/system/promtail.service > /dev/null <<'SERVICEEOF'
+echo "=== Creating systemd service ==="
+/usr/bin/sudo /usr/bin/tee /etc/systemd/system/promtail.service > /dev/null <<'SERVICEEOF'
 [Unit]
 Description=Promtail
 After=network.target
@@ -788,38 +804,87 @@ RestartSec=5
 WantedBy=multi-user.target
 SERVICEEOF
 
-# systemd 리로드 및 서비스 시작
-sudo systemctl daemon-reload
-sudo systemctl start promtail
-sudo systemctl enable promtail
+echo "=== Starting Promtail service ==="
+/usr/bin/sudo /bin/systemctl daemon-reload
+/usr/bin/sudo /bin/systemctl start promtail
+/usr/bin/sudo /bin/systemctl enable promtail
 
-# 설치 확인
 sleep 2
-systemctl is-active promtail || echo "Promtail 설치 완료 (서비스 확인 실패)"
+if systemctl is-active promtail > /dev/null 2>&1; then
+  echo "=== Promtail installation completed successfully ==="
+else
+  echo "WARNING: Promtail service is not active"
+  systemctl status promtail --no-pager || true
+fi
 `;
 
-    const scriptBase64 = Buffer.from(installScript).toString('base64');
-    const command = `${sshCommand} "echo '${scriptBase64}' | base64 -d | bash"`;
-    
-    const { stdout, stderr } = await execPromise(command, {
-      timeout: 300000,
-      maxBuffer: 10 * 1024 * 1024
-    });
+    // Write script to temp file and execute via scp + ssh
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
 
-    return {
-      success: true,
-      serverIp: serverIp,
-      message: `Promtail이 성공적으로 설치되었습니다.`,
-      lokiUrl: finalLokiUrl,
-      output: stdout,
-      error: stderr || null
-    };
+    const timestamp = Date.now();
+    const tmpScriptPath = path.join(os.tmpdir(), `promtail-install-${timestamp}.sh`);
+    const tmpExportScriptPath = path.join(os.tmpdir(), `export-login-history-${timestamp}.sh`);
+
+    fs.writeFileSync(tmpScriptPath, installScript);
+    fs.writeFileSync(tmpExportScriptPath, exportScriptContent);
+
+    try {
+      // Copy both scripts to remote server
+      const scpCommand1 = sshKey
+        ? `scp -i "${sshKey}" -o StrictHostKeyChecking=no "${tmpScriptPath}" ${sshUser}@${serverIp}:/tmp/promtail-install.sh`
+        : `sshpass -p '${sshPassword}' scp -o StrictHostKeyChecking=no "${tmpScriptPath}" ${sshUser}@${serverIp}:/tmp/promtail-install.sh`;
+
+      const scpCommand2 = sshKey
+        ? `scp -i "${sshKey}" -o StrictHostKeyChecking=no "${tmpExportScriptPath}" ${sshUser}@${serverIp}:/tmp/export-login-history.sh`
+        : `sshpass -p '${sshPassword}' scp -o StrictHostKeyChecking=no "${tmpExportScriptPath}" ${sshUser}@${serverIp}:/tmp/export-login-history.sh`;
+
+      await execPromise(scpCommand1, { timeout: 60000 });
+      await execPromise(scpCommand2, { timeout: 60000 });
+
+      // Execute script on remote server with full error output
+      const execCommand = `${sshCommand} "chmod +x /tmp/promtail-install.sh && timeout 300 bash -x /tmp/promtail-install.sh 2>&1; EXIT_CODE=\\$?; rm -f /tmp/promtail-install.sh /tmp/export-login-history.sh 2>/dev/null; exit \\$EXIT_CODE"`;
+      const { stdout, stderr } = await execPromise(execCommand, {
+        timeout: 360000, // 6 minutes
+        maxBuffer: 10 * 1024 * 1024
+      });
+
+      // Clean up local temp files
+      fs.unlinkSync(tmpScriptPath);
+      fs.unlinkSync(tmpExportScriptPath);
+
+      return {
+        success: true,
+        serverIp: serverIp,
+        message: `Promtail이 성공적으로 설치되었습니다.`,
+        lokiUrl: finalLokiUrl,
+        output: stdout,
+        error: stderr || null
+      };
+    } catch (executeError) {
+      // Clean up local temp files on error
+      if (fs.existsSync(tmpScriptPath)) {
+        fs.unlinkSync(tmpScriptPath);
+      }
+      if (fs.existsSync(tmpExportScriptPath)) {
+        fs.unlinkSync(tmpExportScriptPath);
+      }
+      throw executeError;
+    }
   } catch (error) {
     console.error(`[Promtail] 설치 실패 (${serverIp}):`, error);
+
+    // Extract detailed error message
+    let errorDetails = error.stderr || error.stdout || '';
+    if (error.message) {
+      errorDetails = error.message + (errorDetails ? '\n' + errorDetails : '');
+    }
+
     return {
       success: false,
       serverIp: serverIp,
-      error: error.message,
+      error: errorDetails || 'Unknown error',
       details: error.stderr || error.stdout
     };
   }
