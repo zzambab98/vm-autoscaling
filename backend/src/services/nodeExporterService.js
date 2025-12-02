@@ -729,19 +729,16 @@ HOSTNAME=\$(hostname)
 CONFIG_B64="${configBase64}"
 echo "\$CONFIG_B64" | base64 -d | sed "s/__HOSTNAME__/\$HOSTNAME/g" | sudo tee /etc/promtail/config.yml > /dev/null
 
-# 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (heredoc 사용, 변수는 이스케이프)
-sudo bash -c 'cat > /usr/local/bin/export-login-history.sh <<'\''EXPORTSCRIPTEOF'\''
+# 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (cat과 echo 사용)
+sudo bash -c 'cat > /usr/local/bin/export-login-history.sh << "SCRIPTEND"
 #!/bin/bash
 set -eo pipefail
 
-# 변수 정의
 LOG_FILE="/var/log/login_history.log"
 DATE=$(date "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "unknown")
 
-# 로그 파일 디렉토리 생성
 mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
 
-# 로그 내보내기
 {
   echo "=== Login History Export at $DATE ==="
   echo "--- Successful Logins (wtmp) ---"
@@ -757,7 +754,6 @@ mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
   echo ""
 } >> "$LOG_FILE" 2>&1
 
-# 로그 파일 크기 관리
 if [ -f "$LOG_FILE" ]; then
   FILE_SIZE=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo "0")
   MAX_SIZE=10485760
@@ -766,7 +762,7 @@ if [ -f "$LOG_FILE" ]; then
     mv "${LOG_FILE}.tmp" "$LOG_FILE"
   fi
 fi
-EXPORTSCRIPTEOF'
+SCRIPTEND'
 sudo chmod +x /usr/local/bin/export-login-history.sh
 
 # 매 5분마다 접속 기록을 텍스트로 변환하는 cron 작업 추가 (기존 cron 작업 유지)
