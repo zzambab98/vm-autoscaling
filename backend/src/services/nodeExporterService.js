@@ -676,9 +676,14 @@ scrape_configs:
   const exportScript = `#!/bin/bash
 set -eo pipefail
 
+# 변수 정의
 LOG_FILE="/var/log/login_history.log"
 DATE=$(date "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "unknown")
 
+# 로그 파일 디렉토리 생성
+mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+
+# 로그 내보내기
 {
   echo "=== Login History Export at $DATE ==="
   echo "--- Successful Logins (wtmp) ---"
@@ -694,6 +699,7 @@ DATE=$(date "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "unknown")
   echo ""
 } >> "$LOG_FILE" 2>&1
 
+# 로그 파일 크기 관리
 if [ -f "$LOG_FILE" ]; then
   FILE_SIZE=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo "0")
   MAX_SIZE=10485760
