@@ -489,6 +489,389 @@ clients:
   - url: ${finalLokiUrl}
 
 scrape_configs:
+  # 1. 계정 및 인증 관련 로그 (최우선 점검)
+  - job_name: auth
+    static_configs:
+      # Debian/Ubuntu 계열
+      - targets:
+          - localhost
+        labels:
+          job: auth
+          log_type: authentication
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/auth.log
+      # RHEL/CentOS/Rocky 계열
+      - targets:
+          - localhost
+        labels:
+          job: secure
+          log_type: authentication
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/secure
+
+  # 2. 전체 시스템 로그
+  - job_name: system
+    static_configs:
+      # Debian/Ubuntu 계열
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          log_type: system
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/syslog
+      # RHEL/CentOS/Rocky 계열
+      - targets:
+          - localhost
+        labels:
+          job: messages
+          log_type: system
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/messages
+
+  # 3. 접속 기록 (바이너리 파일은 텍스트 변환 필요 - last, lastb 명령어 출력)
+  # 주의: 바이너리 파일은 직접 수집 불가, cron으로 텍스트 변환 후 수집 권장
+  - job_name: login_history
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: login_history
+          log_type: access
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/login_history.log
+
+  # 4. 주요 서비스 및 작업 스케줄 로그
+  - job_name: cron
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: cron
+          log_type: scheduled_task
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/cron
+
+  # 5. 웹 서버 로그
+  - job_name: web_server
+    static_configs:
+      # Apache (RHEL/CentOS)
+      - targets:
+          - localhost
+        labels:
+          job: apache_access
+          log_type: web_access
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/httpd/access_log
+      - targets:
+          - localhost
+        labels:
+          job: apache_error
+          log_type: web_error
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/httpd/error_log
+      # Apache (Debian/Ubuntu)
+      - targets:
+          - localhost
+        labels:
+          job: apache2_access
+          log_type: web_access
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/apache2/access.log
+      - targets:
+          - localhost
+        labels:
+          job: apache2_error
+          log_type: web_error
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/apache2/error.log
+      # Nginx
+      - targets:
+          - localhost
+        labels:
+          job: nginx_access
+          log_type: web_access
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/nginx/access.log
+      - targets:
+          - localhost
+        labels:
+          job: nginx_error
+          log_type: web_error
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/nginx/error.log
+
+  # 6. 사용자 명령어 기록 (Shell History)
+  - job_name: shell_history
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: bash_history
+          log_type: command_history
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /home/*/.bash_history
+      - targets:
+          - localhost
+        labels:
+          job: root_history
+          log_type: command_history
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /root/.bash_history
+      - targets:
+          - localhost
+        labels:
+          job: zsh_history
+          log_type: command_history
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /home/*/.zsh_history
+
+  # 7. 기타 시스템 로그
+  - job_name: system_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: kern
+          log_type: kernel
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/kern.log
+      - targets:
+          - localhost
+        labels:
+          job: daemon
+          log_type: daemon
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/daemon.log
+      - targets:
+          - localhost
+        labels:
+          job: mail
+          log_type: mail
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/mail.log
+      - targets:
+          - localhost
+        labels:
+          job: user
+          log_type: user
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/user.log
+      - targets:
+          - localhost
+        labels:
+          job: dpkg
+          log_type: package
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/dpkg.log
+      - targets:
+          - localhost
+        labels:
+          job: apt
+          log_type: package
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/apt/*.log
+      - targets:
+          - localhost
+        labels:
+          job: journal
+          log_type: systemd
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/journal/**/*.log
+      - targets:
+          - localhost
+        labels:
+          job: varlogs
+          log_type: general
+          hostname: \${HOSTNAME}
+          instance: \${HOSTNAME}
+          __path__: /var/log/*.log
+CONFIGEOF
+
+# 접속 기록 바이너리 파일을 텍스트로 변환하는 스크립트 생성 (선택사항)
+# wtmp, btmp, lastlog는 바이너리 파일이므로 cron으로 주기적으로 텍스트 변환
+sudo tee /usr/local/bin/export-login-history.sh > /dev/null <<'SCRIPTEOF'
+#!/bin/bash
+# 접속 기록을 텍스트 파일로 변환
+LOG_FILE="/var/log/login_history.log"
+DATE=$(date '+%Y-%m-%d %H:%M:%S')
+
+echo "=== Login History Export at $DATE ===" >> $LOG_FILE
+echo "--- Successful Logins (wtmp) ---" >> $LOG_FILE
+last -F -w >> $LOG_FILE 2>/dev/null || echo "wtmp not available" >> $LOG_FILE
+echo "" >> $LOG_FILE
+
+echo "--- Failed Login Attempts (btmp) ---" >> $LOG_FILE
+lastb -F -w >> $LOG_FILE 2>/dev/null || echo "btmp not available" >> $LOG_FILE
+echo "" >> $LOG_FILE
+
+echo "--- Last Login per User (lastlog) ---" >> $LOG_FILE
+lastlog >> $LOG_FILE 2>/dev/null || echo "lastlog not available" >> $LOG_FILE
+echo "" >> $LOG_FILE
+echo "=== End of Export ===" >> $LOG_FILE
+echo "" >> $LOG_FILE
+
+# 로그 파일 크기 제한 (최대 10MB)
+if [ -f "$LOG_FILE" ]; then
+  FILE_SIZE=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null)
+  MAX_SIZE=10485760  # 10MB
+  if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
+    tail -n 1000 "$LOG_FILE" > "${LOG_FILE}.tmp"
+    mv "${LOG_FILE}.tmp" "$LOG_FILE"
+  fi
+fi
+SCRIPTEOF
+
+sudo chmod +x /usr/local/bin/export-login-history.sh
+
+# 매 5분마다 접속 기록을 텍스트로 변환하는 cron 작업 추가 (기존 cron 작업 유지)
+(crontab -l 2>/dev/null | grep -v "export-login-history"; echo "*/5 * * * * /usr/local/bin/export-login-history.sh > /dev/null 2>&1") | crontab -
+
+# systemd 서비스 파일 생성
+sudo tee /etc/systemd/system/promtail.service > /dev/null <<'SERVICEEOF'
+[Unit]
+Description=Promtail
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/promtail -config.file=/etc/promtail/config.yml
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+SERVICEEOF
+
+# systemd 리로드 및 서비스 시작
+sudo systemctl daemon-reload
+sudo systemctl start promtail
+sudo systemctl enable promtail
+
+# 설치 확인
+sleep 2
+systemctl is-active promtail || echo "Promtail 설치 완료 (서비스 확인 실패)"
+`;
+
+    const scriptBase64 = Buffer.from(installScript).toString('base64');
+    const command = `${sshCommand} "echo '${scriptBase64}' | base64 -d | bash"`;
+    
+    const { stdout, stderr } = await execPromise(command, {
+      timeout: 300000,
+      maxBuffer: 10 * 1024 * 1024
+    });
+
+    return {
+      success: true,
+      serverIp: serverIp,
+      message: `Promtail이 성공적으로 설치되었습니다.`,
+      lokiUrl: finalLokiUrl,
+      output: stdout,
+      error: stderr || null
+    };
+  } catch (error) {
+    console.error(`[Promtail] 설치 실패 (${serverIp}):`, error);
+    return {
+      success: false,
+      serverIp: serverIp,
+      error: error.message,
+      details: error.stderr || error.stdout
+    };
+  }
+}
+
+/**
+ * 여러 서버에 Promtail 설치
+ * @param {Array<string>} serverIps - 서버 IP 목록
+ * @param {object} options - 설치 옵션
+ * @returns {Promise<object>} 설치 결과
+ */
+async function installPromtailOnMultipleServers(serverIps, options = {}) {
+  const results = await Promise.all(
+    serverIps.map(serverIp => installPromtail(serverIp, options))
+  );
+
+  return {
+    success: results.every(r => r.success),
+    results: results,
+    summary: {
+      total: serverIps.length,
+      success: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length
+    }
+  };
+}
+
+/**
+ * Promtail 설정 파일 업데이트 (기존 설치된 서버용)
+ * @param {string} serverIp - 서버 IP 주소
+ * @param {object} options - SSH 옵션
+ * @returns {Promise<object>} 업데이트 결과
+ */
+async function updatePromtailConfig(serverIp, options = {}) {
+  const {
+    sshUser = 'ubuntu',
+    sshKey = null,
+    sshPassword = null,
+    lokiUrl = null
+  } = options;
+
+  const finalLokiUrl = lokiUrl || process.env.LOKI_URL || 'http://10.255.1.254:3100/loki/api/v1/push';
+
+  try {
+    let sshCommand = '';
+    if (sshKey) {
+      sshCommand = `ssh -i "${sshKey}" -o StrictHostKeyChecking=no ${sshUser}@${serverIp}`;
+    } else if (sshPassword) {
+      sshCommand = `sshpass -p '${sshPassword}' ssh -o StrictHostKeyChecking=no ${sshUser}@${serverIp}`;
+    } else {
+      throw new Error('SSH Key 또는 Password가 필요합니다.');
+    }
+
+    // Promtail 설정 파일 업데이트 스크립트
+    const updateScript = `#!/bin/bash
+set -e
+
+# 호스트명 가져오기
+HOSTNAME=\$(hostname)
+
+# Promtail 설정 파일 업데이트
+sudo mkdir -p /etc/promtail
+sudo tee /etc/promtail/config.yml > /dev/null <<CONFIGEOF
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: ${finalLokiUrl}
+
+scrape_configs:
   - job_name: system
     static_configs:
       - targets:
@@ -570,51 +953,27 @@ scrape_configs:
           __path__: /var/log/journal/**/*.log
 CONFIGEOF
 
-# systemd 서비스 파일 생성
-sudo tee /etc/systemd/system/promtail.service > /dev/null <<'SERVICEEOF'
-[Unit]
-Description=Promtail
-After=network.target
-
-[Service]
-Type=simple
-User=root
-ExecStart=/usr/local/bin/promtail -config.file=/etc/promtail/config.yml
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-SERVICEEOF
-
-# systemd 리로드 및 서비스 시작
-sudo systemctl daemon-reload
-sudo systemctl start promtail
-sudo systemctl enable promtail
-
-# 설치 확인
-sleep 2
-systemctl is-active promtail || echo "Promtail 설치 완료 (서비스 확인 실패)"
+# Promtail 서비스 재시작
+sudo systemctl restart promtail 2>/dev/null || echo "Promtail 서비스가 없습니다. 재설치가 필요합니다."
 `;
 
-    const scriptBase64 = Buffer.from(installScript).toString('base64');
+    const scriptBase64 = Buffer.from(updateScript).toString('base64');
     const command = `${sshCommand} "echo '${scriptBase64}' | base64 -d | bash"`;
     
     const { stdout, stderr } = await execPromise(command, {
-      timeout: 300000,
+      timeout: 60000,
       maxBuffer: 10 * 1024 * 1024
     });
 
     return {
       success: true,
       serverIp: serverIp,
-      message: `Promtail이 성공적으로 설치되었습니다.`,
-      lokiUrl: finalLokiUrl,
+      message: `Promtail 설정 파일이 업데이트되었습니다.`,
       output: stdout,
       error: stderr || null
     };
   } catch (error) {
-    console.error(`[Promtail] 설치 실패 (${serverIp}):`, error);
+    console.error(`[Promtail] 설정 업데이트 실패 (${serverIp}):`, error);
     return {
       success: false,
       serverIp: serverIp,
@@ -625,14 +984,14 @@ systemctl is-active promtail || echo "Promtail 설치 완료 (서비스 확인 �
 }
 
 /**
- * 여러 서버에 Promtail 설치
+ * 여러 서버의 Promtail 설정 파일 업데이트
  * @param {Array<string>} serverIps - 서버 IP 목록
- * @param {object} options - 설치 옵션
- * @returns {Promise<object>} 설치 결과
+ * @param {object} options - SSH 옵션
+ * @returns {Promise<object>} 업데이트 결과
  */
-async function installPromtailOnMultipleServers(serverIps, options = {}) {
+async function updatePromtailConfigOnMultipleServers(serverIps, options = {}) {
   const results = await Promise.all(
-    serverIps.map(serverIp => installPromtail(serverIp, options))
+    serverIps.map(serverIp => updatePromtailConfig(serverIp, options))
   );
 
   return {
@@ -651,7 +1010,9 @@ module.exports = {
   checkNodeExporterStatus,
   installNodeExporterOnMultipleServers,
   installPromtail,
-  installPromtailOnMultipleServers
+  installPromtailOnMultipleServers,
+  updatePromtailConfig,
+  updatePromtailConfigOnMultipleServers
 };
 
 
