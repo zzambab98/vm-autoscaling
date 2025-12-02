@@ -673,19 +673,20 @@ scrape_configs:
   const configBase64 = Buffer.from(promtailConfig.replace(/\\\${HOSTNAME}/g, '$HOSTNAME')).toString('base64');
 
   // export-login-history.sh 스크립트 생성 및 base64 인코딩
+  // 주의: 스크립트 내부의 변수는 $ 대신 \\$로 이스케이프하여 base64 인코딩 시 변수 확장 방지
   const exportScript = `#!/bin/bash
 set -eo pipefail
 
 # 변수 정의
 LOG_FILE="/var/log/login_history.log"
-DATE=$(date "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "unknown")
+DATE=\\$(date "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "unknown")
 
 # 로그 파일 디렉토리 생성
-mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+mkdir -p "\\$(dirname "\\$LOG_FILE")" 2>/dev/null || true
 
 # 로그 내보내기
 {
-  echo "=== Login History Export at $DATE ==="
+  echo "=== Login History Export at \\$DATE ==="
   echo "--- Successful Logins (wtmp) ---"
   last -F -w 2>/dev/null || echo "wtmp not available"
   echo ""
@@ -697,15 +698,15 @@ mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
   echo ""
   echo "=== End of Export ==="
   echo ""
-} >> "$LOG_FILE" 2>&1
+} >> "\\$LOG_FILE" 2>&1
 
 # 로그 파일 크기 관리
-if [ -f "$LOG_FILE" ]; then
-  FILE_SIZE=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo "0")
+if [ -f "\\$LOG_FILE" ]; then
+  FILE_SIZE=\\$(stat -f%z "\\$LOG_FILE" 2>/dev/null || stat -c%s "\\$LOG_FILE" 2>/dev/null || echo "0")
   MAX_SIZE=10485760
-  if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
-    tail -n 1000 "$LOG_FILE" > "${LOG_FILE}.tmp"
-    mv "${LOG_FILE}.tmp" "$LOG_FILE"
+  if [ "\\$FILE_SIZE" -gt "\\$MAX_SIZE" ]; then
+    tail -n 1000 "\\$LOG_FILE" > "\\${LOG_FILE}.tmp"
+    mv "\\${LOG_FILE}.tmp" "\\$LOG_FILE"
   fi
 fi`;
   const exportScriptBase64 = Buffer.from(exportScript).toString('base64');
