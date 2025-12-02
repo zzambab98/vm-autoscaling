@@ -223,6 +223,10 @@ test -f /usr/local/bin/promtail && echo "binary_exists" || echo "binary_not_foun
 test -f /etc/promtail/config.yml && echo "config_exists" || echo "config_not_found"
 # Promtail HTTP 엔드포인트 확인
 curl -s http://localhost:9080/ready 2>&1 | head -1 || echo "not_responding"
+# Promtail 서비스 상태 상세 확인 (에러 메시지 포함)
+systemctl status promtail --no-pager -l 2>&1 | head -20 || echo "status_check_failed"
+# Promtail 설정 파일에서 Loki URL 확인
+grep -E "^\\s*url:" /etc/promtail/config.yml 2>/dev/null | head -1 || echo "loki_url_not_found"
 `;
 
     // 스크립트를 base64로 인코딩하여 전송
@@ -287,6 +291,8 @@ curl -s http://localhost:9080/ready 2>&1 | head -1 || echo "not_responding"
         isActive: promtailActive,
         isEnabled: promtailEnabled,
         isResponding: promtailResponding,
+        lokiUrl: promtailLokiUrl,
+        statusDetail: promtailStatusDetail,
         status: promtailActive ? 'running' : (promtailEnabled ? 'installed' : 'not_installed')
       },
       // 하위 호환성을 위한 필드
