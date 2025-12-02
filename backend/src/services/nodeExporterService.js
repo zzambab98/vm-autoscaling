@@ -215,7 +215,7 @@ curl -s http://localhost:9100/metrics | head -1 2>/dev/null || echo "not_respond
 # Promtail 상태
 systemctl is-active promtail 2>/dev/null || echo "inactive"
 systemctl is-enabled promtail 2>/dev/null || echo "disabled"
-curl -s http://localhost:9080/ready 2>/dev/null | head -1 || echo "not_responding"
+curl -s http://localhost:9080/ready 2>&1 | head -1 || echo "not_responding"
 `;
 
     // 스크립트를 base64로 인코딩하여 전송
@@ -234,17 +234,20 @@ curl -s http://localhost:9080/ready 2>/dev/null | head -1 || echo "not_respondin
     // Promtail 상태
     const promtailActive = lines[3] === 'active';
     const promtailEnabled = lines[4] === 'enabled';
+    const promtailBinaryExists = lines[5] === 'binary_exists';
+    const promtailConfigExists = lines[6] === 'config_exists';
     // curl 응답 확인: 실제로 응답이 있고 'not_responding'이 아닌 경우만 true
-    // 빈 문자열이나 'disabled'는 false로 처리
-    const promtailResponse = lines[5] ? lines[5].trim() : '';
+    const promtailResponse = lines[7] ? lines[7].trim() : '';
     const promtailResponding = promtailResponse !== '' && 
                                promtailResponse !== 'not_responding' && 
                                promtailResponse !== 'disabled' &&
                                promtailResponse !== 'inactive' &&
                                !promtailResponse.includes('Connection refused') &&
-                               !promtailResponse.includes('curl:');
-    // active이거나 enabled이거나 실제로 응답하는 경우만 설치됨으로 판단
-    const promtailInstalled = promtailActive || promtailEnabled || promtailResponding;
+                               !promtailResponse.includes('curl:') &&
+                               !promtailResponse.includes('could not resolve') &&
+                               !promtailResponse.includes('Failed to connect');
+    // 바이너리나 설정 파일이 존재하거나, 서비스가 활성화되어 있거나, 실제로 응답하는 경우 설치됨으로 판단
+    const promtailInstalled = promtailBinaryExists || promtailConfigExists || promtailActive || promtailEnabled || promtailResponding;
 
     return {
       success: true,
