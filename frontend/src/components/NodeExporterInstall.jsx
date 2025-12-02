@@ -633,7 +633,7 @@ function NodeExporterInstall() {
                 <button
                   className="button"
                   onClick={() => checkStatus(server.ip, true)}
-                  disabled={server.installing || loading}
+                  disabled={server.installing || server.uninstalling || loading}
                   style={{ marginRight: '8px' }}
                 >
                   확인
@@ -641,7 +641,7 @@ function NodeExporterInstall() {
                 <button
                   className="button button-success"
                   onClick={() => installOnServer(server.ip)}
-                  disabled={server.installing || (!installNodeExporter && !installPromtail)}
+                  disabled={server.installing || server.uninstalling || (!installNodeExporter && !installPromtail)}
                   style={{ marginRight: '8px' }}
                 >
                   {server.installing ? '설치 중...' : '설치'}
