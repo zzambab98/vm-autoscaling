@@ -123,6 +123,9 @@ function NodeExporterInstall() {
 
       if (result.success) {
         let successMsg = `${serverIp}: Node Exporter 설치 완료`;
+        if (result.promtailInstalled) {
+          successMsg += ` + Promtail 설치 완료`;
+        }
         if (result.prometheusRegistered) {
           successMsg += ` (Prometheus Job '${result.prometheusJobName}'에 자동 등록됨)`;
         }
@@ -174,8 +177,11 @@ function NodeExporterInstall() {
 
       if (result.success) {
         let successMsg = `설치 완료: ${result.summary.success}/${result.summary.total}개 서버`;
+        if (result.summary.promtailInstalled > 0) {
+          successMsg += ` (Node Exporter + Promtail 설치: ${result.summary.promtailInstalled}개 서버)`;
+        }
         if (result.summary.prometheusRegistered > 0) {
-          successMsg += ` (${result.summary.prometheusRegistered}개 서버 Prometheus 자동 등록됨)`;
+          successMsg += ` (Prometheus 자동 등록: ${result.summary.prometheusRegistered}개 서버)`;
         }
         setMessage({ 
           type: 'success', 
@@ -224,6 +230,32 @@ function NodeExporterInstall() {
   return (
     <div className="card">
       <h2>Node Exporter 설치</h2>
+      
+      <div style={{ 
+        padding: '12px 16px', 
+        marginBottom: '20px', 
+        backgroundColor: '#e7f3ff', 
+        border: '1px solid #2196F3', 
+        borderRadius: '6px',
+        fontSize: '14px',
+        lineHeight: '1.6'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+          <span style={{ fontSize: '18px' }}>ℹ️</span>
+          <div>
+            <strong style={{ color: '#1976D2' }}>자동 설치 안내</strong>
+            <div style={{ marginTop: '6px', color: '#424242' }}>
+              Node Exporter 설치 시 <strong>Promtail (Loki 로그 수집)</strong>도 함께 자동으로 설치됩니다.
+              <br />
+              <span style={{ fontSize: '12px', color: '#666', marginTop: '4px', display: 'block' }}>
+                • Node Exporter: 메트릭 수집 (포트 9100)
+                <br />
+                • Promtail: 로그 수집 및 Loki 전송 (포트 9080)
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
       
       {message && (
         <div className={

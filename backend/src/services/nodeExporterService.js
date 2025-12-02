@@ -17,7 +17,9 @@ async function installNodeExporter(serverIp, options = {}) {
     nodeExporterVersion = '1.7.0',
     autoRegisterPrometheus = false, // Prometheus 자동 등록 옵션
     prometheusJobName = null, // Job 이름 (자동 생성 또는 지정)
-    prometheusLabels = {} // 추가 labels (service, environment 등)
+    prometheusLabels = {}, // 추가 labels (service, environment 등)
+    installPromtail = true, // Promtail도 함께 설치 (기본값: true)
+    lokiUrl = null // Loki 서버 URL
   } = options;
 
   try {
@@ -103,8 +105,33 @@ curl -s http://localhost:9100/metrics | head -5 || echo "Node Exporter 설치 �
       message: `Node Exporter가 성공적으로 설치되었습니다.`,
       output: stdout,
       error: stderr || null,
-      prometheusRegistered: false
+      prometheusRegistered: false,
+      promtailInstalled: false
     };
+
+    // Promtail 설치 (기본적으로 함께 설치)
+    if (installPromtail) {
+      try {
+        const promtailResult = await installPromtail(serverIp, {
+          sshUser,
+          sshKey,
+          sshPassword,
+          lokiUrl: lokiUrl || null
+        });
+        
+        if (promtailResult.success) {
+          result.promtailInstalled = true;
+          result.message += ` Promtail도 함께 설치되었습니다.`;
+          console.log(`[Node Exporter] Promtail 설치 완료: ${serverIp}`);
+        } else {
+          console.warn(`[Node Exporter] Promtail 설치 실패 (${serverIp}):`, promtailResult.error);
+          result.message += ` (Promtail 설치 실패: ${promtailResult.error})`;
+        }
+      } catch (promtailError) {
+        console.warn(`[Node Exporter] Promtail 설치 중 예외 발생 (${serverIp}):`, promtailError.message);
+        result.message += ` (Promtail 설치 실패: ${promtailError.message})`;
+      }
+    }
 
     // Prometheus 자동 등록 옵션이 활성화된 경우
     if (autoRegisterPrometheus) {
@@ -226,13 +253,17 @@ async function installNodeExporterOnMultipleServers(serverIps, options = {}) {
     autoRegisterPrometheus = false,
     prometheusJobName = null,
     prometheusLabels = {},
-    groupByJob = true // 여러 서버를 하나의 Job으로 그룹화할지 여부
+    groupByJob = true, // 여러 서버를 하나의 Job으로 그룹화할지 여부
+    installPromtail = true, // Promtail도 함께 설치 (기본값: true)
+    lokiUrl = null // Loki 서버 URL
   } = options;
 
   const results = await Promise.all(
     serverIps.map(serverIp => installNodeExporter(serverIp, {
       ...options,
-      autoRegisterPrometheus: false // 개별 등록은 나중에 처리
+      autoRegisterPrometheus: false, // 개별 등록은 나중에 처리
+      installPromtail: installPromtail, // Promtail 설치 옵션 전달
+      lokiUrl: lokiUrl // Loki URL 전달
     }))
   );
 
@@ -313,7 +344,8 @@ async function installNodeExporterOnMultipleServers(serverIps, options = {}) {
       total: serverIps.length,
       success: results.filter(r => r.success).length,
       failed: results.filter(r => !r.success).length,
-      prometheusRegistered: results.filter(r => r.prometheusRegistered).length
+      prometheusRegistered: results.filter(r => r.prometheusRegistered).length,
+      promtailInstalled: results.filter(r => r.promtailInstalled).length
     }
   };
 }
