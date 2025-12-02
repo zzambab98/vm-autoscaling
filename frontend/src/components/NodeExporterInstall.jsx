@@ -17,7 +17,7 @@ function NodeExporterInstall() {
 
   const [servers, setServers] = useState([]);
   const [sshUser, setSshUser] = useState('ubuntu');
-  const [selectedSshKey, setSelectedSshKey] = useState(sshKeyOptions[0].value); // danainfra를 기본값으로
+  const [selectedSshKey, setSelectedSshKey] = useState(sshKeyOptions[1].value); // dana-cocktail을 기본값으로
   const [customSshKey, setCustomSshKey] = useState('');
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -320,45 +320,68 @@ function NodeExporterInstall() {
     }
   };
 
-  const updatePromtailConfigOnAll = async () => {
-    setLoading(true);
+  const uninstallOnServer = async (serverIp, tool) => {
+    if (!confirm(`${serverIp}에서 ${tool === 'node_exporter' ? 'Node Exporter' : tool === 'promtail' ? 'Promtail' : 'Node Exporter + Promtail'}를 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    setServers(prev => prev.map(s => 
+      s.ip === serverIp ? { ...s, installing: true } : s
+    ));
     setMessage(null);
 
     try {
-      // Promtail이 설치된 서버만 필터링
-      const serverIps = servers
-        .filter(s => s.ip && s.promtailInstalled)
-        .map(s => s.ip);
-
-      if (serverIps.length === 0) {
-        setMessage({ type: 'info', text: 'Promtail이 설치된 서버가 없습니다.' });
-        setLoading(false);
-        return;
-      }
-
-      const result = await promtailApi.updateConfigMultiple(serverIps, {
-        sshUser,
-        sshKey: getEffectiveSshKey()
-      });
-
-      if (result.success) {
-        setMessage({ 
-          type: 'success', 
-          text: `Promtail 설정 업데이트 완료: ${result.summary.success}/${result.summary.total}개 서버` 
+      if (tool === 'node_exporter') {
+        const result = await nodeExporterApi.uninstall(serverIp, {
+          sshUser,
+          sshKey: getEffectiveSshKey()
         });
-        // 전체 업데이트는 상태 확인 생략 (부하 방지)
-      } else {
-        const failedServers = result.results?.filter(r => !r.success) || [];
-        const errorMessages = failedServers.map(r => `${r.serverIp}: ${r.error || '알 수 없는 오류'}`);
-        setMessage({ 
-          type: 'error', 
-          text: `일부 서버 설정 업데이트 실패:\n${errorMessages.join('\n')}` 
+        
+        if (result.success) {
+          setMessage({ type: 'success', text: `${serverIp}: Node Exporter 삭제 완료` });
+          await checkStatus(serverIp, true);
+        } else {
+          setMessage({ type: 'error', text: `${serverIp}: Node Exporter 삭제 실패 - ${result.error || '알 수 없는 오류'}` });
+        }
+      } else if (tool === 'promtail') {
+        const result = await promtailApi.uninstall(serverIp, {
+          sshUser,
+          sshKey: getEffectiveSshKey()
         });
+        
+        if (result.success) {
+          setMessage({ type: 'success', text: `${serverIp}: Promtail 삭제 완료` });
+          await checkStatus(serverIp, true);
+        } else {
+          setMessage({ type: 'error', text: `${serverIp}: Promtail 삭제 실패 - ${result.error || '알 수 없는 오류'}` });
+        }
+      } else if (tool === 'both') {
+        // 둘 다 삭제
+        const nodeExporterResult = await nodeExporterApi.uninstall(serverIp, {
+          sshUser,
+          sshKey: getEffectiveSshKey()
+        });
+        const promtailResult = await promtailApi.uninstall(serverIp, {
+          sshUser,
+          sshKey: getEffectiveSshKey()
+        });
+        
+        if (nodeExporterResult.success && promtailResult.success) {
+          setMessage({ type: 'success', text: `${serverIp}: Node Exporter + Promtail 삭제 완료` });
+          await checkStatus(serverIp, true);
+        } else {
+          const errors = [];
+          if (!nodeExporterResult.success) errors.push(`Node Exporter: ${nodeExporterResult.error}`);
+          if (!promtailResult.success) errors.push(`Promtail: ${promtailResult.error}`);
+          setMessage({ type: 'error', text: `${serverIp}: 삭제 실패 - ${errors.join(', ')}` });
+        }
       }
     } catch (error) {
-      setMessage({ type: 'error', text: `설정 업데이트 실패: ${error.message}` });
+      setMessage({ type: 'error', text: `${serverIp}: 삭제 실패 - ${error.message}` });
     } finally {
-      setLoading(false);
+      setServers(prev => prev.map(s => 
+        s.ip === serverIp ? { ...s, installing: false } : s
+      ));
     }
   };
 
@@ -511,17 +534,6 @@ function NodeExporterInstall() {
         >
           전체 설치 {installNodeExporter && installPromtail ? '(Node Exporter + Promtail)' : installNodeExporter ? '(Node Exporter)' : '(Promtail)'}
         </button>
-        {installPromtail && (
-          <button 
-            className="button" 
-            onClick={updatePromtailConfigOnAll}
-            disabled={loading || servers.length === 0}
-            style={{ marginLeft: '10px', backgroundColor: '#ff9800', color: '#fff' }}
-            title="기존에 설치된 Promtail의 설정 파일만 업데이트합니다"
-          >
-            Promtail 설정 업데이트
-          </button>
-        )}
       </div>
 
       {loadingVms ? (
@@ -633,39 +645,23 @@ function NodeExporterInstall() {
                 >
                   {server.installing ? '설치 중...' : '설치'}
                 </button>
-                {installPromtail && server.promtailInstalled && (
+                {(server.nodeExporterInstalled || server.promtailInstalled) && (
                   <button
                     className="button"
-                    onClick={async () => {
-                      setServers(prev => prev.map(s => 
-                        s.ip === server.ip ? { ...s, installing: true } : s
-                      ));
-                      setMessage(null);
-                      try {
-                        const result = await promtailApi.updateConfig(server.ip, {
-                          sshUser,
-                          sshKey: getEffectiveSshKey()
-                        });
-                        if (result.success) {
-                          setMessage({ type: 'success', text: `${server.ip}: Promtail 설정 업데이트 완료` });
-                          // 개별 업데이트는 해당 서버만 상태 확인
-                          await checkStatus(server.ip, true);
-                        } else {
-                          setMessage({ type: 'error', text: `${server.ip}: 설정 업데이트 실패 - ${result.error}` });
-                        }
-                      } catch (error) {
-                        setMessage({ type: 'error', text: `${server.ip}: 설정 업데이트 실패 - ${error.message}` });
-                      } finally {
-                        setServers(prev => prev.map(s => 
-                          s.ip === server.ip ? { ...s, installing: false } : s
-                        ));
+                    onClick={() => {
+                      if (server.nodeExporterInstalled && server.promtailInstalled) {
+                        uninstallOnServer(server.ip, 'both');
+                      } else if (server.nodeExporterInstalled) {
+                        uninstallOnServer(server.ip, 'node_exporter');
+                      } else if (server.promtailInstalled) {
+                        uninstallOnServer(server.ip, 'promtail');
                       }
                     }}
                     disabled={server.installing || loading}
-                    style={{ backgroundColor: '#ff9800', color: '#fff', fontSize: '12px', padding: '4px 8px' }}
-                    title="Promtail 설정 파일만 업데이트 (재설치 불필요)"
+                    style={{ backgroundColor: '#f44336', color: '#fff' }}
+                    title="설치된 도구 삭제"
                   >
-                    설정 업데이트
+                    삭제
                   </button>
                 )}
               </td>

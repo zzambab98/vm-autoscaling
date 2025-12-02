@@ -1005,6 +1005,202 @@ async function updatePromtailConfigOnMultipleServers(serverIps, options = {}) {
   };
 }
 
+/**
+ * Node Exporter 삭제
+ * @param {string} serverIp - 서버 IP 주소
+ * @param {object} options - SSH 옵션
+ * @returns {Promise<object>} 삭제 결과
+ */
+async function uninstallNodeExporter(serverIp, options = {}) {
+  const {
+    sshUser = 'ubuntu',
+    sshKey = null,
+    sshPassword = null
+  } = options;
+
+  try {
+    let sshCommand = '';
+    if (sshKey) {
+      sshCommand = `ssh -i "${sshKey}" -o StrictHostKeyChecking=no ${sshUser}@${serverIp}`;
+    } else if (sshPassword) {
+      sshCommand = `sshpass -p '${sshPassword}' ssh -o StrictHostKeyChecking=no ${sshUser}@${serverIp}`;
+    } else {
+      throw new Error('SSH Key 또는 Password가 필요합니다.');
+    }
+
+    const uninstallScript = `#!/bin/bash
+set -e
+
+# Node Exporter 서비스 중지 및 비활성화
+sudo systemctl stop node_exporter 2>/dev/null || true
+sudo systemctl disable node_exporter 2>/dev/null || true
+sudo pkill -f node_exporter 2>/dev/null || true
+sleep 2
+
+# 실행 파일 삭제
+sudo rm -f /usr/local/bin/node_exporter
+
+# systemd 서비스 파일 삭제
+sudo rm -f /etc/systemd/system/node_exporter.service
+
+# systemd 리로드
+sudo systemctl daemon-reload
+
+echo "Node Exporter 삭제 완료"
+`;
+
+    const scriptBase64 = Buffer.from(uninstallScript).toString('base64');
+    const command = `${sshCommand} "echo '${scriptBase64}' | base64 -d | bash"`;
+    
+    const { stdout, stderr } = await execPromise(command, {
+      timeout: 60000,
+      maxBuffer: 10 * 1024 * 1024
+    });
+
+    return {
+      success: true,
+      serverIp: serverIp,
+      message: 'Node Exporter가 성공적으로 삭제되었습니다.',
+      output: stdout,
+      error: stderr || null
+    };
+  } catch (error) {
+    console.error(`[Node Exporter] 삭제 실패 (${serverIp}):`, error);
+    return {
+      success: false,
+      serverIp: serverIp,
+      error: error.message,
+      details: error.stderr || error.stdout
+    };
+  }
+}
+
+/**
+ * 여러 서버에서 Node Exporter 삭제
+ * @param {Array<string>} serverIps - 서버 IP 목록
+ * @param {object} options - SSH 옵션
+ * @returns {Promise<object>} 삭제 결과
+ */
+async function uninstallNodeExporterOnMultipleServers(serverIps, options = {}) {
+  const results = await Promise.all(
+    serverIps.map(serverIp => uninstallNodeExporter(serverIp, options))
+  );
+
+  return {
+    success: results.every(r => r.success),
+    results: results,
+    summary: {
+      total: serverIps.length,
+      success: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length
+    }
+  };
+}
+
+/**
+ * Promtail 삭제
+ * @param {string} serverIp - 서버 IP 주소
+ * @param {object} options - SSH 옵션
+ * @returns {Promise<object>} 삭제 결과
+ */
+async function uninstallPromtail(serverIp, options = {}) {
+  const {
+    sshUser = 'ubuntu',
+    sshKey = null,
+    sshPassword = null
+  } = options;
+
+  try {
+    let sshCommand = '';
+    if (sshKey) {
+      sshCommand = `ssh -i "${sshKey}" -o StrictHostKeyChecking=no ${sshUser}@${serverIp}`;
+    } else if (sshPassword) {
+      sshCommand = `sshpass -p '${sshPassword}' ssh -o StrictHostKeyChecking=no ${sshUser}@${serverIp}`;
+    } else {
+      throw new Error('SSH Key 또는 Password가 필요합니다.');
+    }
+
+    const uninstallScript = `#!/bin/bash
+set -e
+
+# Promtail 서비스 중지 및 비활성화
+sudo systemctl stop promtail 2>/dev/null || true
+sudo systemctl disable promtail 2>/dev/null || true
+sudo pkill -f promtail 2>/dev/null || true
+sleep 2
+
+# 실행 파일 삭제
+sudo rm -f /usr/local/bin/promtail
+
+# 설정 디렉토리 삭제
+sudo rm -rf /etc/promtail
+
+# systemd 서비스 파일 삭제
+sudo rm -f /etc/systemd/system/promtail.service
+
+# 접속 기록 변환 스크립트 삭제
+sudo rm -f /usr/local/bin/export-login-history.sh
+
+# 접속 기록 로그 파일 삭제
+sudo rm -f /var/log/login_history.log
+
+# cron 작업에서 export-login-history.sh 제거
+(crontab -l 2>/dev/null | grep -v "export-login-history" || true) | crontab -
+
+# systemd 리로드
+sudo systemctl daemon-reload
+
+echo "Promtail 삭제 완료"
+`;
+
+    const scriptBase64 = Buffer.from(uninstallScript).toString('base64');
+    const command = `${sshCommand} "echo '${scriptBase64}' | base64 -d | bash"`;
+    
+    const { stdout, stderr } = await execPromise(command, {
+      timeout: 60000,
+      maxBuffer: 10 * 1024 * 1024
+    });
+
+    return {
+      success: true,
+      serverIp: serverIp,
+      message: 'Promtail이 성공적으로 삭제되었습니다.',
+      output: stdout,
+      error: stderr || null
+    };
+  } catch (error) {
+    console.error(`[Promtail] 삭제 실패 (${serverIp}):`, error);
+    return {
+      success: false,
+      serverIp: serverIp,
+      error: error.message,
+      details: error.stderr || error.stdout
+    };
+  }
+}
+
+/**
+ * 여러 서버에서 Promtail 삭제
+ * @param {Array<string>} serverIps - 서버 IP 목록
+ * @param {object} options - SSH 옵션
+ * @returns {Promise<object>} 삭제 결과
+ */
+async function uninstallPromtailOnMultipleServers(serverIps, options = {}) {
+  const results = await Promise.all(
+    serverIps.map(serverIp => uninstallPromtail(serverIp, options))
+  );
+
+  return {
+    success: results.every(r => r.success),
+    results: results,
+    summary: {
+      total: serverIps.length,
+      success: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length
+    }
+  };
+}
+
 module.exports = {
   installNodeExporter,
   checkNodeExporterStatus,
@@ -1012,7 +1208,11 @@ module.exports = {
   installPromtail,
   installPromtailOnMultipleServers,
   updatePromtailConfig,
-  updatePromtailConfigOnMultipleServers
+  updatePromtailConfigOnMultipleServers,
+  uninstallNodeExporter,
+  uninstallNodeExporterOnMultipleServers,
+  uninstallPromtail,
+  uninstallPromtailOnMultipleServers
 };
 
 

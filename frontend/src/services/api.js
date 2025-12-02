@@ -92,6 +92,24 @@ export const nodeExporterApi = {
     const params = new URLSearchParams({ serverIp, ...options });
     const response = await api.get(`/api/node-exporter/status?${params}`);
     return response.data;
+  },
+
+  // Node Exporter 삭제
+  uninstall: async (serverIp, options = {}) => {
+    const response = await api.post('/api/node-exporter/uninstall', {
+      serverIp,
+      ...options
+    });
+    return response.data;
+  },
+
+  // 여러 서버에서 Node Exporter 삭제
+  uninstallMultiple: async (serverIps, options = {}) => {
+    const response = await api.post('/api/node-exporter/uninstall', {
+      serverIps,
+      ...options
+    });
+    return response.data;
   }
 };
 
@@ -108,6 +126,40 @@ export const promtailApi = {
   // 여러 서버에 Promtail 설치
   installMultiple: async (serverIps, options = {}) => {
     const response = await api.post('/api/promtail/install', {
+      serverIps,
+      ...options
+    });
+    return response.data;
+  },
+  // Promtail 설정 업데이트 (기존 설치된 서버용)
+  updateConfig: async (serverIp, options = {}) => {
+    const response = await api.post('/api/promtail/update-config', {
+      serverIp,
+      ...options
+    });
+    return response.data;
+  },
+  // 여러 서버의 Promtail 설정 업데이트
+  updateConfigMultiple: async (serverIps, options = {}) => {
+    const response = await api.post('/api/promtail/update-config', {
+      serverIps,
+      ...options
+    });
+    return response.data;
+  },
+
+  // Promtail 삭제
+  uninstall: async (serverIp, options = {}) => {
+    const response = await api.post('/api/promtail/uninstall', {
+      serverIp,
+      ...options
+    });
+    return response.data;
+  },
+
+  // 여러 서버에서 Promtail 삭제
+  uninstallMultiple: async (serverIps, options = {}) => {
+    const response = await api.post('/api/promtail/uninstall', {
       serverIps,
       ...options
     });

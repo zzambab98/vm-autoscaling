@@ -5,7 +5,13 @@ const {
   checkNodeExporterStatus, 
   installNodeExporterOnMultipleServers,
   installPromtail,
-  installPromtailOnMultipleServers
+  installPromtailOnMultipleServers,
+  updatePromtailConfig,
+  updatePromtailConfigOnMultipleServers,
+  uninstallNodeExporter,
+  uninstallNodeExporterOnMultipleServers,
+  uninstallPromtail,
+  uninstallPromtailOnMultipleServers
 } = require('./services/nodeExporterService');
 const { addPrometheusJob, getPrometheusJobs, getPrometheusTargets } = require('./services/prometheusMonitoringService');
 const { getTemplates, getTemplateById, convertVmToTemplate, deleteTemplate, getVmList } = require('./services/templateService');
@@ -117,6 +123,118 @@ const server = http.createServer((req, res) => {
         } else if (serverIp) {
           // 단일 서버에 설치
           const result = await installPromtail(serverIp, installOptions);
+          sendJSONResponse(res, result.success ? 200 : 500, result);
+        } else {
+          sendJSONResponse(res, 400, { error: 'serverIp 또는 serverIps가 필요합니다.' });
+        }
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    });
+    return;
+  }
+
+  // Promtail 삭제 API
+  if (req.method === 'POST' && parsedUrl.pathname === '/api/promtail/uninstall') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body);
+        const { 
+          serverIp, 
+          serverIps, 
+          sshUser, 
+          sshKey, 
+          sshPassword
+        } = payload;
+
+        const uninstallOptions = {
+          sshUser,
+          sshKey,
+          sshPassword
+        };
+
+        if (serverIps && Array.isArray(serverIps)) {
+          // 여러 서버에서 삭제
+          const result = await uninstallPromtailOnMultipleServers(serverIps, uninstallOptions);
+          sendJSONResponse(res, 200, result);
+        } else if (serverIp) {
+          // 단일 서버에서 삭제
+          const result = await uninstallPromtail(serverIp, uninstallOptions);
+          sendJSONResponse(res, result.success ? 200 : 500, result);
+        } else {
+          sendJSONResponse(res, 400, { error: 'serverIp 또는 serverIps가 필요합니다.' });
+        }
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    });
+    return;
+  }
+
+  // Promtail 설정 업데이트 API (기존 설치된 서버용)
+  if (req.method === 'POST' && parsedUrl.pathname === '/api/promtail/update-config') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body);
+        const { serverIp, serverIps, sshUser, sshKey, sshPassword, lokiUrl } = payload;
+
+        const updateOptions = {
+          sshUser,
+          sshKey,
+          sshPassword,
+          lokiUrl: lokiUrl || null
+        };
+
+        if (serverIps && Array.isArray(serverIps)) {
+          // 여러 서버 설정 업데이트
+          const result = await updatePromtailConfigOnMultipleServers(serverIps, updateOptions);
+          sendJSONResponse(res, 200, result);
+        } else if (serverIp) {
+          // 단일 서버 설정 업데이트
+          const result = await updatePromtailConfig(serverIp, updateOptions);
+          sendJSONResponse(res, result.success ? 200 : 500, result);
+        } else {
+          sendJSONResponse(res, 400, { error: 'serverIp 또는 serverIps가 필요합니다.' });
+        }
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    });
+    return;
+  }
+
+  // Node Exporter 삭제 API
+  if (req.method === 'POST' && parsedUrl.pathname === '/api/node-exporter/uninstall') {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body);
+        const { 
+          serverIp, 
+          serverIps, 
+          sshUser, 
+          sshKey, 
+          sshPassword
+        } = payload;
+
+        const uninstallOptions = {
+          sshUser,
+          sshKey,
+          sshPassword
+        };
+
+        if (serverIps && Array.isArray(serverIps)) {
+          // 여러 서버에서 삭제
+          const result = await uninstallNodeExporterOnMultipleServers(serverIps, uninstallOptions);
+          sendJSONResponse(res, 200, result);
+        } else if (serverIp) {
+          // 단일 서버에서 삭제
+          const result = await uninstallNodeExporter(serverIp, uninstallOptions);
           sendJSONResponse(res, result.success ? 200 : 500, result);
         } else {
           sendJSONResponse(res, 400, { error: 'serverIp 또는 serverIps가 필요합니다.' });
