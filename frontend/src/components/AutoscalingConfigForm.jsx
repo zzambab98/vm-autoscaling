@@ -315,9 +315,6 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
                 <span>스케일아웃 조건</span>
               </div>
               <div style={{ color: '#495057', marginBottom: '8px' }}>
-                <strong>현재 Job:</strong> {formData.monitoring.prometheusJobName} ({targetCount}개 서버)
-              </div>
-              <div style={{ color: '#495057', marginBottom: '8px' }}>
                 <strong>스케일아웃 조건:</strong>
               </div>
               <ul style={{ margin: '8px 0', paddingLeft: '20px', color: '#495057' }}>
