@@ -203,16 +203,38 @@ export async function getCurrentMemoryUsage(jobName) {
 }
 
 /**
- * Prometheus Alerts 조회
+ * Alertmanager Alerts 조회 (최신 Alert 정보)
  * @returns {Promise<Array>} Alert 목록
  */
 export async function getPrometheusAlerts() {
   try {
-    const response = await fetch(`${PROMETHEUS_URL}/api/v1/alerts`);
+    // Alertmanager API 사용 (최신 Alert 정보)
+    const ALERTMANAGER_URL = process.env.REACT_APP_ALERTMANAGER_URL || 'http://10.255.1.254:9093';
+    const response = await fetch(`${ALERTMANAGER_URL}/api/v2/alerts`, {
+      cache: 'no-cache', // 캐시 비활성화
+      headers: {
+        'Cache-Control': 'no-cache'
+      }
+    });
     const data = await response.json();
     
-    if (data.status === 'success' && data.data && data.data.alerts) {
-      return data.data.alerts;
+    if (Array.isArray(data)) {
+      // Alertmanager 형식: [{labels: {...}, annotations: {...}, ...}]
+      return data.map(alert => ({
+        labels: alert.labels || {},
+        annotations: alert.annotations || {},
+        status: alert.status || {},
+        startsAt: alert.startsAt,
+        endsAt: alert.endsAt
+      }));
+    }
+    
+    // Fallback: Prometheus API 사용
+    const promResponse = await fetch(`${PROMETHEUS_URL}/api/v1/alerts`);
+    const promData = await promResponse.json();
+    
+    if (promData.status === 'success' && promData.data && promData.data.alerts) {
+      return promData.data.alerts;
     }
     return [];
   } catch (error) {

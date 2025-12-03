@@ -119,7 +119,9 @@ function MonitoringDashboard() {
   };
 
   const getAlertStatus = (alert) => {
-    return alert.state || 'unknown';
+    // Alertmanager API: alert.status.state
+    // Prometheus API: alert.state
+    return alert.status?.state || alert.state || 'unknown';
   };
 
   return (
@@ -290,7 +292,8 @@ function MonitoringDashboard() {
                   </td>
                   <td>{alert.annotations?.summary || '-'}</td>
                   <td>
-                    {alert.activeAt ? new Date(alert.activeAt).toLocaleString() : '-'}
+                    {alert.startsAt ? new Date(alert.startsAt).toLocaleString('ko-KR') : 
+                     alert.activeAt ? new Date(alert.activeAt).toLocaleString('ko-KR') : '-'}
                   </td>
                 </tr>
               ))}
