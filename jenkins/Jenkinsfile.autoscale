@@ -349,6 +349,29 @@ CUSTOM_EOF
                             echo "IP 설정 시도 중..."
                             
                             // Netplan을 사용하여 IP 설정 (Ubuntu)
+                            // 서브넷 마스크를 CIDR로 변환
+                            def subnetMask = params.SUBNET
+                            def cidr = sh(
+                                script: """
+                                    python3 -c "
+import ipaddress
+netmask = '${subnetMask}'
+# 서브넷 마스크를 CIDR로 변환
+if netmask == '255.255.255.0':
+    cidr = 24
+elif netmask == '255.255.0.0':
+    cidr = 16
+elif netmask == '255.0.0.0':
+    cidr = 8
+else:
+    # 일반적인 변환
+    cidr = sum(bin(int(x)).count('1') for x in netmask.split('.'))
+print(cidr)
+"
+                                """,
+                                returnStdout: true
+                            ).trim()
+                            
                             sh """
                                 ssh -i ${sshKey} \\
                                     -o StrictHostKeyChecking=no \\
@@ -361,7 +384,7 @@ network:
   ethernets:
     eth0:
       addresses:
-        - ${env.VM_IP}/${params.SUBNET.split('.').collect { Integer.toBinaryString(it.toInteger()).padLeft(8, '0') }.join('').count('1')}
+        - ${env.VM_IP}/${cidr}
       gateway4: ${params.GATEWAY}
       nameservers:
         addresses:
