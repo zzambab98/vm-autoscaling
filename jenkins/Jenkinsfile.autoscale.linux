@@ -402,12 +402,27 @@ pipeline {
                         }
                         
                         try {
-                            // govc를 사용하여 VM 클론
-                            // 주의: govc vm.clone은 IP 설정을 직접 지원하지 않으므로,
-                            // 클론 후 customization spec을 사용하거나 별도로 설정해야 함
+                            // vCenter Linux Customization Spec을 사용하여 첫 부팅부터 고정 IP 설정
+                            // 방법: govc vm.clone 시 -customization 옵션과 GOVC_GUESTINFO_* 환경 변수 사용
+                            echo "=========================================="
+                            echo "vCenter Customization Spec으로 VM 클론 (고정 IP 설정)..."
+                            echo "=========================================="
+                            echo "할당된 IP: ${vmIP}"
+                            echo "서브넷: ${subnet}"
+                            echo "게이트웨이: ${gateway}"
+                            echo "호스트네임: ${env.VM_HOSTNAME ?: vmName}"
+                            
+                            // DNS 서버 (기본값)
+                            def dnsServers = '10.255.0.10'
+                            
+                            // Customization Spec 이름 (vCenter에서 미리 생성해야 함)
+                            def customizationSpecName = env.CUSTOMIZATION_SPEC_NAME ?: 'DanaLinuxSpec'
                             
                             // govc 명령어 옵션 구성
-                            def cloneOptions = "-vm=\"${templateName}\" -on=false"
+                            def cloneOptions = "-vm=\"${templateName}\" -on=true"  // 바로 부팅
+                            
+                            // Customization Spec 적용
+                            cloneOptions += " -customization=\"${customizationSpecName}\""
                             
                             // Datastore 지정
                             if (datastore && datastore != 'null' && datastore.trim() != '') {
@@ -424,122 +439,193 @@ pipeline {
                                 cloneOptions += " -net=\"${vlan}\""
                             }
                             
+                            // GOVC_GUESTINFO_* 환경 변수로 고정 IP 설정
+                            // 이렇게 하면 첫 부팅부터 고정 IP로 올라옴 (DHCP 단계 없음)
                             def cloneCommand = """
                                 export GOVC_URL="${govcUrl}"
                                 export GOVC_USERNAME="${govcUser}"
                                 export GOVC_PASSWORD="${govcPass}"
                                 export GOVC_INSECURE="${env.GOVC_INSECURE}"
                                 
+                                # 고정 IP 설정을 위한 Guest Info 환경 변수
+                                export GOVC_GUESTINFO_IPADDR="${vmIP}"
+                                export GOVC_GUESTINFO_NETMASK="${subnet}"
+                                export GOVC_GUESTINFO_GATEWAY="${gateway}"
+                                export GOVC_GUESTINFO_DNS="${dnsServers}"
+                                
+                                # VM 클론 및 Customization Spec 적용
                                 govc vm.clone ${cloneOptions} "${vmName}"
                             """
                             
                             echo "VM 클론 명령어 실행 중..."
                             echo "Template: ${templateName}"
                             echo "VM Name: ${vmName}"
+                            echo "Customization Spec: ${customizationSpecName}"
+                            echo "고정 IP: ${vmIP}"
                             echo "Command: govc vm.clone ${cloneOptions} ${vmName}"
-                            sh cloneCommand
-                        
-                            echo "VM 클론 완료: ${vmName}"
-
-                            // 템플릿의 기존 IP 충돌 방지: 네트워크 어댑터 재설정
-                            echo "=========================================="
-                            echo "네트워크 어댑터 재설정 (IP 충돌 방지)..."
-                            echo "=========================================="
                             
-                            // VM의 네트워크 어댑터를 제거하고 다시 추가하여 MAC 주소 변경
-                            // 이렇게 하면 템플릿의 기존 IP 설정이 무효화됨
+                            def customizationApplied = false
                             try {
-                                def networkResetCommand = """
-                                    export GOVC_URL="${govcUrl}"
-                                    export GOVC_USERNAME="${govcUser}"
-                                    export GOVC_PASSWORD="${govcPass}"
-                                    export GOVC_INSECURE="${env.GOVC_INSECURE}"
-                                    
-                                    # 기존 네트워크 어댑터 제거
-                                    govc device.remove -vm="${vmName}" network-* 2>/dev/null || true
-                                    
-                                    # 새로운 네트워크 어댑터 추가 (MAC 주소 자동 생성)
-                                    if [ -n "${vlan}" ]; then
-                                        govc vm.network.add -vm="${vmName}" -net="${vlan}"
-                                    else
-                                        # VLAN이 없으면 기본 네트워크 사용
-                                        govc vm.network.add -vm="${vmName}"
-                                    fi
-                                """
-                                sh networkResetCommand
-                                echo "✅ 네트워크 어댑터 재설정 완료 (MAC 주소 변경됨)"
-                            } catch (Exception netErr) {
-                                echo "⚠️ 네트워크 어댑터 재설정 실패: ${netErr.message}"
-                                echo "VM 부팅 후 네트워크 설정이 초기화될 수 있습니다."
-                            }
-
-                            // IP 주소 및 호스트네임 설정 안내
-                            echo "=========================================="
-                            echo "VM IP 설정 정보"
-                            echo "=========================================="
-                            echo "할당된 IP: ${vmIP}"
-                            echo "서브넷: ${subnet}"
-                            echo "게이트웨이: ${gateway}"
-                            echo "호스트네임: ${env.VM_HOSTNAME ?: vmName}"
-                            echo "⚠️ VM 부팅 후 SSH로 고정 IP를 설정합니다."
-
-                            // VM 전원 켜기
-                            def powerOnCommand = """
-                                export GOVC_URL="${govcUrl}"
-                                export GOVC_USERNAME="${govcUser}"
-                                export GOVC_PASSWORD="${govcPass}"
-                                export GOVC_INSECURE="${env.GOVC_INSECURE}"
+                                sh cloneCommand
+                                customizationApplied = true
+                                echo "✅ VM 클론 및 Customization Spec 적용 완료"
+                                echo "✅ 첫 부팅부터 고정 IP (${vmIP})로 올라옵니다 (DHCP 단계 없음)"
+                            } catch (Exception cloneErr) {
+                                echo "⚠️ Customization Spec 적용 실패: ${cloneErr.message}"
+                                echo "⚠️ 대체 방법: VM 클론 후 SSH로 고정 IP 설정"
                                 
-                                govc vm.power -on "${vmName}"
-                            """
-                            
-                            sh powerOnCommand
-                            echo "VM 전원 켜기 완료: ${vmName}"
-                            
-                            // VM IP 주소 확인 대기 (초기 부팅 대기)
-                            echo "VM 부팅 대기 중..."
-                            sleep(time: 30, unit: 'SECONDS')
-                            
-                            // VM IP 주소 확인 (DHCP로 받은 IP)
-                            def maxWait = 300  // 5분
-                            def waitTime = 0
-                            def vmIPConfirmed = false
-                            def currentVMIP = ''
-                            
-                            while (waitTime < maxWait && !vmIPConfirmed) {
-                                sleep(time: 10, unit: 'SECONDS')
-                                waitTime += 10
-                                
-                                def ipCheckCommand = """
-                                    export GOVC_URL="${govcUrl}"
-                                    export GOVC_USERNAME="${govcUser}"
-                                    export GOVC_PASSWORD="${govcPass}"
-                                    export GOVC_INSECURE="${env.GOVC_INSECURE}"
+                                // 대체 방법: Customization 없이 클론 후 SSH로 설정
+                                try {
+                                    def fallbackCloneOptions = "-vm=\"${templateName}\" -on=false"
+                                    if (datastore && datastore != 'null' && datastore.trim() != '') {
+                                        fallbackCloneOptions += " -ds=\"${datastore}\""
+                                    }
+                                    if (resourcePool && resourcePool != 'null' && resourcePool.trim() != '') {
+                                        fallbackCloneOptions += " -pool=\"${resourcePool}\""
+                                    }
+                                    if (vlan && vlan != 'null' && vlan.trim() != '') {
+                                        fallbackCloneOptions += " -net=\"${vlan}\""
+                                    }
                                     
-                                    govc vm.ip "${vmName}" | head -1
-                                """
-                            
-                                def ipOutput = sh(
-                                    script: ipCheckCommand,
-                                    returnStdout: true
-                                ).trim()
-                                
-                                if (ipOutput && ipOutput != '') {
-                                    currentVMIP = ipOutput
-                                    vmIPConfirmed = true
-                                    echo "VM 현재 IP 주소: ${currentVMIP}"
-                                } else {
-                                    echo "VM IP 주소 대기 중... (${waitTime}/${maxWait}초)"
+                                    def fallbackCloneCommand = """
+                                        export GOVC_URL="${govcUrl}"
+                                        export GOVC_USERNAME="${govcUser}"
+                                        export GOVC_PASSWORD="${govcPass}"
+                                        export GOVC_INSECURE="${env.GOVC_INSECURE}"
+                                        
+                                        govc vm.clone ${fallbackCloneOptions} "${vmName}"
+                                    """
+                                    sh fallbackCloneCommand
+                                    echo "✅ VM 클론 완료 (대체 방법 - Customization 없음)"
+                                    
+                                    // 전원 켜기
+                                    def powerOnCommand = """
+                                        export GOVC_URL="${govcUrl}"
+                                        export GOVC_USERNAME="${govcUser}"
+                                        export GOVC_PASSWORD="${govcPass}"
+                                        export GOVC_INSECURE="${env.GOVC_INSECURE}"
+                                        
+                                        govc vm.power -on "${vmName}"
+                                    """
+                                    sh powerOnCommand
+                                    echo "VM 전원 켜기 완료: ${vmName}"
+                                } catch (Exception fallbackErr) {
+                                    error("VM 클론 실패: ${fallbackErr.message}")
                                 }
                             }
                             
-                            if (!vmIPConfirmed || !currentVMIP) {
-                                error("VM IP 주소를 확인하지 못했습니다. VM 부팅 상태를 확인하세요.")
-                            }
-                            
-                            // 할당된 IP와 현재 IP가 다르면 SSH로 설정
-                            echo "🔍 IP 비교: 현재=${currentVMIP}, 할당=${vmIP}, 일치=${currentVMIP == vmIP}"
-                            if (currentVMIP != vmIP) {
+                            // VM 부팅 대기 및 IP 확인
+                            if (customizationApplied) {
+                                echo "=========================================="
+                                echo "VM 부팅 대기 중 (Customization Spec 적용됨)..."
+                                echo "=========================================="
+                                echo "✅ 첫 부팅부터 고정 IP (${vmIP})로 올라옵니다 (DHCP 단계 없음)"
+                                
+                                // Customization이 적용되면 DHCP 없이 바로 고정 IP로 올라옴
+                                // govc vm.ip -wait 옵션으로 IP 확인 대기
+                                def maxWait = 300  // 5분
+                                def waitTime = 0
+                                def vmIPConfirmed = false
+                                def currentVMIP = ''
+                                
+                                while (waitTime < maxWait && !vmIPConfirmed) {
+                                    sleep(time: 10, unit: 'SECONDS')
+                                    waitTime += 10
+                                    
+                                    def ipCheckCommand = """
+                                        export GOVC_URL="${govcUrl}"
+                                        export GOVC_USERNAME="${govcUser}"
+                                        export GOVC_PASSWORD="${govcPass}"
+                                        export GOVC_INSECURE="${env.GOVC_INSECURE}"
+                                        
+                                        govc vm.ip "${vmName}" | head -1
+                                    """
+                                
+                                    def ipOutput = sh(
+                                        script: ipCheckCommand,
+                                        returnStdout: true
+                                    ).trim()
+                                    
+                                    if (ipOutput && ipOutput != '') {
+                                        currentVMIP = ipOutput
+                                        vmIPConfirmed = true
+                                        echo "✅ VM IP 확인: ${currentVMIP}"
+                                        
+                                        // Customization이 적용되었으므로 할당된 IP와 일치해야 함
+                                        if (currentVMIP == vmIP) {
+                                            echo "✅ 할당된 고정 IP와 일치합니다: ${vmIP}"
+                                            env.NEW_VM_IP = vmIP
+                                        } else {
+                                            echo "⚠️ IP 불일치: 현재=${currentVMIP}, 할당=${vmIP}"
+                                            echo "⚠️ SSH를 통해 IP 재설정 시도 중..."
+                                            // SSH로 IP 재설정 (아래 로직으로)
+                                            vmIPConfirmed = false  // 재설정 필요
+                                        }
+                                    } else {
+                                        echo "VM IP 주소 대기 중... (${waitTime}/${maxWait}초)"
+                                    }
+                                }
+                                
+                                if (!vmIPConfirmed || !currentVMIP) {
+                                    error("VM IP 주소를 확인하지 못했습니다. VM 부팅 상태를 확인하세요.")
+                                }
+                                
+                                // IP가 일치하지 않으면 SSH로 재설정
+                                if (currentVMIP != vmIP) {
+                                    echo "🔧 SSH를 통해 IP 재설정 시도 중..."
+                                } else {
+                                    // IP가 일치하므로 SSH 설정 단계 건너뛰기
+                                    echo "✅ 고정 IP 설정 완료: ${vmIP}"
+                                    return  // 이 stage 종료
+                                }
+                            } else {
+                                // 대체 방법: DHCP로 임시 IP 받은 후 SSH로 고정 IP 설정
+                                echo "=========================================="
+                                echo "VM 부팅 대기 중 (대체 방법 - DHCP 사용)..."
+                                echo "=========================================="
+                                sleep(time: 30, unit: 'SECONDS')
+                                
+                                // VM IP 주소 확인 (DHCP로 받은 임시 IP)
+                                def maxWait = 300  // 5분
+                                def waitTime = 0
+                                def vmIPConfirmed = false
+                                def currentVMIP = ''
+                                
+                                while (waitTime < maxWait && !vmIPConfirmed) {
+                                    sleep(time: 10, unit: 'SECONDS')
+                                    waitTime += 10
+                                    
+                                    def ipCheckCommand = """
+                                        export GOVC_URL="${govcUrl}"
+                                        export GOVC_USERNAME="${govcUser}"
+                                        export GOVC_PASSWORD="${govcPass}"
+                                        export GOVC_INSECURE="${env.GOVC_INSECURE}"
+                                        
+                                        govc vm.ip "${vmName}" | head -1
+                                    """
+                                
+                                    def ipOutput = sh(
+                                        script: ipCheckCommand,
+                                        returnStdout: true
+                                    ).trim()
+                                    
+                                    if (ipOutput && ipOutput != '') {
+                                        currentVMIP = ipOutput
+                                        vmIPConfirmed = true
+                                        echo "VM 현재 IP 주소: ${currentVMIP}"
+                                        echo "⚠️ 임시 DHCP IP 확인됨. 고정 IP로 변경합니다."
+                                    } else {
+                                        echo "VM IP 주소 대기 중... (${waitTime}/${maxWait}초)"
+                                    }
+                                }
+                                
+                                if (!vmIPConfirmed || !currentVMIP) {
+                                    error("VM IP 주소를 확인하지 못했습니다. VM 부팅 상태를 확인하세요.")
+                                }
+                                
+                                // 할당된 IP와 현재 IP가 다르면 SSH로 설정
+                                echo "🔍 IP 비교: 현재=${currentVMIP}, 할당=${vmIP}, 일치=${currentVMIP == vmIP}"
+                                if (currentVMIP != vmIP) {
                                 echo "⚠️ VM IP가 할당된 IP와 다릅니다. 현재: ${currentVMIP}, 할당: ${vmIP}"
                                 echo "🔧 SSH를 통해 IP 설정 시도 중..."
 
