@@ -211,7 +211,7 @@ pipeline {
                             // VM 이름 생성: 기존 VM 목록 확인 후 다음 순차 번호 생성
                             def serviceName = configData.serviceName ?: 'app'
                             def serviceNameClean = serviceName.toLowerCase().replaceAll(/[^a-z0-9-]/, '-')
-                            
+
                             // serviceName에서 접미사 제거 (예: auto-vm-test-service -> auto-vm-test)
                             def parts = serviceNameClean.split('-')
                             def baseName = serviceNameClean
@@ -221,13 +221,13 @@ pipeline {
                                     baseName = parts[0..-2].join('-')
                                 }
                             }
-                            
+
                             echo "서비스 이름: ${serviceNameClean}"
                             echo "기본 이름: ${baseName}"
-                            
+
                             // vCenter에서 기존 VM 목록 조회하여 다음 번호 결정
                             def nextVMNumber = 1
-                            def vmPrefix = baseName
+                            def vmPrefix = baseName  // 초기값 명시적 설정
                             
                             try {
                                 def govcUrl = env.GOVC_URL ?: VCENTER_SERVER_CRED ?: 'https://vc.danacloud.local'
@@ -585,9 +585,10 @@ pipeline {
                             }
                             
                             // 할당된 IP와 현재 IP가 다르면 SSH로 설정
+                            echo "🔍 IP 비교: 현재=${currentVMIP}, 할당=${vmIP}, 일치=${currentVMIP == vmIP}"
                             if (currentVMIP != vmIP) {
                                 echo "⚠️ VM IP가 할당된 IP와 다릅니다. 현재: ${currentVMIP}, 할당: ${vmIP}"
-                                echo "SSH를 통해 IP 설정 시도 중..."
+                                echo "🔧 SSH를 통해 IP 설정 시도 중..."
                                 
                                 // SSH 키 경로 확인 (여러 키 시도)
                                 def sshKeys = [
@@ -595,20 +596,24 @@ pipeline {
                                     "/home/ubuntu/workspace/vm-autoscaling/pemkey/dana-cocktail",
                                     "/home/ubuntu/workspace/vm-autoscaling/pemkey/jenkins"
                                 ]
-                                
+
+                                echo "🔑 SSH 키 검색 시작..."
                                 def sshKey = null
                                 for (def key in sshKeys) {
                                     def keyExists = sh(
                                         script: "test -f ${key} && echo 'exists' || echo 'not found'",
                                         returnStdout: true
                                     ).trim()
+                                    echo "  - ${key}: ${keyExists}"
                                     if (keyExists == 'exists') {
                                         sshKey = key
+                                        echo "✅ SSH 키 발견: ${sshKey}"
                                         break
                                     }
                                 }
-                                
+
                                 if (sshKey) {
+                                    echo "🔧 SSH 키 사용: ${sshKey}"
                                     // 서브넷 마스크를 CIDR로 변환
                                     def subnetMask = subnet
                                     def cidr = sh(
@@ -641,6 +646,7 @@ print(cidr)
                                     
                                     while (retryCount < maxRetries && !ipConfigured) {
                                         try {
+                                            echo "🔌 SSH 연결 시도 (${retryCount + 1}/${maxRetries}): ubuntu@${currentVMIP}"
                                             sh """
                                                 ssh -i ${sshKey} \\
                                                     -o StrictHostKeyChecking=no \\
@@ -682,13 +688,15 @@ SSH_EOF
                                         env.NEW_VM_IP = currentVMIP
                                     }
                                 } else {
-                                    echo "⚠️ SSH 키를 찾을 수 없습니다. 현재 IP (${currentVMIP})를 사용합니다."
+                                    echo "❌ SSH 키를 찾을 수 없습니다. 현재 IP (${currentVMIP})를 사용합니다."
                                     env.NEW_VM_IP = currentVMIP
                                 }
                             } else {
                                 env.NEW_VM_IP = vmIP
-                                echo "✅ VM IP가 올바르게 설정되었습니다: ${vmIP}"
+                                echo "✅ VM IP가 올바르게 설정되어 있습니다: ${vmIP}"
                             }
+
+                            echo "📌 최종 VM IP: ${env.NEW_VM_IP}"
                         
                         } catch (Exception e) {
                             echo "VM 클론 실패: ${e.getMessage()}"

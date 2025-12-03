@@ -208,16 +208,10 @@ export async function getCurrentMemoryUsage(jobName) {
  */
 export async function getPrometheusAlerts() {
   try {
-    // Alertmanager API 사용 (최신 Alert 정보)
-    const ALERTMANAGER_URL = process.env.REACT_APP_ALERTMANAGER_URL || 'http://10.255.1.254:9093';
-    const response = await fetch(`${ALERTMANAGER_URL}/api/v2/alerts`, {
-      cache: 'no-cache', // 캐시 비활성화
-      headers: {
-        'Cache-Control': 'no-cache'
-      }
-    });
-    const data = await response.json();
-    
+    // 백엔드 API를 통해 Alertmanager 조회 (CORS 문제 해결)
+    const response = await api.get('/api/alerts');
+    const data = response.data;
+
     if (Array.isArray(data)) {
       // Alertmanager 형식: [{labels: {...}, annotations: {...}, ...}]
       return data.map(alert => ({
@@ -228,17 +222,11 @@ export async function getPrometheusAlerts() {
         endsAt: alert.endsAt
       }));
     }
-    
-    // Fallback: Prometheus API 사용
-    const promResponse = await fetch(`${PROMETHEUS_URL}/api/v1/alerts`);
-    const promData = await promResponse.json();
-    
-    if (promData.status === 'success' && promData.data && promData.data.alerts) {
-      return promData.data.alerts;
-    }
+
     return [];
   } catch (error) {
     console.error('[Monitoring API] Alert 조회 실패:', error);
+    // Fallback: 빈 배열 반환
     return [];
   }
 }

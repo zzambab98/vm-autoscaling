@@ -849,6 +849,22 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Alertmanager Alerts 조회 API (프록시)
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/alerts') {
+    (async () => {
+      try {
+        const axios = require('axios');
+        const ALERTMANAGER_URL = process.env.ALERTMANAGER_URL || 'http://10.255.1.254:9093';
+        const response = await axios.get(`${ALERTMANAGER_URL}/api/v2/alerts`);
+        sendJSONResponse(res, 200, response.data);
+      } catch (error) {
+        console.error('[API] Alertmanager 조회 실패:', error.message);
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
   // 디버깅: Alertmanager 상태 확인 API
   if (req.method === 'GET' && parsedUrl.pathname === '/api/debug/alertmanager/status') {
     (async () => {
