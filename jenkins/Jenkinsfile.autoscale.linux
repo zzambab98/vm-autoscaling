@@ -249,6 +249,12 @@ pipeline {
                             env.F5_VIP = configData.f5?.vip ?: ''
                             env.F5_HEALTH_CHECK_PATH = configData.f5?.healthCheckPath ?: '/'
                             
+                            // SSH 키 경로 및 VM Prefix 설정 (백엔드 API에서 조회)
+                            env.SSH_KEY_PATH = configData.sshKeyPath ?: ''
+                            env.VM_PREFIX = configData.vmPrefix ?: ''
+                            echo "SSH 키 경로: ${env.SSH_KEY_PATH ?: '미지정 (Fallback 사용)'}"
+                            echo "VM Prefix: ${env.VM_PREFIX ?: '미지정 (기본값 사용)'}"
+                            
                             // vCenter 정보 설정 (LazyMap 직접 접근)
                             def vcenterInfo = configData.vcenter
                             def vcenterResourcePool = null
@@ -511,8 +517,11 @@ pipeline {
                                 // SSH 키 경로 확인 (설정에서 지정한 키 사용)
                                 def sshKey = null
 
+                                // 디버깅: 환경 변수 확인
+                                echo "🐛 DEBUG: env.SSH_KEY_PATH = '${env.SSH_KEY_PATH}'"
+
                                 // 1순위: 환경 변수로 전달된 SSH 키 경로 (Webhook에서 설정)
-                                if (env.SSH_KEY_PATH) {
+                                if (env.SSH_KEY_PATH && env.SSH_KEY_PATH != 'null' && env.SSH_KEY_PATH.trim() != '') {
                                     echo "🔑 설정에서 지정한 SSH 키 사용: ${env.SSH_KEY_PATH}"
                                     def keyExists = sh(
                                         script: "test -f ${env.SSH_KEY_PATH} && echo 'exists' || echo 'not found'",
