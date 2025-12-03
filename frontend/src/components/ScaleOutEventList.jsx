@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getJenkinsJobs } from '../services/jenkinsApi';
+import { getJenkinsJobs, getJenkinsJobBuilds } from '../services/jenkinsApi';
 import { getConfigs } from '../services/autoscalingApi';
 import './ScaleOutEventList.css';
 
@@ -38,38 +38,56 @@ function ScaleOutEventList() {
     try {
       // Jenkins Job 목록 조회
       const jobsResponse = await getJenkinsJobs();
-      
+
       if (jobsResponse.success) {
         // 오토스케일링 관련 Job만 필터링
-        const autoscaleJobs = jobsResponse.jobs.filter(job => 
-          job.name.startsWith('autoscale-')
+        const autoscaleJobs = jobsResponse.jobs.filter(job =>
+          job.name.startsWith('autoscale-') || job.name === 'plg-autoscale-out' || job.name === 'plg-autoscale-in'
         );
 
         // 각 Job의 빌드 이력 조회
         const eventsData = [];
         for (const job of autoscaleJobs) {
           try {
-            // Job 이름에서 서비스 이름 추출
-            const serviceName = job.name.replace('autoscale-', '');
-            const config = configs.find(c => 
-              c.serviceName.toLowerCase().replace(/\s+/g, '-') === serviceName
-            );
+            // 빌드 이력 조회 (최근 10개)
+            const buildsResponse = await getJenkinsJobBuilds(job.name, 10);
 
-            // 빌드 이력은 Jenkins API로 조회 (간단한 예시)
-            eventsData.push({
-              id: `${job.name}-${Date.now()}`,
-              serviceName: config?.serviceName || serviceName,
-              jobName: job.name,
-              status: job.color === 'blue' ? 'success' : job.color === 'red' ? 'failed' : 'unknown',
-              buildNumber: null, // 실제로는 빌드 번호 조회 필요
-              buildUrl: job.url,
-              timestamp: new Date().toISOString()
-            });
+            if (buildsResponse.success && buildsResponse.builds.length > 0) {
+              // Job 이름에서 서비스 이름 추출
+              let serviceName = job.name;
+              if (job.name.startsWith('autoscale-')) {
+                serviceName = job.name.replace(/^autoscale-/, '').replace(/-out$/, '').replace(/-in$/, '');
+              } else if (job.name === 'plg-autoscale-out') {
+                serviceName = 'auto-vm-test-service';
+              } else if (job.name === 'plg-autoscale-in') {
+                serviceName = 'auto-vm-test-service';
+              }
+
+              const config = configs.find(c =>
+                c.serviceName.toLowerCase().replace(/\s+/g, '-') === serviceName
+              );
+
+              // 각 빌드를 이벤트로 변환
+              buildsResponse.builds.forEach(build => {
+                eventsData.push({
+                  id: `${job.name}-${build.buildNumber}`,
+                  serviceName: config?.serviceName || serviceName,
+                  jobName: job.name,
+                  status: build.status,
+                  buildNumber: build.buildNumber,
+                  buildUrl: build.url,
+                  timestamp: new Date(build.timestamp).toISOString(),
+                  duration: build.duration
+                });
+              });
+            }
           } catch (error) {
             console.error(`Job ${job.name} 빌드 이력 조회 실패:`, error);
           }
         }
 
+        // 시간순 정렬 (최신순)
+        eventsData.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         setEvents(eventsData);
       }
     } catch (error) {

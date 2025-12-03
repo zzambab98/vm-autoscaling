@@ -617,11 +617,79 @@ async function triggerJenkinsJob(jobName, parameters = {}) {
   }
 }
 
+/**
+ * Jenkins Job 빌드 이력 조회
+ * @param {string} jobName - Job 이름
+ * @param {number} limit - 조회할 빌드 개수 (기본: 10)
+ * @returns {Promise<object>} 빌드 이력
+ */
+async function getJenkinsJobBuilds(jobName, limit = 10) {
+  try {
+    const response = await axios.get(
+      `${JENKINS_URL}/job/${encodeURIComponent(jobName)}/api/json?tree=builds[number,result,timestamp,duration,url]{0,${limit}}`,
+      {
+        auth: {
+          username: JENKINS_USER,
+          password: JENKINS_PASSWORD
+        }
+      }
+    );
+
+    if (response.status === 200) {
+      const builds = response.data.builds || [];
+      return {
+        success: true,
+        jobName: jobName,
+        builds: builds.map(build => ({
+          buildNumber: build.number,
+          result: build.result || 'BUILDING',
+          timestamp: build.timestamp,
+          duration: build.duration,
+          url: build.url,
+          status: mapJenkinsResult(build.result)
+        }))
+      };
+    } else {
+      throw new Error(`Jenkins Job 빌드 이력 조회 실패: HTTP ${response.status}`);
+    }
+  } catch (error) {
+    if (error.response && error.response.status === 404) {
+      console.warn(`[Jenkins Service] Job '${jobName}'을 찾을 수 없습니다.`);
+      return {
+        success: true,
+        jobName: jobName,
+        builds: []
+      };
+    }
+    console.error(`[Jenkins Service] Job 빌드 이력 조회 실패:`, error.message);
+    throw new Error(`Jenkins Job 빌드 이력 조회 실패: ${error.message}`);
+  }
+}
+
+/**
+ * Jenkins 빌드 결과를 상태로 매핑
+ * @param {string} result - Jenkins 빌드 결과
+ * @returns {string} 상태
+ */
+function mapJenkinsResult(result) {
+  const statusMap = {
+    'SUCCESS': 'success',
+    'FAILURE': 'failed',
+    'ABORTED': 'failed',
+    'UNSTABLE': 'failed',
+    'NOT_BUILT': 'failed',
+    'BUILDING': 'running',
+    null: 'running'
+  };
+  return statusMap[result] || 'unknown';
+}
+
 module.exports = {
   createJenkinsJob,
   deleteJenkinsJob,
   getJenkinsJobStatus,
   getJenkinsJobs,
-  triggerJenkinsJob
+  triggerJenkinsJob,
+  getJenkinsJobBuilds
 };
 

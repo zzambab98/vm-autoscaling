@@ -47,4 +47,20 @@ export async function triggerJenkinsJob(jobName, parameters = {}) {
   }
 }
 
+/**
+ * Jenkins Job 빌드 이력 조회
+ * @param {string} jobName - Job 이름
+ * @param {number} limit - 조회할 빌드 개수
+ * @returns {Promise<object>} 빌드 이력
+ */
+export async function getJenkinsJobBuilds(jobName, limit = 10) {
+  try {
+    const response = await api.get(`/api/jenkins/jobs/${encodeURIComponent(jobName)}/builds?limit=${limit}`);
+    return response.data;
+  } catch (error) {
+    console.error('[Jenkins API] Job 빌드 이력 조회 실패:', error);
+    throw error;
+  }
+}
+
 

@@ -666,6 +666,22 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Jenkins Job 빌드 이력 조회 API
+  if (req.method === 'GET' && parsedUrl.pathname.match(/^\/api\/jenkins\/jobs\/[^/]+\/builds$/)) {
+    const pathParts = parsedUrl.pathname.split('/');
+    const jobName = decodeURIComponent(pathParts[pathParts.length - 2]);
+    (async () => {
+      try {
+        const { getJenkinsJobBuilds } = require('./services/jenkinsService');
+        const result = await getJenkinsJobBuilds(jobName);
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
   // Jenkins Job 상태 조회 API
   if (req.method === 'GET' && parsedUrl.pathname.startsWith('/api/jenkins/jobs/')) {
     const jobName = decodeURIComponent(parsedUrl.pathname.split('/').pop());
