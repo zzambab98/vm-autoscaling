@@ -441,18 +441,47 @@ pipeline {
                         
                             echo "VM 클론 완료: ${vmName}"
 
-                            // IP 주소 및 호스트네임 설정 (govc vm.customize 사용)
+                            // 템플릿의 기존 IP 충돌 방지: 네트워크 어댑터 재설정
                             echo "=========================================="
-                            echo "VM에 고정 IP 및 호스트네임 설정 중..."
+                            echo "네트워크 어댑터 재설정 (IP 충돌 방지)..."
+                            echo "=========================================="
+                            
+                            // VM의 네트워크 어댑터를 제거하고 다시 추가하여 MAC 주소 변경
+                            // 이렇게 하면 템플릿의 기존 IP 설정이 무효화됨
+                            try {
+                                def networkResetCommand = """
+                                    export GOVC_URL="${govcUrl}"
+                                    export GOVC_USERNAME="${govcUser}"
+                                    export GOVC_PASSWORD="${govcPass}"
+                                    export GOVC_INSECURE="${env.GOVC_INSECURE}"
+                                    
+                                    # 기존 네트워크 어댑터 제거
+                                    govc device.remove -vm="${vmName}" network-* 2>/dev/null || true
+                                    
+                                    # 새로운 네트워크 어댑터 추가 (MAC 주소 자동 생성)
+                                    if [ -n "${vlan}" ]; then
+                                        govc vm.network.add -vm="${vmName}" -net="${vlan}"
+                                    else
+                                        # VLAN이 없으면 기본 네트워크 사용
+                                        govc vm.network.add -vm="${vmName}"
+                                    fi
+                                """
+                                sh networkResetCommand
+                                echo "✅ 네트워크 어댑터 재설정 완료 (MAC 주소 변경됨)"
+                            } catch (Exception netErr) {
+                                echo "⚠️ 네트워크 어댑터 재설정 실패: ${netErr.message}"
+                                echo "VM 부팅 후 네트워크 설정이 초기화될 수 있습니다."
+                            }
+
+                            // IP 주소 및 호스트네임 설정 안내
+                            echo "=========================================="
+                            echo "VM IP 설정 정보"
                             echo "=========================================="
                             echo "할당된 IP: ${vmIP}"
                             echo "서브넷: ${subnet}"
                             echo "게이트웨이: ${gateway}"
                             echo "호스트네임: ${env.VM_HOSTNAME ?: vmName}"
-
-                            // govc vm.customize는 -hostname 플래그를 지원하지 않으므로 제거
-                            // IP 설정은 VM 부팅 후 SSH로 직접 설정
-                            echo "⚠️ govc vm.customize는 IP 설정을 보장하지 않습니다. VM 부팅 후 SSH로 설정합니다."
+                            echo "⚠️ VM 부팅 후 SSH로 고정 IP를 설정합니다."
 
                             // VM 전원 켜기
                             def powerOnCommand = """
@@ -636,21 +665,46 @@ print(cidr)
                                     while (retryCount < maxRetries && !ipConfigured) {
                                         try {
                                             echo "🔌 SSH 연결 시도 (${retryCount + 1}/${maxRetries}): ubuntu@${currentVMIP}"
+                                            
+                                            // SSH 키 권한 설정 (0600으로 변경)
+                                            sh """
+                                                chmod 600 ${sshKey} || true
+                                            """
+                                            
+                                            // known_hosts에서 해당 IP 제거 (호스트 키 변경 문제 해결)
+                                            sh """
+                                                ssh-keygen -f ~/.ssh/known_hosts -R ${currentVMIP} 2>/dev/null || true
+                                            """
+                                            
+                                            // Groovy 변수를 Shell 변수로 설정
+                                            def vmIPVar = vmIP
+                                            def cidrVar = cidr
+                                            def gatewayVar = gateway
+                                            def vmNameVar = vmName
+                                            
                                             sh """
                                                 ssh -i ${sshKey} \\
                                                     -o StrictHostKeyChecking=no \\
+                                                    -o UserKnownHostsFile=/dev/null \\
                                                     -o ConnectTimeout=10 \\
-                                                    ubuntu@${currentVMIP} << SSH_EOF
+                                                    ubuntu@${currentVMIP} bash -s << SSH_SCRIPT_EOF
+# 템플릿의 기존 IP 충돌 방지: 기존 Netplan 설정 백업 및 삭제
+echo "기존 네트워크 설정 초기화 중..."
+sudo rm -f /etc/netplan/*.yaml /etc/netplan/*.yml 2>/dev/null || true
+sudo systemctl stop systemd-networkd 2>/dev/null || true
+sudo systemctl start systemd-networkd 2>/dev/null || true
+sleep 2
+
 # 네트워크 인터페이스 이름 확인 (ens33, ens192, ens160, eth0 등)
 # 우선순위: ens33 > ens192 > ens160 > eth0 > 기타
-INTERFACE=\$(ip -o link show | grep -v lo | awk -F': ' '{print \\\$2}' | grep -E '^(ens33|ens192|ens160|eth0)' | head -1)
+INTERFACE=\$(ip -br link show | grep -v lo | grep -E '^(ens33|ens192|ens160|eth0)' | head -1 | cut -d' ' -f1)
 if [ -z "\\\${INTERFACE}" ]; then
     # 우선순위 인터페이스가 없으면 첫 번째 인터페이스 사용
-    INTERFACE=\$(ip -o link show | grep -v lo | awk -F': ' '{print \\\$2}' | head -1)
+    INTERFACE=\$(ip -br link show | grep -v lo | head -1 | cut -d' ' -f1)
 fi
 echo "네트워크 인터페이스: \\\${INTERFACE}"
 
-# Netplan 설정 (고정 IP, DHCP 비활성화)
+# 새로운 Netplan 설정 (고정 IP, DHCP 비활성화)
 sudo tee /etc/netplan/01-netcfg.yaml > /dev/null << NETPLAN_EOF
 network:
   version: 2
@@ -660,18 +714,18 @@ network:
       dhcp4: no
       dhcp6: no
       addresses:
-        - ${vmIP}/${cidr}
-      gateway4: ${gateway}
+        - ${vmIPVar}/${cidrVar}
+      gateway4: ${gatewayVar}
       nameservers:
         addresses:
           - 10.255.0.10
 NETPLAN_EOF
 
 sudo netplan apply
-sleep 2
-hostnamectl set-hostname ${vmName}
-echo "고정 IP 설정 완료: ${vmIP}/${cidr}"
-SSH_EOF
+sleep 3
+hostnamectl set-hostname ${vmNameVar}
+echo "고정 IP 설정 완료: ${vmIPVar}/${cidrVar}"
+SSH_SCRIPT_EOF
                                             """
                                             ipConfigured = true
                                             echo "✅ VM IP 설정 완료: ${vmIP}"
