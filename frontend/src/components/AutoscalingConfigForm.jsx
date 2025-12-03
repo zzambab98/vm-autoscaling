@@ -296,6 +296,62 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
           ⚠️ 중요: PLG Stack 모니터링 등록 메뉴에서 등록한 Job 이름과 정확히 일치해야 합니다.
         </div>
 
+        {/* 스케일아웃 조건 설명 */}
+        {formData.monitoring.prometheusJobName && (() => {
+          const selectedJob = prometheusJobs.find(job => job.jobName === formData.monitoring.prometheusJobName);
+          const targetCount = selectedJob?.targets?.length || 0;
+          return (
+            <div style={{
+              marginTop: '16px',
+              padding: '16px',
+              backgroundColor: '#f8f9fa',
+              border: '1px solid #dee2e6',
+              borderRadius: '6px',
+              fontSize: '13px',
+              lineHeight: '1.6'
+            }}>
+              <div style={{ fontWeight: '600', marginBottom: '12px', color: '#2c3e50', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px' }}>📊</span>
+                <span>스케일아웃 조건</span>
+              </div>
+              <div style={{ color: '#495057', marginBottom: '8px' }}>
+                <strong>현재 Job:</strong> {formData.monitoring.prometheusJobName} ({targetCount}개 서버)
+              </div>
+              <div style={{ color: '#495057', marginBottom: '8px' }}>
+                <strong>스케일아웃 조건:</strong>
+              </div>
+              <ul style={{ margin: '8px 0', paddingLeft: '20px', color: '#495057' }}>
+                <li style={{ marginBottom: '6px' }}>
+                  <strong>CPU 사용률:</strong> {targetCount > 1 
+                    ? `${targetCount}개 서버 중 <span style="color: #dc3545; font-weight: 600;">한 대라도</span> CPU 사용률이 <strong>${formData.monitoring.cpuThreshold}%</strong>를 초과하면`
+                    : `CPU 사용률이 <strong>${formData.monitoring.cpuThreshold}%</strong>를 초과하면`}
+                </li>
+                <li style={{ marginBottom: '6px' }}>
+                  <strong>Memory 사용률:</strong> {targetCount > 1 
+                    ? `${targetCount}개 서버 중 <span style="color: #dc3545; font-weight: 600;">한 대라도</span> Memory 사용률이 <strong>${formData.monitoring.memoryThreshold}%</strong>를 초과하면`
+                    : `Memory 사용률이 <strong>${formData.monitoring.memoryThreshold}%</strong>를 초과하면`}
+                </li>
+                <li style={{ marginBottom: '6px' }}>
+                  <strong>지속 시간:</strong> 위 조건이 <strong>{formData.monitoring.duration}분</strong> 이상 지속되면
+                </li>
+              </ul>
+              <div style={{ 
+                marginTop: '12px', 
+                padding: '10px', 
+                backgroundColor: '#fff3cd', 
+                border: '1px solid #ffc107', 
+                borderRadius: '4px',
+                color: '#856404',
+                fontSize: '12px'
+              }}>
+                <strong>💡 참고:</strong> {targetCount > 1 
+                  ? `여러 서버가 등록된 경우, <strong>모든 서버의 평균값이 아닌</strong> 각 서버별로 계산하여 <strong>가장 높은 값(최대값)</strong>이 임계치를 넘으면 스케일아웃이 발생합니다. 즉, 한 대라도 임계치를 넘으면 스케일아웃됩니다.`
+                  : `단일 서버의 CPU 또는 Memory 사용률이 임계치를 넘으면 스케일아웃이 발생합니다.`}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* 스케일링 설정 */}
         <h3 style={{ marginTop: '30px', marginBottom: '12px', color: '#2c3e50' }}>스케일링 설정</h3>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
