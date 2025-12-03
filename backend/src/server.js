@@ -435,6 +435,30 @@ const server = http.createServer((req, res) => {
       try {
         const payload = JSON.parse(body);
         const config = await saveConfig(payload);
+        
+        // 설정이 enabled=true로 생성된 경우 자동으로 Jenkins Job 생성
+        if (config.enabled) {
+          try {
+            const { createAlertRule } = require('./services/prometheusAlertService');
+            const { addRoutingRule } = require('./services/alertmanagerService');
+            const { createJenkinsJob } = require('./services/jenkinsService');
+            
+            // Alert Rule 생성
+            await createAlertRule(config);
+            
+            // Alertmanager 라우팅 규칙 추가
+            await addRoutingRule(config);
+            
+            // Jenkins Job 생성
+            await createJenkinsJob(config);
+            
+            console.log(`[Server] 오토스케일링 설정 생성 및 Jenkins Job 생성 완료: ${config.serviceName}`);
+          } catch (error) {
+            console.error(`[Server] Jenkins Job 생성 실패 (설정은 저장됨):`, error);
+            // Jenkins Job 생성 실패해도 설정은 저장됨 (경고만)
+          }
+        }
+        
         sendJSONResponse(res, 200, { success: true, config });
       } catch (error) {
         sendJSONResponse(res, 400, { error: error.message });
