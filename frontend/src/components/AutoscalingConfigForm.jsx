@@ -20,7 +20,10 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
       cpuThreshold: 80,
       memoryThreshold: 80,
       duration: 5,
-      prometheusJobName: ''
+      prometheusJobName: '',
+      scaleInCpuThreshold: 30,
+      scaleInMemoryThreshold: 30,
+      scaleInDuration: 10
     },
     scaling: {
       minVms: 2,
@@ -296,6 +299,49 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
           ⚠️ 중요: PLG Stack 모니터링 등록 메뉴에서 등록한 Job 이름과 정확히 일치해야 합니다.
         </div>
 
+        {/* 스케일인 조건 */}
+        <h4 style={{ marginTop: '24px', marginBottom: '12px', color: '#495057', fontSize: '14px', fontWeight: '600' }}>스케일인 조건</h4>
+        <label className="label">스케일인 CPU 임계값 (%) *</label>
+        <input
+          type="number"
+          className="input"
+          value={formData.monitoring.scaleInCpuThreshold}
+          onChange={(e) => updateNestedField('monitoring', 'scaleInCpuThreshold', parseInt(e.target.value))}
+          min="0"
+          max="100"
+          required
+        />
+        <div style={{ fontSize: '12px', color: '#666', marginTop: '4px', marginBottom: '12px' }}>
+          스케일인 CPU 임계값은 스케일아웃 CPU 임계값보다 낮아야 합니다. (현재 스케일아웃: {formData.monitoring.cpuThreshold}%)
+        </div>
+
+        <label className="label">스케일인 Memory 임계값 (%) *</label>
+        <input
+          type="number"
+          className="input"
+          value={formData.monitoring.scaleInMemoryThreshold}
+          onChange={(e) => updateNestedField('monitoring', 'scaleInMemoryThreshold', parseInt(e.target.value))}
+          min="0"
+          max="100"
+          required
+        />
+        <div style={{ fontSize: '12px', color: '#666', marginTop: '4px', marginBottom: '12px' }}>
+          스케일인 Memory 임계값은 스케일아웃 Memory 임계값보다 낮아야 합니다. (현재 스케일아웃: {formData.monitoring.memoryThreshold}%)
+        </div>
+
+        <label className="label">스케일인 지속 시간 (분) *</label>
+        <input
+          type="number"
+          className="input"
+          value={formData.monitoring.scaleInDuration}
+          onChange={(e) => updateNestedField('monitoring', 'scaleInDuration', parseInt(e.target.value))}
+          min="1"
+          required
+        />
+        <div style={{ fontSize: '12px', color: '#666', marginTop: '4px', marginBottom: '12px' }}>
+          스케일인 지속 시간은 스케일아웃 지속 시간보다 길어야 합니다. (현재 스케일아웃: {formData.monitoring.duration}분) 안정성을 위해 더 긴 시간을 권장합니다.
+        </div>
+
         {/* 스케일아웃 조건 설명 */}
         {formData.monitoring.prometheusJobName && (() => {
           const selectedJob = prometheusJobs.find(job => job.jobName === formData.monitoring.prometheusJobName);
@@ -365,6 +411,84 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
                   )
                   : (
                     <>단일 서버의 CPU 또는 Memory 사용률이 임계치를 넘으면 스케일아웃이 발생합니다.</>
+                  )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* 스케일인 조건 설명 */}
+        {formData.monitoring.prometheusJobName && (() => {
+          const selectedJob = prometheusJobs.find(job => job.jobName === formData.monitoring.prometheusJobName);
+          const targetCount = selectedJob?.targets?.length || 0;
+          return (
+            <div style={{
+              marginTop: '16px',
+              padding: '16px',
+              backgroundColor: '#e7f3ff',
+              border: '1px solid #b3d9ff',
+              borderRadius: '6px',
+              fontSize: '13px',
+              lineHeight: '1.6'
+            }}>
+              <div style={{ fontWeight: '600', marginBottom: '12px', color: '#2c3e50', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '16px' }}>📉</span>
+                <span>스케일인 조건</span>
+              </div>
+              <div style={{ color: '#495057', marginBottom: '8px' }}>
+                <strong>스케일인 조건:</strong>
+              </div>
+              <ul style={{ margin: '8px 0', paddingLeft: '20px', color: '#495057' }}>
+                <li style={{ marginBottom: '6px' }}>
+                  <strong>CPU 사용률:</strong> {targetCount > 1 
+                    ? (
+                      <>
+                        {targetCount}개 서버 <span style={{ color: '#28a745', fontWeight: 600 }}>모두</span> CPU 사용률이 <strong>{formData.monitoring.scaleInCpuThreshold}%</strong> 이하이고
+                      </>
+                    )
+                    : (
+                      <>
+                        CPU 사용률이 <strong>{formData.monitoring.scaleInCpuThreshold}%</strong> 이하이고
+                      </>
+                    )}
+                </li>
+                <li style={{ marginBottom: '6px' }}>
+                  <strong>Memory 사용률:</strong> {targetCount > 1 
+                    ? (
+                      <>
+                        {targetCount}개 서버 <span style={{ color: '#28a745', fontWeight: 600 }}>모두</span> Memory 사용률이 <strong>{formData.monitoring.scaleInMemoryThreshold}%</strong> 이하일 때
+                      </>
+                    )
+                    : (
+                      <>
+                        Memory 사용률이 <strong>{formData.monitoring.scaleInMemoryThreshold}%</strong> 이하일 때
+                      </>
+                    )}
+                </li>
+                <li style={{ marginBottom: '6px' }}>
+                  <strong>지속 시간:</strong> 위 조건이 <strong>{formData.monitoring.scaleInDuration}분</strong> 이상 지속되면
+                </li>
+                <li style={{ marginBottom: '6px' }}>
+                  <strong>최소 VM 수:</strong> 현재 VM 개수가 <strong>최소 VM 수</strong>보다 많을 때만 스케일인 실행
+                </li>
+              </ul>
+              <div style={{ 
+                marginTop: '12px', 
+                padding: '10px', 
+                backgroundColor: '#d1ecf1', 
+                border: '1px solid #bee5eb', 
+                borderRadius: '4px',
+                color: '#0c5460',
+                fontSize: '12px'
+              }}>
+                <strong>💡 참고:</strong> {targetCount > 1 
+                  ? (
+                    <>
+                      여러 서버가 등록된 경우, <strong>모든 서버의 평균값이 아닌</strong> 각 서버별로 계산하여 <strong>가장 낮은 값(최소값)</strong>이 임계치 이하여야 스케일인이 발생합니다. 즉, <strong>모든 서버가</strong> 임계치 이하여야 스케일인됩니다.
+                    </>
+                  )
+                  : (
+                    <>단일 서버의 CPU와 Memory 사용률이 모두 임계치 이하여야 스케일인이 발생합니다.</>
                   )}
               </div>
             </div>

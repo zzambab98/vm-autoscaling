@@ -1,0 +1,597 @@
+<?xml version='1.0' encoding='utf-8'?>
+<flow-definition plugin="workflow-job@1559.va_a_533730b_ea_d">
+  <actions>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1" />
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2277.v00573e73ddf1">
+      <jobProperties />
+      <triggers>
+        <string>org.jenkinsci.plugins.gwt.GenericTrigger</string>
+      </triggers>
+      <parameters />
+      <options />
+    </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
+  </actions>
+  <description>Alertmanager Webhook to Jenkins to vCenter API to F5 Pool 자동 등록 파이프라인</description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        <org.jenkinsci.plugins.gwt.GenericTrigger plugin="generic-webhook-trigger@2.4.1">
+          <spec />
+          <genericVariables>
+            <org.jenkinsci.plugins.gwt.GenericVariable>
+              <key>alertname</key>
+              <value>$.alerts[0].labels.alertname</value>
+              <regexpFilter />
+            </org.jenkinsci.plugins.gwt.GenericVariable>
+            <org.jenkinsci.plugins.gwt.GenericVariable>
+              <key>instance</key>
+              <value>$.alerts[0].labels.instance</value>
+              <regexpFilter />
+            </org.jenkinsci.plugins.gwt.GenericVariable>
+            <org.jenkinsci.plugins.gwt.GenericVariable>
+              <key>service</key>
+              <value>$.alerts[0].labels.service</value>
+              <regexpFilter />
+            </org.jenkinsci.plugins.gwt.GenericVariable>
+            <org.jenkinsci.plugins.gwt.GenericVariable>
+              <key>autoscaleConfigId</key>
+              <value>$.alerts[0].labels.autoscaleConfigId</value>
+              <regexpFilter />
+            </org.jenkinsci.plugins.gwt.GenericVariable>
+            <org.jenkinsci.plugins.gwt.GenericVariable>
+              <key>severity</key>
+              <value>$.alerts[0].labels.severity</value>
+              <regexpFilter />
+            </org.jenkinsci.plugins.gwt.GenericVariable>
+            <org.jenkinsci.plugins.gwt.GenericVariable>
+              <key>status</key>
+              <value>$.status</value>
+              <regexpFilter />
+            </org.jenkinsci.plugins.gwt.GenericVariable>
+            <org.jenkinsci.plugins.gwt.GenericVariable>
+              <key>summary</key>
+              <value>$.alerts[0].annotations.summary</value>
+              <regexpFilter />
+            </org.jenkinsci.plugins.gwt.GenericVariable>
+            <org.jenkinsci.plugins.gwt.GenericVariable>
+              <key>description</key>
+              <value>$.alerts[0].annotations.description</value>
+              <regexpFilter />
+            </org.jenkinsci.plugins.gwt.GenericVariable>
+          </genericVariables>
+          <regexpFilterText>$status</regexpFilterText>
+          <regexpFilterExpression>^firing$</regexpFilterExpression>
+          <printPostContent>true</printPostContent>
+          <printContributedVariables>true</printContributedVariables>
+          <causeString>Alert: $alertname - Service: $service - Instance: $instance</causeString>
+          <token>plg-autoscale-token</token>
+          <silentResponse>false</silentResponse>
+          <overrideQuietPeriod>false</overrideQuietPeriod>
+          <shouldNotFlattern>false</shouldNotFlattern>
+          <allowSeveralTriggersPerBuild>false</allowSeveralTriggersPerBuild>
+        </org.jenkinsci.plugins.gwt.GenericTrigger>
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@4218.vff679a_5c0f3a_">
+    <script>// Jenkins Pipeline 통합 스크립트 (Linux 환경용 - govc 사용)
+// Alertmanager Webhook → Jenkins → vCenter API (govc) → F5 Pool 자동 등록 파이프라인
+// Job 이름: plg-autoscale-out
+
+pipeline {
+    agent any
+    
+    // Generic Webhook Trigger 설정
+    triggers {
+        GenericTrigger(
+            genericVariables: [
+                // Alertmanager에서 전달되는 데이터 파싱
+                [key: 'alertname', value: '$.alerts[0].labels.alertname', regexpFilter: ''],
+                [key: 'instance', value: '$.alerts[0].labels.instance', regexpFilter: ''],
+                [key: 'service', value: '$.alerts[0].labels.service', regexpFilter: ''],
+                [key: 'autoscaleConfigId', value: '$.alerts[0].labels.autoscaleConfigId', regexpFilter: ''],
+                [key: 'severity', value: '$.alerts[0].labels.severity', regexpFilter: ''],
+                [key: 'status', value: '$.status', regexpFilter: ''],
+                [key: 'summary', value: '$.alerts[0].annotations.summary', regexpFilter: ''],
+                [key: 'description', value: '$.alerts[0].annotations.description', regexpFilter: '']
+            ],
+            causeString: 'Alert: $alertname - Service: $service - Instance: $instance',
+            token: 'plg-autoscale-token',
+            printContributedVariables: true,
+            printPostContent: true,
+            // Resolved 알림은 무시 (firing만 처리)
+            regexpFilterText: '$status',
+            regexpFilterExpression: '^firing$'
+        )
+    }
+    
+    // 환경 변수 설정
+    environment {
+        // vCenter 설정 (Jenkins Credentials 또는 환경 변수로 주입)
+        GOVC_URL = ''
+        GOVC_USERNAME = ''
+        GOVC_PASSWORD = ''
+        GOVC_INSECURE = '1'  // SSL 인증서 검증 비활성화
+        
+        // 기본 vCenter 설정 (오토스케일링 설정에서 덮어쓸 수 있음)
+        VCENTER_RESOURCE_POOL = 'APP-RP'
+        VCENTER_DATASTORE = 'PowerStore-DS1'
+        
+        // F5 설정 (오토스케일링 설정에서 덮어쓸 수 있음)
+        F5_SERVER = '10.255.1.80'
+        F5_PARTITION = 'Common'
+        F5_HEALTH_MONITOR = '/Common/http'
+        F5_USERNAME = ''
+        F5_PASSWORD = ''
+        
+        // 백엔드 API URL (오토스케일링 설정 조회용)
+        BACKEND_API_URL = 'http://10.255.48.253:6010'
+        
+        // 타임아웃 설정
+        VM_IP_TIMEOUT = '300'  // 5분
+    }
+    
+    stages {
+        // Stage 1: Alert 데이터 파싱 및 검증
+        stage('Parse Alert') {
+            steps {
+                script {
+                    echo "=========================================="
+                    echo "Alert 데이터 파싱 및 검증"
+                    echo "=========================================="
+                    
+                    def alertname = env.alertname ?: 'Unknown'
+                    def instance = env.instance ?: 'all'
+                    def service = env.service ?: 'unknown'
+                    def autoscaleConfigId = env.autoscaleConfigId ?: ''
+                    def severity = env.severity ?: 'warning'
+                    def status = env.status ?: 'unknown'
+                    def summary = env.summary ?: ''
+                    def description = env.description ?: ''
+                    
+                    echo "Alert Name: ${alertname}"
+                    echo "Service: ${service}"
+                    echo "Instance: ${instance}"
+                    echo "Autoscale Config ID: ${autoscaleConfigId}"
+                    echo "Severity: ${severity}"
+                    echo "Status: ${status}"
+                    echo "Summary: ${summary}"
+                    echo "Description: ${description}"
+                    
+                    // Resolved 알림은 무시
+                    if (status != 'firing') {
+                        echo "Alert status is '${status}', skipping scale-out"
+                        currentBuild.result = 'ABORTED'
+                        return
+                    }
+                    
+                    // Critical 또는 Warning 알림만 처리
+                    if (severity != 'critical' &amp;&amp; severity != 'warning') {
+                        echo "Alert severity is '${severity}', skipping scale-out"
+                        currentBuild.result = 'ABORTED'
+                        return
+                    }
+                    
+                    // Autoscale Config ID가 없으면 오류
+                    if (!autoscaleConfigId) {
+                        error("Autoscale Config ID가 없습니다. Alert Rule 설정을 확인하세요.")
+                    }
+                    
+                    // 환경 변수 저장
+                    env.VM_INSTANCE = instance
+                    env.ALERT_SERVICE = service
+                    env.ALERT_SEVERITY = severity
+                    env.AUTOSCALE_CONFIG_ID = autoscaleConfigId
+                    
+                    echo "Alert 파싱 완료. 오토스케일링 설정 조회 중..."
+                }
+            }
+        }
+        
+        // Stage 2: 오토스케일링 설정 조회
+        stage('Get Autoscaling Config') {
+            steps {
+                script {
+                    withCredentials([
+                        string(credentialsId: 'vcenter-server', variable: 'VCENTER_SERVER_CRED'),
+                        string(credentialsId: 'vcenter-user', variable: 'VCENTER_USER_CRED'),
+                        string(credentialsId: 'vcenter-password', variable: 'VCENTER_PASSWORD_CRED'),
+                        usernamePassword(credentialsId: 'f5-credentials', usernameVariable: 'F5_USERNAME_CRED', passwordVariable: 'F5_PASSWORD_CRED')
+                    ]) {
+                        echo "=========================================="
+                        echo "오토스케일링 설정 조회"
+                       	echo "=========================================="
+                        
+                        if (!env.GOVC_URL || env.GOVC_URL.trim() == '') {
+                            env.GOVC_URL = VCENTER_SERVER_CRED ?: 'https://vc.danacloud.local'
+                        }
+                        if (!env.GOVC_USERNAME || env.GOVC_USERNAME.trim() == '') {
+                            env.GOVC_USERNAME = VCENTER_USER_CRED ?: 'svc-auto'
+                        }
+                        if (!env.GOVC_PASSWORD || env.GOVC_PASSWORD.trim() == '') {
+                            if (VCENTER_PASSWORD_CRED &amp;&amp; VCENTER_PASSWORD_CRED.trim() != '') {
+                                env.GOVC_PASSWORD = VCENTER_PASSWORD_CRED
+                            } else {
+                                error("vCenter 비밀번호가 설정되지 않았습니다. Jenkins Credentials 'vcenter-password'를 확인하세요.")
+                            }
+                        }
+                        
+                        env.F5_USERNAME = F5_USERNAME_CRED ?: env.F5_USERNAME
+                        env.F5_PASSWORD = F5_PASSWORD_CRED ?: env.F5_PASSWORD
+                        
+                        def configId = env.AUTOSCALE_CONFIG_ID
+                        if (!configId || configId.trim() == '') {
+                            error("Autoscale Config ID가 없습니다.")
+                        }
+                        
+                        try {
+                            echo "백엔드 API 호출: ${env.BACKEND_API_URL}/api/autoscaling/configs/${configId}"
+                            def configResponseText = sh(
+                                script: """curl -sf -H "Content-Type: application/json" "${env.BACKEND_API_URL}/api/autoscaling/configs/${configId}" """,
+                                returnStdout: true
+                            ).trim()
+                            
+                            def configResponse = new groovy.json.JsonSlurper().parseText(configResponseText)
+                            def configData = configResponse.config ?: configResponse
+                            
+                            if (!configData.serviceName) {
+                                error("오토스케일링 설정 응답이 올바르지 않습니다: ${configResponseText}")
+                            }
+                            
+                            if (configData.templateId) {
+                                echo "Template 정보 조회: ${configData.templateId}"
+                                try {
+                                    def templateResponseText = sh(
+                                        script: """curl -sf -H "Content-Type: application/json" "${env.BACKEND_API_URL}/api/templates/${configData.templateId}" """,
+                                        returnStdout: true
+                                    ).trim()
+                                    def templateJson = new groovy.json.JsonSlurper().parseText(templateResponseText)
+                                    env.VCENTER_TEMPLATE = templateJson.template?.name ?: templateJson.name ?: 'app-template'
+                                } catch (Exception tmplErr) {
+                                    echo "경고: Template 정보를 찾을 수 없습니다. 기본값 사용: app-template (${tmplErr.message})"
+                                    env.VCENTER_TEMPLATE = 'app-template'
+                                }
+                            } else {
+                                env.VCENTER_TEMPLATE = 'app-template'
+                            }
+                            
+                            env.VM_NAME_PREFIX = "${configData.serviceName}-auto" ?: 'app-auto'
+                            env.NEW_VM_NAME = "${env.VM_NAME_PREFIX}-${BUILD_NUMBER}-${System.currentTimeMillis()}"
+                            env.NEW_VM_NAME = env.NEW_VM_NAME.toLowerCase().replaceAll(/[^a-z0-9-]/, '-')
+                            
+                            env.IP_POOL_START = configData.network?.ipPoolStart ?: ''
+                            env.IP_POOL_END = configData.network?.ipPoolEnd ?: ''
+                            env.SUBNET = configData.network?.subnet ?: '255.255.255.0'
+                            env.GATEWAY = configData.network?.gateway ?: ''
+                            env.VLAN = configData.network?.vlan ?: ''
+                            
+                            env.F5_POOL_NAME = configData.f5?.poolName ?: ''
+                            env.F5_POOL_PORT = configData.f5?.vipPort ?: '80'
+                            env.F5_VIP = configData.f5?.vip ?: ''
+                            env.F5_HEALTH_CHECK_PATH = configData.f5?.healthCheckPath ?: '/'
+                            
+                            env.VCENTER_RESOURCE_POOL = configData.vcenter?.resourcePool ?: env.VCENTER_RESOURCE_POOL
+                            env.VCENTER_DATASTORE = configData.vcenter?.datastore ?: env.VCENTER_DATASTORE
+                            
+                            echo "오토스케일링 설정 조회 완료:"
+                            echo "  Template: ${env.VCENTER_TEMPLATE}"
+                            echo "  VM Name: ${env.NEW_VM_NAME}"
+                            echo "  IP Pool: ${env.IP_POOL_START} - ${env.IP_POOL_END}"
+                            echo "  F5 Pool: ${env.F5_POOL_NAME}"
+                            echo "  F5 VIP: ${env.F5_VIP}"
+                            echo "  Resource Pool: ${env.VCENTER_RESOURCE_POOL}"
+                            echo "  Datastore: ${env.VCENTER_DATASTORE}"
+                            
+                        } catch (Exception e) {
+                            error("오토스케일링 설정 조회 실패: ${e.getMessage()}")
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Stage 3: IP 주소 할당
+        stage('Allocate IP Address') {
+            steps {
+                script {
+                    echo "=========================================="
+                    echo "IP 주소 할당"
+                    echo "=========================================="
+                    
+                    def ipStart = env.IP_POOL_START
+                    def ipEnd = env.IP_POOL_END
+                    
+                    if (!ipStart || !ipEnd) {
+                        error("IP Pool이 설정되지 않았습니다.")
+                    }
+                    
+                    // IP Pool에서 사용 가능한 IP 찾기
+                    // 간단한 방법: IP Pool 범위에서 순차적으로 확인
+                    def allocatedIP = ''
+                    
+                    // IP 주소를 숫자로 변환
+                    def ipStartParts = ipStart.split('\\.')
+                    def ipEndParts = ipEnd.split('\\.')
+                    
+                    def startLong = Long.parseLong(ipStartParts[0]) * 256 * 256 * 256 +
+                                   Long.parseLong(ipStartParts[1]) * 256 * 256 +
+                                   Long.parseLong(ipStartParts[2]) * 256 +
+                                   Long.parseLong(ipStartParts[3])
+                    
+                    def endLong = Long.parseLong(ipEndParts[0]) * 256 * 256 * 256 +
+                                 Long.parseLong(ipEndParts[1]) * 256 * 256 +
+                                 Long.parseLong(ipEndParts[2]) * 256 +
+                                 Long.parseLong(ipEndParts[3])
+                    
+                    // IP Pool 범위에서 사용 가능한 IP 찾기 (ping 테스트)
+                    for (long ip = startLong; ip &lt;= endLong; ip++) {
+                        // 숫자를 IP로 변환
+                        def octet1 = (ip &gt;&gt; 24) &amp; 0xFF
+                        def octet2 = (ip &gt;&gt; 16) &amp; 0xFF
+                        def octet3 = (ip &gt;&gt; 8) &amp; 0xFF
+                        def octet4 = ip &amp; 0xFF
+                        def testIP = "${octet1}.${octet2}.${octet3}.${octet4}"
+                        
+                        // ping으로 IP 사용 가능 여부 확인
+                        def pingResult = sh(
+                            script: "ping -c 1 -W 1 ${testIP} &gt; /dev/null 2&gt;&amp;1",
+                            returnStatus: true
+                        )
+                        
+                        if (pingResult != 0) {
+                            // ping 실패 = IP 사용 가능
+                            allocatedIP = testIP
+                            break
+                        }
+                    }
+                    
+                    if (!allocatedIP) {
+                        error("IP Pool (${ipStart} - ${ipEnd})에서 사용 가능한 IP를 찾을 수 없습니다.")
+                    }
+                    
+                    env.NEW_VM_IP = allocatedIP
+                    echo "IP 주소 할당 완료: ${env.NEW_VM_IP}"
+                }
+            }
+        }
+        
+        // Stage 4: vCenter VM 클론 (govc 사용)
+        stage('VM Clone') {
+            steps {
+                script {
+                    echo "=========================================="
+                    echo "vCenter VM 클론 시작 (govc 사용)"
+                    echo "=========================================="
+                    
+                    def templateName = env.VCENTER_TEMPLATE
+                    def vmName = env.NEW_VM_NAME
+                    def vmIP = env.NEW_VM_IP
+                    def subnet = env.SUBNET
+                    def gateway = env.GATEWAY
+                    def vlan = env.VLAN
+                    def datastore = env.VCENTER_DATASTORE
+                    def resourcePool = env.VCENTER_RESOURCE_POOL
+                    
+                    try {
+                        // govc를 사용하여 VM 클론
+                        // 주의: govc vm.clone은 IP 설정을 직접 지원하지 않으므로,
+                        // 클론 후 customization spec을 사용하거나 별도로 설정해야 함
+                        
+                        def cloneCommand = """
+                            export GOVC_URL="${env.GOVC_URL}"
+                            export GOVC_USERNAME="${env.GOVC_USERNAME}"
+                            export GOVC_PASSWORD="${env.GOVC_PASSWORD}"
+                            export GOVC_INSECURE="${env.GOVC_INSECURE}"
+                            
+                            govc vm.clone \\
+                                -vm="${templateName}" \\
+                                -name="${vmName}" \\
+                                -on=false
+                        """
+                        
+                        // Datastore 지정
+                        if (datastore) {
+                            cloneCommand += """ \\
+                                -ds="${datastore}"
+                            """
+                        }
+                        
+                        // Resource Pool 지정
+                        if (resourcePool) {
+                            cloneCommand += """ \\
+                                -pool="${resourcePool}"
+                            """
+                        }
+                        
+                        // Network/VLAN 지정
+                        if (vlan) {
+                            cloneCommand += """ \\
+                                -net="${vlan}"
+                            """
+                        }
+                        
+                        cloneCommand += """ \\
+                            "${vmName}"
+                        """
+                        
+                        echo "VM 클론 명령어 실행 중..."
+                        sh cloneCommand
+                        
+                        echo "VM 클론 완료: ${vmName}"
+                        
+                        // IP 주소 설정 (govc vm.customize 또는 별도 스크립트 필요)
+                        // 주의: govc는 IP 설정을 직접 지원하지 않으므로,
+                        // vCenter Customization Spec을 사용하거나 별도 스크립트가 필요할 수 있음
+                        
+                        // VM 전원 켜기
+                        def powerOnCommand = """
+                            export GOVC_URL="${env.GOVC_URL}"
+                            export GOVC_USERNAME="${env.GOVC_USERNAME}"
+                            export GOVC_PASSWORD="${env.GOVC_PASSWORD}"
+                            export GOVC_INSECURE="${env.GOVC_INSECURE}"
+                            
+                            govc vm.power -on "${vmName}"
+                        """
+                        
+                        sh powerOnCommand
+                        echo "VM 전원 켜기 완료: ${vmName}"
+                        
+                        // VM IP 주소 확인 대기
+                        echo "VM IP 주소 확인 대기 중..."
+                        def maxWait = 300  // 5분
+                        def waitTime = 0
+                        def vmIPConfirmed = false
+                        
+                        while (waitTime &lt; maxWait &amp;&amp; !vmIPConfirmed) {
+                            sleep(time: 10, unit: 'SECONDS')
+                            waitTime += 10
+                            
+                            def ipCheckCommand = """
+                                export GOVC_URL="${env.GOVC_URL}"
+                                export GOVC_USERNAME="${env.GOVC_USERNAME}"
+                                export GOVC_PASSWORD="${env.GOVC_PASSWORD}"
+                                export GOVC_INSECURE="${env.GOVC_INSECURE}"
+                                
+                                govc vm.ip "${vmName}" | head -1
+                            """
+                            
+                            def ipOutput = sh(
+                                script: ipCheckCommand,
+                                returnStdout: true
+                            ).trim()
+                            
+                            if (ipOutput &amp;&amp; ipOutput != '') {
+                                env.NEW_VM_IP = ipOutput
+                                vmIPConfirmed = true
+                                echo "VM IP 주소 확인: ${env.NEW_VM_IP}"
+                            } else {
+                                echo "VM IP 주소 대기 중... (${waitTime}/${maxWait}초)"
+                            }
+                        }
+                        
+                        if (!vmIPConfirmed) {
+                            echo "경고: VM IP 주소를 확인하지 못했습니다. 할당된 IP (${vmIP})를 사용합니다."
+                        }
+                        
+                    } catch (Exception e) {
+                        echo "VM 클론 실패: ${e.getMessage()}"
+                        error("VM 클론 중 오류 발생: ${e.getMessage()}")
+                    }
+                }
+            }
+        }
+        
+        // Stage 5: F5 Pool Member 추가
+        stage('F5 Pool Registration') {
+            steps {
+                script {
+                    echo "=========================================="
+                    echo "F5 Pool Member 추가 시작"
+                    echo "=========================================="
+                    
+                    def poolName = env.F5_POOL_NAME
+                    def memberIP = env.NEW_VM_IP
+                    def port = env.F5_POOL_PORT.toInteger()
+                    
+                    if (!poolName || poolName == '') {
+                        error("F5 Pool 이름이 설정되지 않았습니다.")
+                    }
+                    
+                    if (!memberIP || memberIP == 'null' || memberIP == '') {
+                        error("VM IP 주소가 설정되지 않았습니다.")
+                    }
+                    
+                    // F5 Credential 사용
+                    withCredentials([usernamePassword(credentialsId: 'f5-credentials', usernameVariable: 'F5_USERNAME', passwordVariable: 'F5_PASSWORD')]) {
+                        try {
+                            // F5 API를 사용하여 Pool Member 추가
+                            // Python 스크립트 또는 curl을 사용하여 F5 API 호출
+                            
+                            echo "Linux 환경에서 F5 API 호출..."
+                            
+                            // F5 API를 사용하여 Pool Member 추가
+                            // 예시: Python 스크립트 사용
+                            sh """
+                                python3 /opt/scripts/f5-pool-add.py \
+                                    ${poolName} \
+                                    ${memberIP} \
+                                    ${port} \
+                                    --f5-server ${env.F5_SERVER} \
+                                    --f5-user ${env.F5_USERNAME} \
+                                    --f5-password '${env.F5_PASSWORD}' \
+                                    --partition ${env.F5_PARTITION} \
+                                    --health-monitor ${env.F5_HEALTH_MONITOR}
+                            """
+                            
+                            echo "F5 Pool Member 추가 완료: ${memberIP}:${port}"
+                        } catch (Exception e) {
+                            echo "F5 Pool Member 추가 실패: ${e.getMessage()}"
+                            // F5 등록 실패는 경고로 처리 (VM은 이미 생성됨)
+                            currentBuild.result = 'UNSTABLE'
+                            echo "경고: F5 Pool 등록 실패했지만 VM은 생성되었습니다."
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Stage 6: 결과 요약
+        stage('Summary') {
+            steps {
+                script {
+                    echo "=========================================="
+                    echo "작업 완료 요약"
+                    echo "=========================================="
+                    echo "Alert: ${env.alertname}"
+                    echo "Service: ${env.ALERT_SERVICE}"
+                    echo "Instance: ${env.VM_INSTANCE}"
+                    echo "새 VM 이름: ${env.NEW_VM_NAME ?: 'N/A'}"
+                    echo "새 VM IP: ${env.NEW_VM_IP ?: 'N/A'}"
+                    echo "F5 Pool: ${env.F5_POOL_NAME}"
+                    echo "F5 Member: ${env.NEW_VM_IP ?: 'N/A'}:${env.F5_POOL_PORT}"
+                    echo "=========================================="
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo "Pipeline 실행 완료"
+            // 결과를 파일로 저장
+            script {
+                def summary = """
+                    Alert: ${env.alertname}
+                    Service: ${env.ALERT_SERVICE}
+                    Instance: ${env.VM_INSTANCE}
+                    새 VM 이름: ${env.NEW_VM_NAME ?: 'N/A'}
+                    새 VM IP: ${env.NEW_VM_IP ?: 'N/A'}
+                    F5 Pool: ${env.F5_POOL_NAME}
+                    F5 Member: ${env.NEW_VM_IP ?: 'N/A'}:${env.F5_POOL_PORT}
+                    실행 시간: ${currentBuild.durationString}
+                    결과: ${currentBuild.result ?: 'SUCCESS'}
+                """
+                writeFile file: 'pipeline-summary.txt', text: summary
+                archiveArtifacts artifacts: 'pipeline-summary.txt', fingerprint: true
+            }
+        }
+        success {
+            echo "✅ 자동 스케일아웃 성공"
+        }
+        failure {
+            echo "❌ 자동 스케일아웃 실패"
+        }
+        unstable {
+            echo "⚠️ 자동 스케일아웃 부분 실패 (VM 생성 성공, F5 등록 실패)"
+        }
+    }
+}
+
+</script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers />
+  <authToken>plg-autoscale-token</authToken>
+  <disabled>false</disabled>
+</flow-definition>

@@ -50,48 +50,67 @@ async function addRoutingRule(config) {
       alertmanagerConfig.route.routes = [];
     }
 
-    // 기존 라우팅 규칙 제거 (같은 서비스)
+    // 기존 라우팅 규칙 제거 (같은 서비스의 스케일아웃/스케일인)
     alertmanagerConfig.route.routes = alertmanagerConfig.route.routes.filter(
-      route => !(route.match && route.match.service === serviceName)
+      route => !(
+        route.match && 
+        route.match.service === serviceName && 
+        (route.match.alertname === `${serviceName}_HighResourceUsage` || 
+         route.match.alertname === `${serviceName}_LowResourceUsage`)
+      )
     );
 
-    // 새 라우팅 규칙 추가 (맨 앞에 추가하여 우선순위 부여)
-    const newRoute = {
+    // 스케일아웃 라우팅 규칙 추가 (맨 앞에 추가하여 우선순위 부여)
+    const scaleOutRoute = {
       match: {
-        service: serviceName
+        service: serviceName,
+        alertname: `${serviceName}_HighResourceUsage`
       },
-      receiver: `jenkins-webhook-${serviceName}`,
+      receiver: `jenkins-webhook-${serviceName}-out`,
       continue: false
     };
 
-    alertmanagerConfig.route.routes.unshift(newRoute);
+    // 스케일인 라우팅 규칙 추가
+    const scaleInRoute = {
+      match: {
+        service: serviceName,
+        alertname: `${serviceName}_LowResourceUsage`
+      },
+      receiver: `jenkins-webhook-${serviceName}-in`,
+      continue: false
+    };
+
+    alertmanagerConfig.route.routes.unshift(scaleInRoute); // 스케일인이 먼저 (더 구체적)
+    alertmanagerConfig.route.routes.unshift(scaleOutRoute);
 
     // 4. Webhook 수신자 추가
     if (!alertmanagerConfig.receivers) {
       alertmanagerConfig.receivers = [];
     }
 
-    // 기존 수신자 제거 (같은 이름)
+    // 기존 수신자 제거 (같은 서비스의 스케일아웃/스케일인)
     alertmanagerConfig.receivers = alertmanagerConfig.receivers.filter(
-      receiver => receiver.name !== `jenkins-webhook-${serviceName}`
+      receiver => !(
+        receiver.name === `jenkins-webhook-${serviceName}-out` ||
+        receiver.name === `jenkins-webhook-${serviceName}-in`
+      )
     );
 
-    // Jenkins Webhook URL (직접 Jenkins로 전송)
-    // 모든 서비스가 같은 plg-autoscale-out 파이프라인을 사용
-    const JENKINS_DEFAULT_WEBHOOK_TOKEN = process.env.JENKINS_DEFAULT_WEBHOOK_TOKEN || 'plg-autoscale-token';
-    const webhookToken = (config.jenkins && config.jenkins.webhookToken)
-      ? config.jenkins.webhookToken
-      : JENKINS_DEFAULT_WEBHOOK_TOKEN;
-    const webhookUrl = (config.jenkins && config.jenkins.webhookUrl)
-      ? config.jenkins.webhookUrl
-      : `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookToken}`;
+    // Jenkins Webhook URL 생성
+    const jobNameOut = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-out`;
+    const jobNameIn = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-in`;
+    const webhookTokenOut = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-out-token`;
+    const webhookTokenIn = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-in-token`;
+    
+    const webhookUrlOut = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookTokenOut}`;
+    const webhookUrlIn = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookTokenIn}`;
 
-    // 새 수신자 추가
-    const newReceiver = {
-      name: `jenkins-webhook-${serviceName}`,
+    // 스케일아웃 수신자 추가
+    const scaleOutReceiver = {
+      name: `jenkins-webhook-${serviceName}-out`,
       webhook_configs: [
         {
-          url: webhookUrl,
+          url: webhookUrlOut,
           send_resolved: false, // Alert 해결 시 webhook 전송 안 함
           http_config: {
             basic_auth: {
@@ -103,7 +122,25 @@ async function addRoutingRule(config) {
       ]
     };
 
-    alertmanagerConfig.receivers.push(newReceiver);
+    // 스케일인 수신자 추가
+    const scaleInReceiver = {
+      name: `jenkins-webhook-${serviceName}-in`,
+      webhook_configs: [
+        {
+          url: webhookUrlIn,
+          send_resolved: false, // Alert 해결 시 webhook 전송 안 함
+          http_config: {
+            basic_auth: {
+              username: JENKINS_WEBHOOK_USER,
+              password: JENKINS_WEBHOOK_PASSWORD
+            }
+          }
+        }
+      ]
+    };
+
+    alertmanagerConfig.receivers.push(scaleOutReceiver);
+    alertmanagerConfig.receivers.push(scaleInReceiver);
 
     // 5. YAML로 변환
     const newConfigYaml = yaml.dump(alertmanagerConfig, {
@@ -137,9 +174,17 @@ async function addRoutingRule(config) {
     return {
       success: true,
       serviceName: serviceName,
-      webhookUrl: webhookUrl,
-      webhookToken: webhookToken,
-      message: 'Alertmanager 라우팅 규칙이 추가되었습니다.'
+      scaleOut: {
+        webhookUrl: webhookUrlOut,
+        webhookToken: webhookTokenOut,
+        jobName: jobNameOut
+      },
+      scaleIn: {
+        webhookUrl: webhookUrlIn,
+        webhookToken: webhookTokenIn,
+        jobName: jobNameIn
+      },
+      message: 'Alertmanager 라우팅 규칙이 추가되었습니다. (스케일아웃 + 스케일인)'
     };
   } catch (error) {
     console.error(`[Alertmanager] 라우팅 규칙 추가 실패:`, error);
@@ -163,17 +208,25 @@ async function deleteRoutingRule(serviceName) {
     // 2. YAML 파싱
     const alertmanagerConfig = yaml.load(currentConfig);
 
-    // 3. 라우팅 규칙 제거
+    // 3. 라우팅 규칙 제거 (스케일아웃 + 스케일인)
     if (alertmanagerConfig.route && alertmanagerConfig.route.routes) {
       alertmanagerConfig.route.routes = alertmanagerConfig.route.routes.filter(
-        route => !(route.match && route.match.service === serviceName)
+        route => !(
+          route.match && 
+          route.match.service === serviceName && 
+          (route.match.alertname === `${serviceName}_HighResourceUsage` || 
+           route.match.alertname === `${serviceName}_LowResourceUsage`)
+        )
       );
     }
 
-    // 4. 수신자 제거
+    // 4. 수신자 제거 (스케일아웃 + 스케일인)
     if (alertmanagerConfig.receivers) {
       alertmanagerConfig.receivers = alertmanagerConfig.receivers.filter(
-        receiver => receiver.name !== `jenkins-webhook-${serviceName}`
+        receiver => !(
+          receiver.name === `jenkins-webhook-${serviceName}-out` ||
+          receiver.name === `jenkins-webhook-${serviceName}-in`
+        )
       );
     }
 

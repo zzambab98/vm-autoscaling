@@ -37,7 +37,16 @@ function validateConfig(config) {
 
   // 모니터링 설정 검증
   if (config.monitoring) {
-    const { cpuThreshold, memoryThreshold, duration } = config.monitoring;
+    const { 
+      cpuThreshold, 
+      memoryThreshold, 
+      duration,
+      scaleInCpuThreshold,
+      scaleInMemoryThreshold,
+      scaleInDuration
+    } = config.monitoring;
+    
+    // 스케일아웃 조건 검증
     if (cpuThreshold !== undefined && (cpuThreshold < 0 || cpuThreshold > 100)) {
       errors.push('CPU 임계값은 0-100 사이여야 합니다.');
     }
@@ -46,6 +55,34 @@ function validateConfig(config) {
     }
     if (duration !== undefined && duration < 1) {
       errors.push('지속 시간은 1분 이상이어야 합니다.');
+    }
+    
+    // 스케일인 조건 검증
+    if (scaleInCpuThreshold !== undefined && (scaleInCpuThreshold < 0 || scaleInCpuThreshold > 100)) {
+      errors.push('스케일인 CPU 임계값은 0-100 사이여야 합니다.');
+    }
+    if (scaleInMemoryThreshold !== undefined && (scaleInMemoryThreshold < 0 || scaleInMemoryThreshold > 100)) {
+      errors.push('스케일인 Memory 임계값은 0-100 사이여야 합니다.');
+    }
+    if (scaleInDuration !== undefined && scaleInDuration < 1) {
+      errors.push('스케일인 지속 시간은 1분 이상이어야 합니다.');
+    }
+    
+    // 스케일인 조건이 스케일아웃 조건보다 낮아야 함
+    if (cpuThreshold !== undefined && scaleInCpuThreshold !== undefined) {
+      if (scaleInCpuThreshold >= cpuThreshold) {
+        errors.push('스케일인 CPU 임계값은 스케일아웃 CPU 임계값보다 낮아야 합니다.');
+      }
+    }
+    if (memoryThreshold !== undefined && scaleInMemoryThreshold !== undefined) {
+      if (scaleInMemoryThreshold >= memoryThreshold) {
+        errors.push('스케일인 Memory 임계값은 스케일아웃 Memory 임계값보다 낮아야 합니다.');
+      }
+    }
+    if (duration !== undefined && scaleInDuration !== undefined) {
+      if (scaleInDuration <= duration) {
+        errors.push('스케일인 지속 시간은 스케일아웃 지속 시간보다 길어야 합니다. (안정성을 위해)');
+      }
     }
   }
 

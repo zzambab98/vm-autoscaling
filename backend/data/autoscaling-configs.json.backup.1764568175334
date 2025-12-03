@@ -1,0 +1,40 @@
+[
+  {
+    "serviceName": "auto-vm-test-service",
+    "templateId": "template-1764043685242",
+    "enabled": false,
+    "monitoring": {
+      "cpuThreshold": 80,
+      "memoryThreshold": 80,
+      "duration": 1,
+      "prometheusJobName": "auto-vm-test-service-job"
+    },
+    "scaling": {
+      "minVms": 2,
+      "maxVms": 4,
+      "scaleOutStep": 1,
+      "scaleInStep": 1,
+      "cooldownPeriod": 300
+    },
+    "f5": {
+      "poolName": "auto-vm-test-pool",
+      "vip": "10.255.48.229",
+      "vipPort": 80,
+      "healthCheckPath": "/"
+    },
+    "network": {
+      "ipPoolStart": "10.255.48.100",
+      "ipPoolEnd": "10.255.48.102",
+      "subnet": "255.255.255.0",
+      "gateway": "10.255.48.1",
+      "vlan": "vlan_1048"
+    },
+    "vcenter": {
+      "resourcePool": "/Datacenter/host/Cluster-01/Resources",
+      "datastore": "OS-Datastore-Power-Store"
+    },
+    "id": "config-1764568169505",
+    "createdAt": "2025-12-01T05:49:29.505Z",
+    "updatedAt": "2025-12-01T05:49:29.505Z"
+  }
+]

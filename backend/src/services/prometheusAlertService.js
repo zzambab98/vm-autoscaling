@@ -10,11 +10,11 @@ const PLG_STACK_SSH_KEY = process.env.PLG_STACK_SSH_KEY || '/home/ubuntu/workspa
 const ALERT_RULES_PATH = '/mnt/plg-stack/prometheus/rules/alert_rules.yml';
 
 /**
- * Alert Rule 생성
+ * 스케일아웃 Alert Rule 생성
  * @param {object} config - 오토스케일링 설정
  * @returns {Promise<object>} 생성 결과
  */
-async function createAlertRule(config) {
+async function createScaleOutAlertRule(config) {
   const {
     serviceName,
     id: configId,
@@ -120,11 +120,153 @@ async function createAlertRule(config) {
     return {
       success: true,
       alertRule: alertRule,
-      message: 'Alert Rule이 생성되었습니다.'
+      message: '스케일아웃 Alert Rule이 생성되었습니다.'
+    };
+  } catch (error) {
+    console.error(`[Prometheus Alert] 스케일아웃 Alert Rule 생성 실패:`, error);
+    throw new Error(`스케일아웃 Alert Rule 생성 실패: ${error.message}`);
+  }
+}
+
+/**
+ * 스케일인 Alert Rule 생성
+ * @param {object} config - 오토스케일링 설정
+ * @returns {Promise<object>} 생성 결과
+ */
+async function createScaleInAlertRule(config) {
+  const {
+    serviceName,
+    id: configId,
+    monitoring: {
+      scaleInCpuThreshold,
+      scaleInMemoryThreshold,
+      scaleInDuration,
+      prometheusJobName
+    }
+  } = config;
+
+  try {
+    const sshCommand = `ssh -i "${PLG_STACK_SSH_KEY}" -o StrictHostKeyChecking=no ${PLG_STACK_USER}@${PLG_STACK_SERVER}`;
+
+    // 1. 현재 Alert Rules 파일 읽기
+    const readCommand = `${sshCommand} "cat ${ALERT_RULES_PATH}"`;
+    const { stdout: currentRulesContent } = await execPromise(readCommand);
+
+    // 2. YAML 파싱
+    let alertRules = { groups: [] };
+    try {
+      alertRules = yaml.load(currentRulesContent) || { groups: [] };
+    } catch (parseError) {
+      console.warn('[Prometheus Alert] YAML 파싱 실패, 새 파일 생성:', parseError.message);
+      alertRules = { groups: [] };
+    }
+
+    // 3. 기존 그룹 찾기 또는 생성
+    let group = alertRules.groups.find(g => g.name === `${serviceName}-autoscale`);
+    if (!group) {
+      group = {
+        name: `${serviceName}-autoscale`,
+        interval: '15s',
+        rules: []
+      };
+      alertRules.groups.push(group);
+    }
+
+    // 4. 기존 스케일인 Alert Rule 제거 (같은 이름이 있으면)
+    group.rules = group.rules.filter(rule => rule.alert !== `${serviceName}_LowResourceUsage`);
+
+    // 5. 새 스케일인 Alert Rule 생성
+    // CPU 사용률: 각 instance별로 계산하고, 그 중 최소값이 임계값 이하이고
+    // Memory 사용률: 각 instance별로 계산하고, 그 중 최소값이 임계값 이하일 때 Alert 발생
+    // - 모든 서버가 CPU와 Memory 모두 낮아야 스케일인
+    // - min() 함수 사용 (모든 서버가 낮아야 함)
+    // - AND 조건 사용 (CPU와 Memory 모두 낮아야 함)
+    const alertRule = {
+      alert: `${serviceName}_LowResourceUsage`,
+      expr: `(
+        min(100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle",job="${prometheusJobName}"}[5m])) * 100)) < ${scaleInCpuThreshold}
+        AND
+        min((1 - (avg by (instance) (node_memory_MemAvailable_bytes{job="${prometheusJobName}"}) / avg by (instance) (node_memory_MemTotal_bytes{job="${prometheusJobName}"}))) * 100) < ${scaleInMemoryThreshold}
+      )`,
+      for: `${scaleInDuration}m`,
+      labels: {
+        severity: 'info',
+        service: serviceName,
+        autoscaleConfigId: configId,
+        scaleAction: 'scale-in', // 스케일인 액션 표시
+        instance: 'all' // min() 집계를 사용하므로 모든 instance를 의미
+      },
+      annotations: {
+        summary: `${serviceName} 리소스 사용률이 낮습니다`,
+        description: `모든 서버의 CPU와 Memory 사용률이 임계값(${scaleInCpuThreshold}% CPU, ${scaleInMemoryThreshold}% Memory) 이하여서 ${scaleInDuration}분 이상 지속되었습니다. 자동 스케일인이 필요합니다.`,
+        instances: `{{ \$labels.job }}/{{ \$labels.instance }}` // 모든 instance 정보 포함
+      }
+    };
+
+    group.rules.push(alertRule);
+
+    // 6. YAML로 변환
+    const newRulesYaml = yaml.dump(alertRules, {
+      lineWidth: -1,
+      noRefs: true
+    });
+
+    // 7. 설정 파일 백업
+    const backupCommand = `${sshCommand} "sudo cp ${ALERT_RULES_PATH} ${ALERT_RULES_PATH}.backup.$(date +%Y%m%d_%H%M%S)"`;
+    await execPromise(backupCommand).catch(() => {});
+
+    // 8. 새 설정 파일 작성
+    const tempFile = `/tmp/alert_rules_${Date.now()}.yml`;
+    await fs.writeFile(tempFile, newRulesYaml);
+
+    // 9. 원격 서버로 파일 복사
+    const scpCommand = `scp -i "${PLG_STACK_SSH_KEY}" -o StrictHostKeyChecking=no ${tempFile} ${PLG_STACK_USER}@${PLG_STACK_SERVER}:/tmp/alert_rules_new.yml`;
+    await execPromise(scpCommand);
+
+    // 10. 원격 서버에서 파일 이동
+    const moveCommand = `${sshCommand} "sudo mv /tmp/alert_rules_new.yml ${ALERT_RULES_PATH}"`;
+    await execPromise(moveCommand);
+
+    // 11. 임시 파일 삭제
+    await fs.unlink(tempFile).catch(() => {});
+
+    // 12. Prometheus 컨테이너 재시작
+    const restartCommand = `${sshCommand} "sudo docker restart prometheus"`;
+    await execPromise(restartCommand);
+
+    return {
+      success: true,
+      alertRule: alertRule,
+      message: '스케일인 Alert Rule이 생성되었습니다.'
+    };
+  } catch (error) {
+    console.error(`[Prometheus Alert] 스케일인 Alert Rule 생성 실패:`, error);
+    throw new Error(`스케일인 Alert Rule 생성 실패: ${error.message}`);
+  }
+}
+
+/**
+ * Alert Rule 생성 (스케일아웃 + 스케일인)
+ * @param {object} config - 오토스케일링 설정
+ * @returns {Promise<object>} 생성 결과
+ */
+async function createAlertRule(config) {
+  try {
+    // 스케일아웃 Alert Rule 생성
+    const scaleOutResult = await createScaleOutAlertRule(config);
+    
+    // 스케일인 Alert Rule 생성
+    const scaleInResult = await createScaleInAlertRule(config);
+    
+    return {
+      success: true,
+      scaleOut: scaleOutResult,
+      scaleIn: scaleInResult,
+      message: '스케일아웃 및 스케일인 Alert Rule이 생성되었습니다.'
     };
   } catch (error) {
     console.error(`[Prometheus Alert] Alert Rule 생성 실패:`, error);
-    throw new Error(`Alert Rule 생성 실패: ${error.message}`);
+    throw error;
   }
 }
 
