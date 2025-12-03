@@ -323,13 +323,29 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
               <ul style={{ margin: '8px 0', paddingLeft: '20px', color: '#495057' }}>
                 <li style={{ marginBottom: '6px' }}>
                   <strong>CPU 사용률:</strong> {targetCount > 1 
-                    ? `${targetCount}개 서버 중 <span style="color: #dc3545; font-weight: 600;">한 대라도</span> CPU 사용률이 <strong>${formData.monitoring.cpuThreshold}%</strong>를 초과하면`
-                    : `CPU 사용률이 <strong>${formData.monitoring.cpuThreshold}%</strong>를 초과하면`}
+                    ? (
+                      <>
+                        {targetCount}개 서버 중 <span style={{ color: '#dc3545', fontWeight: 600 }}>한 대라도</span> CPU 사용률이 <strong>{formData.monitoring.cpuThreshold}%</strong>를 초과하면
+                      </>
+                    )
+                    : (
+                      <>
+                        CPU 사용률이 <strong>{formData.monitoring.cpuThreshold}%</strong>를 초과하면
+                      </>
+                    )}
                 </li>
                 <li style={{ marginBottom: '6px' }}>
                   <strong>Memory 사용률:</strong> {targetCount > 1 
-                    ? `${targetCount}개 서버 중 <span style="color: #dc3545; font-weight: 600;">한 대라도</span> Memory 사용률이 <strong>${formData.monitoring.memoryThreshold}%</strong>를 초과하면`
-                    : `Memory 사용률이 <strong>${formData.monitoring.memoryThreshold}%</strong>를 초과하면`}
+                    ? (
+                      <>
+                        {targetCount}개 서버 중 <span style={{ color: '#dc3545', fontWeight: 600 }}>한 대라도</span> Memory 사용률이 <strong>{formData.monitoring.memoryThreshold}%</strong>를 초과하면
+                      </>
+                    )
+                    : (
+                      <>
+                        Memory 사용률이 <strong>{formData.monitoring.memoryThreshold}%</strong>를 초과하면
+                      </>
+                    )}
                 </li>
                 <li style={{ marginBottom: '6px' }}>
                   <strong>지속 시간:</strong> 위 조건이 <strong>{formData.monitoring.duration}분</strong> 이상 지속되면
@@ -345,8 +361,14 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
                 fontSize: '12px'
               }}>
                 <strong>💡 참고:</strong> {targetCount > 1 
-                  ? `여러 서버가 등록된 경우, <strong>모든 서버의 평균값이 아닌</strong> 각 서버별로 계산하여 <strong>가장 높은 값(최대값)</strong>이 임계치를 넘으면 스케일아웃이 발생합니다. 즉, 한 대라도 임계치를 넘으면 스케일아웃됩니다.`
-                  : `단일 서버의 CPU 또는 Memory 사용률이 임계치를 넘으면 스케일아웃이 발생합니다.`}
+                  ? (
+                    <>
+                      여러 서버가 등록된 경우, <strong>모든 서버의 평균값이 아닌</strong> 각 서버별로 계산하여 <strong>가장 높은 값(최대값)</strong>이 임계치를 넘으면 스케일아웃이 발생합니다. 즉, 한 대라도 임계치를 넘으면 스케일아웃됩니다.
+                    </>
+                  )
+                  : (
+                    <>단일 서버의 CPU 또는 Memory 사용률이 임계치를 넘으면 스케일아웃이 발생합니다.</>
+                  )}
               </div>
             </div>
           );
