@@ -470,16 +470,16 @@ scrape_configs:
         labels:
           job: auth
           log_type: authentication
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/auth.log
       - targets:
           - localhost
         labels:
           job: secure
           log_type: authentication
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/secure
 
   - job_name: system
@@ -489,16 +489,16 @@ scrape_configs:
         labels:
           job: syslog
           log_type: system
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/syslog
       - targets:
           - localhost
         labels:
           job: messages
           log_type: system
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/messages
 
   - job_name: login_history
@@ -508,8 +508,8 @@ scrape_configs:
         labels:
           job: login_history
           log_type: access
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/login_history.log
 
   - job_name: cron
@@ -519,8 +519,8 @@ scrape_configs:
         labels:
           job: cron
           log_type: scheduled_task
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/cron
 
   - job_name: web_server
@@ -530,48 +530,48 @@ scrape_configs:
         labels:
           job: apache_access
           log_type: web_access
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/httpd/access_log
       - targets:
           - localhost
         labels:
           job: apache_error
           log_type: web_error
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/httpd/error_log
       - targets:
           - localhost
         labels:
           job: apache2_access
           log_type: web_access
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/apache2/access.log
       - targets:
           - localhost
         labels:
           job: apache2_error
           log_type: web_error
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/apache2/error.log
       - targets:
           - localhost
         labels:
           job: nginx_access
           log_type: web_access
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/nginx/access.log
       - targets:
           - localhost
         labels:
           job: nginx_error
           log_type: web_error
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/nginx/error.log
 
   - job_name: shell_history
@@ -581,24 +581,24 @@ scrape_configs:
         labels:
           job: bash_history
           log_type: command_history
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /home/*/.bash_history
       - targets:
           - localhost
         labels:
           job: root_history
           log_type: command_history
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /root/.bash_history
       - targets:
           - localhost
         labels:
           job: zsh_history
           log_type: command_history
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /home/*/.zsh_history
 
   - job_name: system_logs
@@ -608,69 +608,69 @@ scrape_configs:
         labels:
           job: kern
           log_type: kernel
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/kern.log
       - targets:
           - localhost
         labels:
           job: daemon
           log_type: daemon
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/daemon.log
       - targets:
           - localhost
         labels:
           job: mail
           log_type: mail
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/mail.log
       - targets:
           - localhost
         labels:
           job: user
           log_type: user
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/user.log
       - targets:
           - localhost
         labels:
           job: dpkg
           log_type: package
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/dpkg.log
       - targets:
           - localhost
         labels:
           job: apt
           log_type: package
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/apt/*.log
       - targets:
           - localhost
         labels:
           job: journal
           log_type: systemd
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/journal/**/*.log
       - targets:
           - localhost
         labels:
           job: varlogs
           log_type: general
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/*.log`;
 
   // 설정 파일을 base64로 인코딩 (HOSTNAME은 스크립트에서 치환)
-  // HOSTNAME 플레이스홀더를 __HOSTNAME__으로 변경 (스크립트에서 실제 호스트명으로 치환)
-  const configBase64 = Buffer.from(promtailConfig.replace(/\\\${HOSTNAME}/g, '__HOSTNAME__')).toString('base64');
+  // promtailConfig에 이미 __HOSTNAME__이 사용되므로 그대로 인코딩
+  const configBase64 = Buffer.from(promtailConfig).toString('base64');
 
   // export-login-history.sh script content
   const exportScriptContent = `#!/bin/bash
@@ -965,78 +965,78 @@ scrape_configs:
           - localhost
         labels:
           job: varlogs
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/*log
       - targets:
           - localhost
         labels:
           job: syslog
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/syslog
       - targets:
           - localhost
         labels:
           job: auth
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/auth.log
       - targets:
           - localhost
         labels:
           job: messages
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/messages
       - targets:
           - localhost
         labels:
           job: kern
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/kern.log
       - targets:
           - localhost
         labels:
           job: daemon
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/daemon.log
       - targets:
           - localhost
         labels:
           job: mail
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/mail.log
       - targets:
           - localhost
         labels:
           job: user
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/user.log
       - targets:
           - localhost
         labels:
           job: dpkg
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/dpkg.log
       - targets:
           - localhost
         labels:
           job: apt
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/apt/*.log
       - targets:
           - localhost
         labels:
           job: journal
-          hostname: \${HOSTNAME}
-          instance: \${HOSTNAME}
+          hostname: __HOSTNAME__
+          instance: __HOSTNAME__
           __path__: /var/log/journal/**/*.log
 CONFIGEOF
 
