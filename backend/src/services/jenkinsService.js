@@ -48,8 +48,8 @@ async function generateJobXml(config) {
     }
   }
 
-  const jobName = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}`;
-  const webhookToken = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-token`;
+  const jobName = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-out`;
+  const webhookToken = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-out-token`;
 
   // Jenkinsfile 경로 (Git 저장소 내)
   const jenkinsfilePath = 'jenkins/Jenkinsfile.autoscale';
