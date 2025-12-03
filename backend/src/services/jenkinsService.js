@@ -136,6 +136,11 @@ async function generateJobXml(config) {
                   <value>$.config.f5.healthCheckPath</value>
                   <regexpFilter></regexpFilter>
                 </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                  <key>SSH_KEY_PATH</key>
+                  <value>$.config.sshKeyPath</value>
+                  <regexpFilter></regexpFilter>
+                </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
               </values>
             </org.jenkinsci.plugins.gwt.GenericTriggerVariables>
           </variables>

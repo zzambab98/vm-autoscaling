@@ -728,6 +728,50 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // SSH 키 목록 조회 API
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/ssh-keys') {
+    (async () => {
+      try {
+        const fs = require('fs').promises;
+        const path = require('path');
+        const sshKeyDir = '/home/ubuntu/workspace/vm-autoscaling/pemkey';
+
+        try {
+          const files = await fs.readdir(sshKeyDir);
+          const sshKeys = [];
+
+          for (const file of files) {
+            const filePath = path.join(sshKeyDir, file);
+            const stats = await fs.stat(filePath);
+
+            // 일반 파일만 (디렉토리 제외)
+            if (stats.isFile()) {
+              sshKeys.push({
+                name: file,
+                path: filePath
+              });
+            }
+          }
+
+          sendJSONResponse(res, 200, {
+            success: true,
+            keys: sshKeys
+          });
+        } catch (error) {
+          console.error('[API] SSH 키 디렉토리 읽기 실패:', error.message);
+          sendJSONResponse(res, 200, {
+            success: true,
+            keys: []
+          });
+        }
+      } catch (error) {
+        console.error('[API] SSH 키 목록 조회 실패:', error.message);
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
 
 
   // Webhook 엔드포인트: Alertmanager에서 받은 webhook을 설정 정보와 함께 Jenkins에 전달

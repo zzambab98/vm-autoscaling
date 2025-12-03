@@ -3,6 +3,7 @@ import { autoscalingApi } from '../services/autoscalingApi';
 import { templateApi } from '../services/templateApi';
 import f5Api from '../services/f5Api';
 import { prometheusApi } from '../services/api';
+import { getSshKeys } from '../services/sshKeyApi';
 
 function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
   const [templates, setTemplates] = useState([]);
@@ -10,6 +11,7 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
   const [f5Vips, setF5Vips] = useState([]);
   const [f5Error, setF5Error] = useState(null);
   const [prometheusJobs, setPrometheusJobs] = useState([]);
+  const [sshKeys, setSshKeys] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [formData, setFormData] = useState({
@@ -48,13 +50,15 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
     vcenter: {
       resourcePool: '/Datacenter/host/Cluster-01/Resources',
       datastore: 'OS-Datastore-Power-Store'
-    }
+    },
+    sshKeyPath: ''
   });
 
   useEffect(() => {
     loadTemplates();
     loadF5Data();
     loadPrometheusJobs();
+    loadSshKeys();
     // configId가 있고 'new'가 아닐 때만 설정 조회
     if (configId && configId !== 'new') {
       loadConfig();
@@ -84,6 +88,18 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
     } catch (error) {
       console.error('Prometheus Job 목록 조회 실패:', error);
       setPrometheusJobs([]);
+    }
+  };
+
+  const loadSshKeys = async () => {
+    try {
+      const result = await getSshKeys();
+      if (result.success) {
+        setSshKeys(result.keys || []);
+      }
+    } catch (error) {
+      console.error('SSH 키 목록 조회 실패:', error);
+      setSshKeys([]);
     }
   };
 
@@ -681,6 +697,37 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
         />
         <div style={{ fontSize: '12px', color: '#666', marginTop: '4px', marginBottom: '12px' }}>
           vCenter 데이터스토어 이름을 입력하세요.
+        </div>
+
+        {/* SSH 키 설정 */}
+        <h3 style={{ marginTop: '30px', marginBottom: '12px', color: '#2c3e50' }}>SSH 키 설정</h3>
+        <label className="label">SSH Private Key *</label>
+        {sshKeys.length > 0 ? (
+          <select
+            className="input"
+            value={formData.sshKeyPath}
+            onChange={(e) => setFormData({ ...formData, sshKeyPath: e.target.value })}
+            required
+          >
+            <option value="">SSH 키 선택</option>
+            {sshKeys.map(key => (
+              <option key={key.path} value={key.path}>
+                {key.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="text"
+            className="input"
+            value={formData.sshKeyPath}
+            onChange={(e) => setFormData({ ...formData, sshKeyPath: e.target.value })}
+            placeholder="SSH 키 경로를 입력하세요 (예: /home/ubuntu/workspace/vm-autoscaling/pemkey/danainfra)"
+            required
+          />
+        )}
+        <div style={{ fontSize: '12px', color: '#666', marginTop: '4px', marginBottom: '12px' }}>
+          새로 생성된 VM에 SSH 접속 시 사용할 Private Key를 선택하세요. IP 설정 및 초기 구성에 사용됩니다.
         </div>
 
         {/* 네트워크 설정 */}

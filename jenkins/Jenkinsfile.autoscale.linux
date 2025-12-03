@@ -589,26 +589,44 @@ pipeline {
                             if (currentVMIP != vmIP) {
                                 echo "⚠️ VM IP가 할당된 IP와 다릅니다. 현재: ${currentVMIP}, 할당: ${vmIP}"
                                 echo "🔧 SSH를 통해 IP 설정 시도 중..."
-                                
-                                // SSH 키 경로 확인 (여러 키 시도)
-                                def sshKeys = [
-                                    "/home/ubuntu/workspace/vm-autoscaling/pemkey/danainfra",
-                                    "/home/ubuntu/workspace/vm-autoscaling/pemkey/dana-cocktail",
-                                    "/home/ubuntu/workspace/vm-autoscaling/pemkey/jenkins"
-                                ]
 
-                                echo "🔑 SSH 키 검색 시작..."
+                                // SSH 키 경로 확인 (설정에서 지정한 키 사용)
                                 def sshKey = null
-                                for (def key in sshKeys) {
+
+                                // 1순위: 환경 변수로 전달된 SSH 키 경로 (Webhook에서 설정)
+                                if (env.SSH_KEY_PATH) {
+                                    echo "🔑 설정에서 지정한 SSH 키 사용: ${env.SSH_KEY_PATH}"
                                     def keyExists = sh(
-                                        script: "test -f ${key} && echo 'exists' || echo 'not found'",
+                                        script: "test -f ${env.SSH_KEY_PATH} && echo 'exists' || echo 'not found'",
                                         returnStdout: true
                                     ).trim()
-                                    echo "  - ${key}: ${keyExists}"
                                     if (keyExists == 'exists') {
-                                        sshKey = key
+                                        sshKey = env.SSH_KEY_PATH
                                         echo "✅ SSH 키 발견: ${sshKey}"
-                                        break
+                                    } else {
+                                        echo "⚠️ 설정에서 지정한 SSH 키를 찾을 수 없습니다: ${env.SSH_KEY_PATH}"
+                                    }
+                                }
+
+                                // 2순위: 기본 키 목록에서 자동 검색 (Fallback)
+                                if (!sshKey) {
+                                    echo "🔑 기본 SSH 키 자동 검색 시작..."
+                                    def sshKeys = [
+                                        "/home/ubuntu/workspace/vm-autoscaling/pemkey/danainfra",
+                                        "/home/ubuntu/workspace/vm-autoscaling/pemkey/dana-cocktail",
+                                        "/home/ubuntu/workspace/vm-autoscaling/pemkey/jenkins"
+                                    ]
+                                    for (def key in sshKeys) {
+                                        def keyExists = sh(
+                                            script: "test -f ${key} && echo 'exists' || echo 'not found'",
+                                            returnStdout: true
+                                        ).trim()
+                                        echo "  - ${key}: ${keyExists}"
+                                        if (keyExists == 'exists') {
+                                            sshKey = key
+                                            echo "✅ SSH 키 발견: ${sshKey}"
+                                            break
+                                        }
                                     }
                                 }
 
