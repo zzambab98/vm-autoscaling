@@ -640,13 +640,25 @@ print(cidr)
                                                 ssh -i ${sshKey} \\
                                                     -o StrictHostKeyChecking=no \\
                                                     -o ConnectTimeout=10 \\
-                                                    ubuntu@${currentVMIP} << 'SSH_EOF'
-sudo tee /etc/netplan/01-netcfg.yaml > /dev/null << 'NETPLAN_EOF'
+                                                    ubuntu@${currentVMIP} << SSH_EOF
+# 네트워크 인터페이스 이름 확인 (ens33, ens192, ens160, eth0 등)
+# 우선순위: ens33 > ens192 > ens160 > eth0 > 기타
+INTERFACE=\$(ip -o link show | grep -v lo | awk -F': ' '{print \\\$2}' | grep -E '^(ens33|ens192|ens160|eth0)' | head -1)
+if [ -z "\\\${INTERFACE}" ]; then
+    # 우선순위 인터페이스가 없으면 첫 번째 인터페이스 사용
+    INTERFACE=\$(ip -o link show | grep -v lo | awk -F': ' '{print \\\$2}' | head -1)
+fi
+echo "네트워크 인터페이스: \\\${INTERFACE}"
+
+# Netplan 설정 (고정 IP, DHCP 비활성화)
+sudo tee /etc/netplan/01-netcfg.yaml > /dev/null << NETPLAN_EOF
 network:
   version: 2
   renderer: networkd
   ethernets:
-    eth0:
+    \\\${INTERFACE}:
+      dhcp4: no
+      dhcp6: no
       addresses:
         - ${vmIP}/${cidr}
       gateway4: ${gateway}
@@ -654,8 +666,11 @@ network:
         addresses:
           - 10.255.0.10
 NETPLAN_EOF
+
 sudo netplan apply
+sleep 2
 hostnamectl set-hostname ${vmName}
+echo "고정 IP 설정 완료: ${vmIP}/${cidr}"
 SSH_EOF
                                             """
                                             ipConfigured = true
