@@ -80,7 +80,7 @@ async function createScaleOutAlertRule(config) {
         instance: 'all' // max() 집계를 사용하므로 모든 instance를 의미
       },
       annotations: {
-        summary: `${serviceName} 리소스 사용률이 높습니다`,
+        summary: `${serviceName} 자동 스케일아웃 필요 (리소스 사용률 높음)`,
         description: `CPU 또는 Memory 사용률이 임계값(${cpuThreshold}% CPU, ${memoryThreshold}% Memory)을 초과하여 ${duration}분 이상 지속되었습니다. 자동 스케일아웃이 필요합니다.`,
         instances: `{{ \$labels.job }}/{{ \$labels.instance }}` // 모든 instance 정보 포함
       }
@@ -197,7 +197,7 @@ async function createScaleInAlertRule(config) {
         instance: 'all' // min() 집계를 사용하므로 모든 instance를 의미
       },
       annotations: {
-        summary: `${serviceName} 리소스 사용률이 낮습니다`,
+        summary: `${serviceName} 자동 스케일인 필요 (리소스 사용률 낮음)`,
         description: `모든 서버의 CPU와 Memory 사용률이 임계값(${scaleInCpuThreshold}% CPU, ${scaleInMemoryThreshold}% Memory) 이하여서 ${scaleInDuration}분 이상 지속되었습니다. 자동 스케일인이 필요합니다.`,
         instances: `{{ \$labels.job }}/{{ \$labels.instance }}` // 모든 instance 정보 포함
       }
