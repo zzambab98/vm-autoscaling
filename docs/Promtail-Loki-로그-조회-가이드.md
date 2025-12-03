@@ -56,7 +56,9 @@ Promtail이 Loki에 전송하는 로그는 다음과 같은 라벨 구조를 가
 
 ## Grafana에서 호스트별 로그 조회 방법
 
-### 방법 1: Label Browser 사용 (추천)
+### 방법 1: Label Browser 사용 - 의존성 필터링 (가장 추천)
+
+Grafana의 Label Browser를 사용하면 **호스트명을 먼저 선택하면 해당 호스트의 로그 종류(job)만 자동으로 필터링**되어 표시됩니다.
 
 1. **Grafana 접속**
    - URL: `http://10.255.1.254:3000`
@@ -67,35 +69,56 @@ Promtail이 Loki에 전송하는 로그는 다음과 같은 라벨 구조를 가
 
 3. **Label Browser 열기**
    - "Label browser" 버튼 클릭
-   - `hostname` 라벨을 선택하면 등록된 모든 호스트 목록이 표시됨
 
-4. **호스트 선택**
-   - 원하는 호스트명을 클릭하면 자동으로 필터가 적용됨
-   - 예: `hostname="auto-vm-test-01"`
+4. **호스트명 선택 (첫 번째 필터)**
+   - `hostname` 라벨을 클릭
+   - 등록된 모든 호스트 목록이 표시됨
+   - 원하는 호스트명을 클릭 (예: `auto-vm-test-01`)
+   - 자동으로 `hostname="auto-vm-test-01"` 필터가 적용됨
 
-5. **로그 조회**
-   - "Run query" 버튼을 클릭하거나 쿼리를 실행하면 해당 호스트의 로그가 표시됨
+5. **로그 종류(job) 선택 (두 번째 필터)**
+   - `job` 라벨을 클릭
+   - **선택한 호스트명에 해당하는 job만 자동으로 필터링되어 표시됨**
+   - 예: `auto-vm-test-01`을 선택하면 해당 호스트의 `auth`, `syslog`, `login_history` 등만 표시
+   - 원하는 job을 선택 (예: `auth`)
 
-### 방법 2: 수동으로 쿼리 입력
+6. **로그 조회**
+   - "Run query" 버튼을 클릭하면 선택한 호스트의 선택한 로그 종류만 표시됨
+   - 예: `{hostname="auto-vm-test-01", job="auth"}`
+
+**장점:**
+- 호스트명을 먼저 선택하면 해당 호스트에 실제로 존재하는 로그 종류만 표시됨
+- 불필요한 옵션을 선택할 수 없어 사용자 실수 방지
+- 직관적이고 사용하기 쉬움
+
+### 방법 2: Label Filters 사용 (수동 입력)
+
+Label Browser 대신 Label Filters를 직접 사용할 수도 있습니다:
 
 1. **Grafana Explore 접속**
    - URL: `http://10.255.1.254:3000/explore`
 
-2. **Label filters 추가**
+2. **첫 번째 필터: 호스트명**
    - "Label filters" 섹션에서:
      - Label: `hostname` 선택
      - Operator: `=` 선택
-     - Value: 호스트명 입력 (예: `auto-vm-test-01`)
+     - Value: 호스트명 입력 또는 드롭다운에서 선택 (예: `auto-vm-test-01`)
 
-3. **추가 필터 (선택사항)**
-   - 특정 로그 유형만 보려면:
-     - Label: `job` 선택
-     - Value: `auth`, `syslog`, `login_history` 등 선택
+3. **두 번째 필터: 로그 종류(job)**
+   - "+" 버튼을 클릭하여 필터 추가
+   - Label: `job` 선택
+   - Operator: `=` 선택
+   - Value: 드롭다운에서 선택하면 **선택한 hostname에 해당하는 job만 표시됨**
+   - 예: `auth`, `syslog`, `login_history` 등
+
+4. **추가 필터 (선택사항)**
    - 특정 키워드 검색:
      - "Line contains" 섹션에 검색어 입력 (예: `jenkins`, `error`)
 
-4. **쿼리 실행**
+5. **쿼리 실행**
    - "Run query" 버튼 클릭
+
+**참고:** Label Filters에서도 Value 드롭다운을 사용하면 의존성 필터링이 자동으로 적용됩니다.
 
 ### 방법 3: LogQL 쿼리 직접 입력
 
@@ -228,9 +251,45 @@ cat /etc/promtail/config.yml | grep hostname
    docker logs loki
    ```
 
+## Grafana 대시보드에서 변수 사용하기 (고급)
+
+더 나은 사용자 경험을 위해 Grafana 대시보드를 만들어 변수를 사용할 수 있습니다:
+
+### 대시보드 변수 설정
+
+1. **새 대시보드 생성**
+   - Grafana → Dashboards → New Dashboard
+
+2. **호스트명 변수 생성**
+   - Dashboard settings (톱니바퀴 아이콘) → Variables → Add variable
+   - Name: `hostname`
+   - Type: `Query`
+   - Data source: `Loki`
+   - Query: `label_values(hostname)`
+   - 이렇게 하면 모든 호스트명이 드롭다운으로 표시됨
+
+3. **로그 종류(job) 변수 생성 (의존성 필터링)**
+   - Add variable
+   - Name: `job`
+   - Type: `Query`
+   - Data source: `Loki`
+   - Query: `label_values(job, hostname="$hostname")`
+   - **중요:** `hostname="$hostname"`을 사용하면 선택한 호스트명에 해당하는 job만 표시됨
+
+4. **패널에서 변수 사용**
+   - 새 패널 생성 → Data source: `Loki`
+   - Query: `{hostname="$hostname", job="$job"}`
+   - 이제 대시보드 상단에서 호스트명과 로그 종류를 선택할 수 있음
+
+**장점:**
+- 대시보드를 저장하여 재사용 가능
+- 여러 패널에서 동일한 변수 사용 가능
+- 더 나은 사용자 경험 제공
+
 ## 참고사항
 
 - **로그 보존 기간**: Loki의 설정에 따라 오래된 로그는 자동으로 삭제될 수 있습니다
 - **로그 수집 지연**: Promtail이 로그를 수집하고 Loki로 전송하는 데 몇 초의 지연이 있을 수 있습니다
 - **대용량 로그**: 많은 양의 로그를 조회할 때는 시간 범위를 좁히거나 필터를 추가하여 성능을 개선할 수 있습니다
+- **의존성 필터링**: Grafana는 자동으로 라벨 간 의존성을 인식하여, 호스트명을 선택하면 해당 호스트의 로그 종류만 표시합니다
 
