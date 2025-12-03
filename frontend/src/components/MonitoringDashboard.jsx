@@ -104,10 +104,26 @@ function MonitoringDashboard() {
   const loadAlerts = async () => {
     try {
       const alertsData = await getPrometheusAlerts();
+      console.log('[MonitoringDashboard] 전체 Alert 데이터:', alertsData);
+      
       // 오토스케일링 관련 Alert만 필터링
-      const autoscaleAlerts = alertsData.filter(alert => 
-        alert.labels?.autoscaleConfigId || alert.labels?.service
-      );
+      const autoscaleAlerts = alertsData.filter(alert => {
+        const hasConfigId = alert.labels?.autoscaleConfigId;
+        const hasService = alert.labels?.service;
+        const isActive = alert.status?.state === 'active' || alert.state === 'firing';
+        
+        console.log('[MonitoringDashboard] Alert 필터링:', {
+          hasConfigId,
+          hasService,
+          isActive,
+          labels: alert.labels,
+          status: alert.status
+        });
+        
+        return (hasConfigId || hasService) && isActive;
+      });
+      
+      console.log('[MonitoringDashboard] 필터링된 Alert:', autoscaleAlerts);
       setAlerts(autoscaleAlerts);
     } catch (error) {
       console.error('Alert 로드 실패:', error);
@@ -119,9 +135,14 @@ function MonitoringDashboard() {
   };
 
   const getAlertStatus = (alert) => {
-    // Alertmanager API: alert.status.state
-    // Prometheus API: alert.state
-    return alert.status?.state || alert.state || 'unknown';
+    // Alertmanager API: alert.status.state (active, suppressed, unprocessed)
+    // Prometheus API: alert.state (firing, pending, inactive)
+    const state = alert.status?.state || alert.state || 'unknown';
+    // Alertmanager의 'active' 상태를 'firing'으로 표시
+    if (state === 'active') {
+      return 'firing';
+    }
+    return state;
   };
 
   return (
