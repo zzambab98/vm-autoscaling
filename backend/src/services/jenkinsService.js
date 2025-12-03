@@ -141,6 +141,11 @@ async function generateJobXml(config) {
                   <value>$.config.sshKeyPath</value>
                   <regexpFilter></regexpFilter>
                 </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                  <key>VM_PREFIX</key>
+                  <value>$.config.vmPrefix</value>
+                  <regexpFilter></regexpFilter>
+                </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
               </values>
             </org.jenkinsci.plugins.gwt.GenericTriggerVariables>
           </variables>
@@ -184,6 +189,7 @@ async function generateJobXml(config) {
 async function generateScaleInJobXml(config) {
   const {
     serviceName,
+    vmPrefix,
     id: configId,
     monitoring: { prometheusJobName },
     scaling: { minVms, scaleInStep },
@@ -256,6 +262,11 @@ async function generateScaleInJobXml(config) {
                 <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
                   <key>SCALE_IN_STEP</key>
                   <value>${scaleInStep || 1}</value>
+                  <regexpFilter></regexpFilter>
+                </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
+                  <key>VM_PREFIX</key>
+                  <value>${vmPrefix}</value>
                   <regexpFilter></regexpFilter>
                 </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
               </values>

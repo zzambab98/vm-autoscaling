@@ -16,6 +16,7 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
   const [message, setMessage] = useState(null);
   const [formData, setFormData] = useState({
     serviceName: '',
+    vmPrefix: '',
     templateId: '',
     enabled: false,
     monitoring: {
@@ -236,6 +237,19 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
           placeholder="예: auto-vm-test-service"
           required
         />
+
+        <label className="label">VM 이름 Prefix *</label>
+        <input
+          type="text"
+          className="input"
+          value={formData.vmPrefix}
+          onChange={(e) => setFormData({ ...formData, vmPrefix: e.target.value })}
+          placeholder="예: auto-vm-test (생성 시 auto-vm-test-202512031545 형식으로 생성됨)"
+          required
+        />
+        <div style={{ fontSize: '12px', color: '#666', marginTop: '4px', marginBottom: '12px' }}>
+          생성될 VM의 이름 앞부분을 입력하세요. 타임스탬프가 자동으로 추가됩니다. (형식: {formData.vmPrefix || 'prefix'}-YYYYMMDDHHmm)
+        </div>
 
         <label className="label">템플릿 선택 *</label>
         <select
