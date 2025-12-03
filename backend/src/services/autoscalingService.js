@@ -267,9 +267,8 @@ async function deleteConfig(configId) {
       // 라우팅 규칙 삭제
       await deleteRoutingRule(config.serviceName);
 
-      // Jenkins Job 삭제
-      const jobName = `autoscale-${config.serviceName.toLowerCase().replace(/\s+/g, '-')}`;
-      await deleteJenkinsJob(jobName);
+      // Jenkins Job 삭제 (스케일아웃 + 스케일인)
+      await deleteJenkinsJob(config.serviceName);
     } catch (error) {
       console.error(`[Autoscaling Service] 리소스 정리 실패:`, error);
       // 정리 실패해도 설정은 삭제됨
