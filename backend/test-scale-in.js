@@ -52,3 +52,4 @@ console.log('  - 최소 VM 수:', config.scaling.minVms);
   }
 })();
 
+

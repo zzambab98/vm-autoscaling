@@ -111,3 +111,4 @@ ssh -i /path/to/key ubuntu@<VM_IP> "sudo pkill stress-ng"
 - [ ] vCenter에서 VM 삭제 확인
 - [ ] 최소 VM 수(2) 보호 확인
 
+

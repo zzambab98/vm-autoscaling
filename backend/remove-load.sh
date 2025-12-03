@@ -22,3 +22,4 @@ done
 echo "=== 부하 제거 완료 ==="
 echo "메트릭 확인: ./check-current-vms.sh"
 
+

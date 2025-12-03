@@ -35,3 +35,4 @@ console.log('활성화 상태:', config.enabled);
   }
 })();
 
+

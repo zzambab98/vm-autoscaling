@@ -813,6 +813,8 @@ const server = http.createServer((req, res) => {
           alerts: alertmanagerPayload.alerts || [],
           config: {
             templateName: templateName,
+            vmPrefix: config.vmPrefix || '',
+            sshKeyPath: config.sshKeyPath || '',
             network: {
               ipPoolStart: config.network?.ipPoolStart || '',
               ipPoolEnd: config.network?.ipPoolEnd || '',
