@@ -40,6 +40,7 @@
   - 대시보드 관리
   - Prometheus 메트릭 시각화
   - Loki 로그 조회
+- **로그 조회 가이드**: [Promtail-Loki-로그-조회-가이드.md](./Promtail-Loki-로그-조회-가이드.md)
 
 ## Promtail 관리
 
