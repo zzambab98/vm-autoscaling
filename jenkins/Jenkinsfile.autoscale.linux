@@ -519,41 +519,85 @@ pipeline {
 
                                 // 디버깅: 환경 변수 확인
                                 echo "🐛 DEBUG: env.SSH_KEY_PATH = '${env.SSH_KEY_PATH}'"
+                                echo "🐛 DEBUG: WORKSPACE = '${env.WORKSPACE}'"
 
-                                // 1순위: 환경 변수로 전달된 SSH 키 경로 (Webhook에서 설정)
+                                // 1순위: 환경 변수로 전달된 SSH 키 경로 (백엔드 API에서 조회)
                                 if (env.SSH_KEY_PATH && env.SSH_KEY_PATH != 'null' && env.SSH_KEY_PATH.trim() != '') {
-                                    echo "🔑 설정에서 지정한 SSH 키 사용: ${env.SSH_KEY_PATH}"
-                                    def keyExists = sh(
-                                        script: "test -f ${env.SSH_KEY_PATH} && echo 'exists' || echo 'not found'",
-                                        returnStdout: true
-                                    ).trim()
-                                    if (keyExists == 'exists') {
-                                        sshKey = env.SSH_KEY_PATH
-                                        echo "✅ SSH 키 발견: ${sshKey}"
-                                    } else {
-                                        echo "⚠️ 설정에서 지정한 SSH 키를 찾을 수 없습니다: ${env.SSH_KEY_PATH}"
+                                    def sshKeyPath = env.SSH_KEY_PATH.trim()
+                                    echo "🔑 설정에서 지정한 SSH 키 경로: ${sshKeyPath}"
+                                    
+                                    // 여러 가능한 경로 시도
+                                    def possiblePaths = []
+                                    
+                                    // 절대 경로 그대로 시도
+                                    possiblePaths.add(sshKeyPath)
+                                    
+                                    // Jenkins 워크스페이스 기준 상대 경로 시도
+                                    if (env.WORKSPACE) {
+                                        // 경로에서 pemkey/ 이후 부분 추출
+                                        def keyName = sshKeyPath.split('pemkey/')[-1]
+                                        if (keyName) {
+                                            possiblePaths.add("${env.WORKSPACE}/pemkey/${keyName}")
+                                            possiblePaths.add("${env.WORKSPACE}/../pemkey/${keyName}")
+                                        }
+                                    }
+                                    
+                                    // 파일명만 추출하여 여러 위치에서 검색
+                                    def fileName = sshKeyPath.split('/')[-1]
+                                    if (fileName) {
+                                        possiblePaths.add("${env.WORKSPACE}/pemkey/${fileName}")
+                                        possiblePaths.add("${env.WORKSPACE}/../pemkey/${fileName}")
+                                        possiblePaths.add("/home/ubuntu/workspace/vm-autoscaling/pemkey/${fileName}")
+                                        possiblePaths.add("/var/lib/jenkins/workspace/vm-autoscaling/pemkey/${fileName}")
+                                    }
+                                    
+                                    // 각 경로 확인
+                                    for (def path in possiblePaths) {
+                                        def keyExists = sh(
+                                            script: "test -f '${path}' && echo 'exists' || echo 'not found'",
+                                            returnStdout: true
+                                        ).trim()
+                                        echo "  - ${path}: ${keyExists}"
+                                        if (keyExists == 'exists') {
+                                            sshKey = path
+                                            echo "✅ SSH 키 발견: ${sshKey}"
+                                            break
+                                        }
+                                    }
+                                    
+                                    if (!sshKey) {
+                                        echo "⚠️ 설정에서 지정한 SSH 키를 찾을 수 없습니다: ${sshKeyPath}"
                                     }
                                 }
 
                                 // 2순위: 기본 키 목록에서 자동 검색 (Fallback)
                                 if (!sshKey) {
                                     echo "🔑 기본 SSH 키 자동 검색 시작..."
-                                    def sshKeys = [
-                                        "/home/ubuntu/workspace/vm-autoscaling/pemkey/danainfra",
-                                        "/home/ubuntu/workspace/vm-autoscaling/pemkey/dana-cocktail",
-                                        "/home/ubuntu/workspace/vm-autoscaling/pemkey/jenkins"
-                                    ]
-                                    for (def key in sshKeys) {
-                                        def keyExists = sh(
-                                            script: "test -f ${key} && echo 'exists' || echo 'not found'",
-                                            returnStdout: true
-                                        ).trim()
-                                        echo "  - ${key}: ${keyExists}"
-                                        if (keyExists == 'exists') {
-                                            sshKey = key
-                                            echo "✅ SSH 키 발견: ${sshKey}"
-                                            break
+                                    def basePaths = []
+                                    if (env.WORKSPACE) {
+                                        basePaths.add("${env.WORKSPACE}/pemkey")
+                                        basePaths.add("${env.WORKSPACE}/../pemkey")
+                                    }
+                                    basePaths.add("/home/ubuntu/workspace/vm-autoscaling/pemkey")
+                                    basePaths.add("/var/lib/jenkins/workspace/vm-autoscaling/pemkey")
+                                    
+                                    def keyNames = ["danainfra", "dana-cocktail", "jenkins"]
+                                    
+                                    for (def basePath in basePaths) {
+                                        for (def keyName in keyNames) {
+                                            def keyPath = "${basePath}/${keyName}"
+                                            def keyExists = sh(
+                                                script: "test -f '${keyPath}' && echo 'exists' || echo 'not found'",
+                                                returnStdout: true
+                                            ).trim()
+                                            echo "  - ${keyPath}: ${keyExists}"
+                                            if (keyExists == 'exists') {
+                                                sshKey = keyPath
+                                                echo "✅ SSH 키 발견: ${sshKey}"
+                                                break
+                                            }
                                         }
+                                        if (sshKey) break
                                     }
                                 }
 
