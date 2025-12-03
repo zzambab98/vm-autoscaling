@@ -96,14 +96,12 @@ async function addRoutingRule(config) {
       )
     );
 
-    // Jenkins Webhook URL 생성
-    const jobNameOut = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-out`;
-    const jobNameIn = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-in`;
-    const webhookTokenOut = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-out-token`;
-    const webhookTokenIn = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-in-token`;
+    // Jenkins Webhook URL 생성 (공통 파이프라인 사용)
+    const JENKINS_DEFAULT_WEBHOOK_TOKEN_OUT = process.env.JENKINS_DEFAULT_WEBHOOK_TOKEN || 'plg-autoscale-token';
+    const JENKINS_DEFAULT_WEBHOOK_TOKEN_IN = 'plg-autoscale-in-token';
     
-    const webhookUrlOut = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookTokenOut}`;
-    const webhookUrlIn = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookTokenIn}`;
+    const webhookUrlOut = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${JENKINS_DEFAULT_WEBHOOK_TOKEN_OUT}`;
+    const webhookUrlIn = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${JENKINS_DEFAULT_WEBHOOK_TOKEN_IN}`;
 
     // 스케일아웃 수신자 추가
     const scaleOutReceiver = {
@@ -176,13 +174,13 @@ async function addRoutingRule(config) {
       serviceName: serviceName,
       scaleOut: {
         webhookUrl: webhookUrlOut,
-        webhookToken: webhookTokenOut,
-        jobName: jobNameOut
+        webhookToken: JENKINS_DEFAULT_WEBHOOK_TOKEN_OUT,
+        jobName: 'plg-autoscale-out'
       },
       scaleIn: {
         webhookUrl: webhookUrlIn,
-        webhookToken: webhookTokenIn,
-        jobName: jobNameIn
+        webhookToken: JENKINS_DEFAULT_WEBHOOK_TOKEN_IN,
+        jobName: 'plg-autoscale-in'
       },
       message: 'Alertmanager 라우팅 규칙이 추가되었습니다. (스케일아웃 + 스케일인)'
     };

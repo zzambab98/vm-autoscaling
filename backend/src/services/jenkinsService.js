@@ -341,8 +341,9 @@ async function createScaleOutJenkinsJob(config) {
  * @returns {Promise<object>} 생성 결과
  */
 async function createScaleInJenkinsJob(config) {
-  const jobName = `autoscale-${config.serviceName.toLowerCase().replace(/\s+/g, '-')}-in`;
-  const webhookToken = `autoscale-${config.serviceName.toLowerCase().replace(/\s+/g, '-')}-in-token`;
+  // 공통 파이프라인 사용
+  const jobName = 'plg-autoscale-in';
+  const webhookToken = 'plg-autoscale-in-token';
 
   try {
     // Job XML 생성
@@ -385,67 +386,28 @@ async function createScaleInJenkinsJob(config) {
 }
 
 /**
- * Jenkins Job 생성 (스케일아웃 + 스케일인)
+ * Jenkins Job 생성 (공통 파이프라인: plg-autoscale-in만 생성)
  * @param {object} config - 오토스케일링 설정
  * @returns {Promise<object>} 생성 결과
  */
 async function createJenkinsJob(config) {
   try {
-    // 스케일아웃 Job 생성
-    const scaleOutResult = await createScaleOutJenkinsJob(config);
-    
-    // 스케일인 Job 생성
+    // 스케일아웃은 기존 plg-autoscale-out 사용 (생성하지 않음)
+    // 스케일인만 plg-autoscale-in 생성
     const scaleInResult = await createScaleInJenkinsJob(config);
     
     return {
       success: true,
-      scaleOut: scaleOutResult,
+      scaleOut: {
+        jobName: 'plg-autoscale-out',
+        message: '기존 공통 파이프라인 사용'
+      },
       scaleIn: scaleInResult,
-      message: `Jenkins Job이 생성되었습니다. (스케일아웃: ${scaleOutResult.jobName}, 스케일인: ${scaleInResult.jobName})`
+      message: `Jenkins Job이 생성되었습니다. (스케일아웃: plg-autoscale-out 사용, 스케일인: ${scaleInResult.jobName})`
     };
   } catch (error) {
     console.error(`[Jenkins Service] Job 생성 실패:`, error);
     throw error;
-  }
-}
-
-  try {
-    // Job XML 생성
-    const jobXml = await generateJobXml(config);
-
-    // Jenkins API를 통해 Job 생성
-    const createJobUrl = `${JENKINS_URL}/createItem?name=${encodeURIComponent(jobName)}`;
-
-    const response = await axios.post(createJobUrl, jobXml, {
-      headers: {
-        'Content-Type': 'application/xml',
-        'Authorization': getAuthHeader()
-      },
-      validateStatus: (status) => status < 500 // 400번대는 에러로 처리
-    });
-
-    if (response.status === 200 || response.status === 201) {
-      return {
-        success: true,
-        jobName: jobName,
-        webhookToken: webhookToken,
-        webhookUrl: `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookToken}`,
-        message: `Jenkins Job '${jobName}'이 생성되었습니다.`
-      };
-    } else if (response.status === 400) {
-      // Job이 이미 존재할 수 있음
-      throw new Error(`Job '${jobName}'이 이미 존재하거나 생성에 실패했습니다.`);
-    } else {
-      throw new Error(`Jenkins Job 생성 실패: HTTP ${response.status}`);
-    }
-  } catch (error) {
-    if (error.response) {
-      console.error(`[Jenkins Service] Job 생성 실패 (${error.response.status}):`, error.response.data);
-      throw new Error(`Jenkins Job 생성 실패: ${error.response.status} - ${error.response.statusText}`);
-    } else {
-      console.error(`[Jenkins Service] Job 생성 실패:`, error.message);
-      throw new Error(`Jenkins Job 생성 실패: ${error.message}`);
-    }
   }
 }
 

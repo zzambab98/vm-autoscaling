@@ -7,7 +7,10 @@
       "cpuThreshold": 80,
       "memoryThreshold": 80,
       "duration": 1,
-      "prometheusJobName": "auto-vm-test-service-job"
+      "prometheusJobName": "auto-vm-test-service-job",
+      "scaleInCpuThreshold": 30,
+      "scaleInMemoryThreshold": 30,
+      "scaleInDuration": 10
     },
     "scaling": {
       "minVms": 2,
