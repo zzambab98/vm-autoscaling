@@ -111,9 +111,12 @@ async function getTemplates() {
         source: 'vcenter'
       };
     }
-    // 없으면 vCenter 정보만 사용
+    // 없으면 vCenter 정보만 사용 (ID는 이름 기반으로 일관되게 생성)
+    // 이름 기반 해시를 사용하여 ID 일관성 유지
+    const crypto = require('crypto');
+    const nameHash = crypto.createHash('md5').update(vcTemplate.name).digest('hex').substring(0, 8);
     return {
-      id: `vcenter-${Date.now()}-${vcTemplate.name}`,
+      id: `vcenter-${nameHash}-${vcTemplate.name}`,
       name: vcTemplate.name,
       originalVmName: vcTemplate.name,
       description: '',
@@ -717,7 +720,13 @@ async function saveTemplateMetadata(templateData) {
 async function deleteTemplate(templateId) {
   try {
     const templates = await getTemplates();
-    const template = templates.find(t => t.id === templateId);
+    // ID로 먼저 찾기
+    let template = templates.find(t => t.id === templateId);
+    
+    // ID로 찾지 못하면 이름으로 찾기 (vCenter 템플릿의 경우 ID가 동적으로 생성될 수 있음)
+    if (!template) {
+      template = templates.find(t => t.name === templateId);
+    }
     
     if (!template) {
       throw new Error(`템플릿 '${templateId}'을 찾을 수 없습니다.`);
@@ -741,8 +750,8 @@ async function deleteTemplate(templateId) {
       }
     }
 
-    // 메타데이터에서 삭제
-    const filtered = templates.filter(t => t.id !== templateId);
+    // 메타데이터에서 삭제 (ID 또는 이름으로 매칭)
+    const filtered = templates.filter(t => t.id !== templateId && t.name !== template.name);
     
     // 백업 생성
     const backupPath = `${TEMPLATES_DATA_PATH}.backup.${Date.now()}`;
