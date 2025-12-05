@@ -735,18 +735,23 @@ async function deleteTemplate(templateId) {
     // vCenter에서 템플릿 삭제
     if (VCENTER_URL && VCENTER_USERNAME && VCENTER_PASSWORD) {
       try {
+        console.log(`[Template Service] vCenter에서 템플릿 삭제 시작: ${template.name}`);
         const deleteCommand = `govc object.destroy "${template.name}"`;
         await execPromise(deleteCommand, {
           env: {
             ...process.env,
             GOVC_URL: VCENTER_URL,
             GOVC_USERNAME: VCENTER_USERNAME,
-            GOVC_PASSWORD: VCENTER_PASSWORD
-          }
+            GOVC_PASSWORD: VCENTER_PASSWORD,
+            GOVC_INSECURE: process.env.GOVC_INSECURE || '1'
+          },
+          timeout: 300000 // 5분 타임아웃 (템플릿 삭제는 시간이 걸릴 수 있음)
         });
         console.log(`[Template Service] vCenter에서 템플릿 삭제 완료: ${template.name}`);
       } catch (error) {
-        console.warn(`[Template Service] vCenter 템플릿 삭제 실패 (메타데이터는 삭제됨):`, error.message);
+        console.error(`[Template Service] vCenter 템플릿 삭제 실패:`, error.message);
+        // vCenter 삭제 실패해도 메타데이터는 삭제 (일관성 유지)
+        console.warn(`[Template Service] vCenter 템플릿 삭제 실패했지만 메타데이터는 삭제합니다.`);
       }
     }
 

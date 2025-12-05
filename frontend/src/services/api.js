@@ -7,7 +7,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json'
   },
-  timeout: 60000 // 60초 타임아웃 (VM 목록 조회 시 시간이 걸릴 수 있음)
+  timeout: 300000 // 5분 타임아웃 (템플릿 삭제 등 시간이 걸릴 수 있는 작업 대응)
 });
 
 // 요청 인터셉터
