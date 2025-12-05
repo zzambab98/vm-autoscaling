@@ -1,7 +1,8 @@
 const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsPromises = require('fs').promises;
 const path = require('path');
 
 const TEMPLATES_DATA_PATH = path.join(__dirname, '../../data/templates.json');
@@ -15,10 +16,10 @@ const DEFAULT_DATASTORE = process.env.GOVC_DATASTORE || process.env.VCENTER_DATA
  */
 async function ensureDataFile() {
   try {
-    await fs.access(TEMPLATES_DATA_PATH);
+    await fsPromises.access(TEMPLATES_DATA_PATH);
   } catch {
     // 파일이 없으면 생성
-    await fs.writeFile(TEMPLATES_DATA_PATH, JSON.stringify([], null, 2));
+    await fsPromises.writeFile(TEMPLATES_DATA_PATH, JSON.stringify([], null, 2));
   }
 }
 
@@ -30,12 +31,19 @@ async function getTemplatesFromVCenter() {
   try {
     if (!VCENTER_URL || !VCENTER_USERNAME || !VCENTER_PASSWORD) {
       console.warn('[Template Service] vCenter 연결 정보가 설정되지 않았습니다.');
+      console.warn(`  GOVC_URL: ${VCENTER_URL ? '설정됨' : '없음'}`);
+      console.warn(`  GOVC_USERNAME: ${VCENTER_USERNAME ? '설정됨' : '없음'}`);
+      console.warn(`  GOVC_PASSWORD: ${VCENTER_PASSWORD ? '설정됨' : '없음'}`);
       return [];
     }
 
+    console.log('[Template Service] vCenter 템플릿 목록 조회 시작...');
+    console.log(`  vCenter URL: ${VCENTER_URL}`);
+    console.log(`  vCenter User: ${VCENTER_USERNAME}`);
+
     // vCenter에서 템플릿 목록 조회 (이름에 "template"이 포함된 VM)
     const command = `govc find / -type m -name "*template*"`;
-    const { stdout } = await execPromise(command, {
+    const { stdout, stderr } = await execPromise(command, {
       env: {
         ...process.env,
         GOVC_URL: VCENTER_URL,
@@ -45,7 +53,12 @@ async function getTemplatesFromVCenter() {
       }
     });
 
+    if (stderr && stderr.trim()) {
+      console.warn('[Template Service] govc stderr:', stderr);
+    }
+
     const lines = stdout.trim().split('\n').filter(line => line.trim());
+    console.log(`[Template Service] vCenter 템플릿 ${lines.length}개 발견`);
     
     return lines.map(path => {
       const parts = path.split('/');
@@ -57,7 +70,13 @@ async function getTemplatesFromVCenter() {
       };
     });
   } catch (error) {
-    console.error('[Template Service] vCenter 템플릿 목록 조회 실패:', error);
+    console.error('[Template Service] vCenter 템플릿 목록 조회 실패:', error.message);
+    console.error('[Template Service] 에러 상세:', {
+      code: error.code,
+      signal: error.signal,
+      stdout: error.stdout,
+      stderr: error.stderr
+    });
     return [];
   }
 }
@@ -75,7 +94,7 @@ async function getTemplates() {
   // 로컬 저장소에서 템플릿 메타데이터 조회
   let localTemplates = [];
   try {
-    const data = await fs.readFile(TEMPLATES_DATA_PATH, 'utf8');
+    const data = await fsPromises.readFile(TEMPLATES_DATA_PATH, 'utf8');
     localTemplates = JSON.parse(data);
   } catch (error) {
     console.warn('[Template Service] 로컬 템플릿 목록 조회 실패:', error);
@@ -377,6 +396,209 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
       console.warn(`[Template Service] 전원 상태 확인/종료 실패 (계속 진행):`, error.message);
     }
 
+    // ==========================================
+    // 네트워크 초기화 스크립트 실행 (템플릿 준비)
+    // ==========================================
+    console.log(`[Template Service] 템플릿 네트워크 초기화 시작: ${cloneName}`);
+    
+    try {
+      // 1. VM 전원 켜기
+      console.log(`[Template Service] VM 전원 켜기: ${cloneName}`);
+      const powerOnCommand = `govc vm.power -on "${cloneName}"`;
+      await execPromise(powerOnCommand, {
+        env: {
+          ...process.env,
+          GOVC_URL: VCENTER_URL,
+          GOVC_USERNAME: VCENTER_USERNAME,
+          GOVC_PASSWORD: VCENTER_PASSWORD,
+          GOVC_INSECURE: process.env.GOVC_INSECURE || '1'
+        },
+        timeout: 60000
+      });
+      
+      // VM 부팅 대기 (최대 2분)
+      console.log(`[Template Service] VM 부팅 대기 중...`);
+      let vmIP = null;
+      let waitTime = 0;
+      const maxWait = 120; // 2분
+      
+      while (waitTime < maxWait && !vmIP) {
+        await new Promise(resolve => setTimeout(resolve, 10000)); // 10초 대기
+        waitTime += 10;
+        
+        try {
+          const ipCheckCommand = `govc vm.ip "${cloneName}" | head -1`;
+          const { stdout: ipOutput } = await execPromise(ipCheckCommand, {
+            env: {
+              ...process.env,
+              GOVC_URL: VCENTER_URL,
+              GOVC_USERNAME: VCENTER_USERNAME,
+              GOVC_PASSWORD: VCENTER_PASSWORD,
+              GOVC_INSECURE: process.env.GOVC_INSECURE || '1'
+            }
+          });
+          
+          const ip = ipOutput.trim();
+          if (ip && ip !== '') {
+            vmIP = ip;
+            console.log(`[Template Service] VM IP 확인: ${vmIP}`);
+            break;
+          }
+        } catch (error) {
+          // IP 확인 실패는 계속 재시도
+          console.log(`[Template Service] IP 확인 대기 중... (${waitTime}/${maxWait}초)`);
+        }
+      }
+      
+      if (!vmIP) {
+        throw new Error('VM IP를 확인하지 못했습니다. 네트워크 초기화를 건너뜁니다.');
+      }
+      
+      // 2. SSH 접속을 위한 SSH 키 찾기
+      const sshKeyPaths = [
+        process.env.SSH_KEY_PATH,
+        path.join(__dirname, '../../pemkey/danainfra'),
+        path.join(__dirname, '../../pemkey/dana-cocktail'),
+        path.join(__dirname, '../../pemkey/jenkins'),
+        '/home/ubuntu/workspace/vm-autoscaling/pemkey/danainfra',
+        '/home/ubuntu/workspace/vm-autoscaling/pemkey/dana-cocktail',
+        '/home/ubuntu/workspace/vm-autoscaling/pemkey/jenkins'
+      ];
+      
+      let sshKey = null;
+      for (const keyPath of sshKeyPaths) {
+        if (keyPath && fs.existsSync(keyPath)) {
+          sshKey = keyPath;
+          console.log(`[Template Service] SSH 키 발견: ${sshKey}`);
+          break;
+        }
+      }
+      
+      if (!sshKey) {
+        throw new Error('SSH 키를 찾을 수 없습니다. 네트워크 초기화를 건너뜁니다.');
+      }
+      
+      // SSH 키 권한 설정
+      await execPromise(`chmod 600 "${sshKey}"`);
+      
+      // 3. 네트워크 초기화 스크립트 실행
+      console.log(`[Template Service] 네트워크 초기화 스크립트 실행 중...`);
+      
+      // 네트워크 인터페이스 자동 감지 (ens33, ens192, ens160, eth0 등)
+      const networkInitScript = `#!/bin/bash
+set -e
+
+echo "=== 템플릿 네트워크 초기화 시작 ==="
+
+# 네트워크 인터페이스 자동 감지
+INTERFACE=$(ip -br link show | grep -v lo | grep -E '^(ens33|ens192|ens160|eth0)' | head -1 | cut -d' ' -f1)
+if [ -z "$INTERFACE" ]; then
+    # 우선순위 인터페이스가 없으면 첫 번째 인터페이스 사용
+    INTERFACE=$(ip -br link show | grep -v lo | head -1 | cut -d' ' -f1)
+fi
+
+if [ -z "$INTERFACE" ]; then
+    echo "ERROR: 네트워크 인터페이스를 찾을 수 없습니다."
+    exit 1
+fi
+
+echo "네트워크 인터페이스: $INTERFACE"
+
+# netplan 파일 백업
+mkdir -p /root/netplan-backup
+cp /etc/netplan/*.yaml /root/netplan-backup/ 2>/dev/null || true
+
+# static IP 제거하고 DHCP로 변경
+cat <<EOF > /etc/netplan/01-netcfg.yaml
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    $INTERFACE:
+      dhcp4: yes
+      dhcp6: no
+EOF
+
+echo "=== hostname 초기화 ==="
+echo "localhost" > /etc/hostname
+sed -i 's/127.0.1.1.*/127.0.1.1 localhost/' /etc/hosts 2>/dev/null || true
+
+echo "=== cloud-init 비활성화 ==="
+touch /etc/cloud/cloud-init.disabled
+
+echo "=== SSH host key 초기화 ==="
+rm -f /etc/ssh/ssh_host_*
+systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null || true
+
+echo "=== 로그 정리 ==="
+/usr/sbin/logrotate -f /etc/logrotate.conf 2>/dev/null || true
+rm -rf /tmp/* 2>/dev/null || true
+rm -rf /var/tmp/* 2>/dev/null || true
+apt clean 2>/dev/null || true
+
+echo "=== 네트워크 설정 적용 ==="
+netplan apply
+sleep 3
+
+echo "=== 템플릿 네트워크 초기화 완료 ==="
+`;
+      
+      // SSH로 스크립트 실행
+      const sshCommand = `ssh -i "${sshKey}" \\
+        -o StrictHostKeyChecking=no \\
+        -o UserKnownHostsFile=/dev/null \\
+        -o ConnectTimeout=10 \\
+        ubuntu@${vmIP} bash -s << 'TEMPLATE_INIT_EOF'
+${networkInitScript}
+TEMPLATE_INIT_EOF`;
+      
+      await execPromise(sshCommand, {
+        timeout: 120000 // 2분 타임아웃
+      });
+      
+      console.log(`[Template Service] 네트워크 초기화 완료`);
+      
+      // 4. VM 전원 끄기
+      console.log(`[Template Service] VM 전원 끄기: ${cloneName}`);
+      await new Promise(resolve => setTimeout(resolve, 5000)); // 네트워크 설정 적용 대기
+      
+      const powerOffCommand = `govc vm.power -off -force "${cloneName}"`;
+      await execPromise(powerOffCommand, {
+        env: {
+          ...process.env,
+          GOVC_URL: VCENTER_URL,
+          GOVC_USERNAME: VCENTER_USERNAME,
+          GOVC_PASSWORD: VCENTER_PASSWORD,
+          GOVC_INSECURE: process.env.GOVC_INSECURE || '1'
+        },
+        timeout: 60000
+      });
+      
+      // 전원이 완전히 꺼질 때까지 대기
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+    } catch (error) {
+      console.warn(`[Template Service] 네트워크 초기화 실패 (템플릿 변환은 계속 진행):`, error.message);
+      // 네트워크 초기화 실패해도 템플릿 변환은 계속 진행
+      // VM이 켜져 있으면 강제 종료
+      try {
+        const powerOffCommand = `govc vm.power -off -force "${cloneName}"`;
+        await execPromise(powerOffCommand, {
+          env: {
+            ...process.env,
+            GOVC_URL: VCENTER_URL,
+            GOVC_USERNAME: VCENTER_USERNAME,
+            GOVC_PASSWORD: VCENTER_PASSWORD,
+            GOVC_INSECURE: process.env.GOVC_INSECURE || '1'
+          },
+          timeout: 60000
+        });
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      } catch (powerOffError) {
+        console.warn(`[Template Service] 전원 끄기 실패:`, powerOffError.message);
+      }
+    }
+
     console.log(`[Template Service] 템플릿으로 변환 시작: ${cloneName}`);
     const markTemplateCommand = `govc vm.markastemplate "${cloneName}"`;
     
@@ -475,10 +697,10 @@ async function saveTemplateMetadata(templateData) {
 
     // 백업 생성
     const backupPath = `${TEMPLATES_DATA_PATH}.backup.${Date.now()}`;
-    await fs.copyFile(TEMPLATES_DATA_PATH, backupPath);
+    await fsPromises.copyFile(TEMPLATES_DATA_PATH, backupPath);
 
     // 파일 저장
-    await fs.writeFile(TEMPLATES_DATA_PATH, JSON.stringify(templates, null, 2));
+    await fsPromises.writeFile(TEMPLATES_DATA_PATH, JSON.stringify(templates, null, 2));
 
     return existing || templateData;
   } catch (error) {
@@ -524,10 +746,10 @@ async function deleteTemplate(templateId) {
     
     // 백업 생성
     const backupPath = `${TEMPLATES_DATA_PATH}.backup.${Date.now()}`;
-    await fs.copyFile(TEMPLATES_DATA_PATH, backupPath);
+    await fsPromises.copyFile(TEMPLATES_DATA_PATH, backupPath);
 
     // 파일 저장
-    await fs.writeFile(TEMPLATES_DATA_PATH, JSON.stringify(filtered, null, 2));
+    await fsPromises.writeFile(TEMPLATES_DATA_PATH, JSON.stringify(filtered, null, 2));
 
     return {
       success: true,
@@ -548,12 +770,19 @@ async function getVmList() {
   try {
     if (!VCENTER_URL || !VCENTER_USERNAME || !VCENTER_PASSWORD) {
       console.warn('[Template Service] vCenter 연결 정보가 설정되지 않았습니다.');
+      console.warn(`  GOVC_URL: ${VCENTER_URL ? '설정됨' : '없음'}`);
+      console.warn(`  GOVC_USERNAME: ${VCENTER_USERNAME ? '설정됨' : '없음'}`);
+      console.warn(`  GOVC_PASSWORD: ${VCENTER_PASSWORD ? '설정됨' : '없음'}`);
       throw new Error('vCenter 연결 정보가 설정되지 않았습니다. 환경 변수를 확인하세요.');
     }
 
+    console.log('[Template Service] vCenter VM 목록 조회 시작...');
+    console.log(`  vCenter URL: ${VCENTER_URL}`);
+    console.log(`  vCenter User: ${VCENTER_USERNAME}`);
+
     // VM 목록 조회: /Datacenter/vm 경로 또는 find 명령 사용
     const command = `govc find / -type m`;
-    const { stdout } = await execPromise(command, {
+    const { stdout, stderr } = await execPromise(command, {
       env: {
         ...process.env,
         GOVC_URL: VCENTER_URL,
@@ -562,6 +791,10 @@ async function getVmList() {
         GOVC_INSECURE: process.env.GOVC_INSECURE || '1'
       }
     });
+
+    if (stderr && stderr.trim()) {
+      console.warn('[Template Service] govc stderr:', stderr);
+    }
 
     // govc find는 한 줄에 하나씩 경로를 반환합니다
     const lines = stdout.trim().split('\n').filter(line => line.trim());
