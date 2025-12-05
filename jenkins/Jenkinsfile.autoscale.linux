@@ -839,9 +839,10 @@ SSH_SCRIPT_EOF
                                     env.NEW_VM_IP = vmIP
                                     echo "✅ VM IP가 올바르게 설정되어 있습니다: ${vmIP}"
                                 }
+                            }
 
                             echo "📌 최종 VM IP: ${env.NEW_VM_IP}"
-                        
+                            
                         } catch (Exception e) {
                             echo "VM 클론 실패: ${e.getMessage()}"
                             error("VM 클론 중 오류 발생: ${e.getMessage()}")
