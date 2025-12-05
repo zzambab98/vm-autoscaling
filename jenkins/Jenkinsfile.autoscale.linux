@@ -403,9 +403,9 @@ pipeline {
                         
                         try {
                             // vCenter Linux Customization Spec을 사용하여 첫 부팅부터 고정 IP 설정
-                            // 방법: govc vm.clone 시 -customization 옵션과 GOVC_GUESTINFO_* 환경 변수 사용
+                            // 방법: vm.clone -on=false → vm.customize -ip ... → vm.power -on
                             echo "=========================================="
-                            echo "vCenter Customization Spec으로 VM 클론 (고정 IP 설정)..."
+                            echo "vCenter VM 클론 및 Guest Customization (고정 IP 설정)..."
                             echo "=========================================="
                             echo "할당된 IP: ${vmIP}"
                             echo "서브넷: ${subnet}"
@@ -418,11 +418,13 @@ pipeline {
                             // Customization Spec 이름 (vCenter에서 미리 생성해야 함)
                             def customizationSpecName = env.CUSTOMIZATION_SPEC_NAME ?: 'DanaLinuxSpec'
                             
-                            // govc 명령어 옵션 구성
-                            def cloneOptions = "-vm=\"${templateName}\" -on=true"  // 바로 부팅
+                            // ==========================================
+                            // (1) VM 클론 (전원 OFF 상태)
+                            // ==========================================
+                            echo ""
+                            echo "Step 1: VM 클론 (전원 꺼진 상태)..."
                             
-                            // Customization Spec 적용
-                            cloneOptions += " -customization=\"${customizationSpecName}\""
+                            def cloneOptions = "-vm=\"${templateName}\" -on=false"
                             
                             // Datastore 지정
                             if (datastore && datastore != 'null' && datastore.trim() != '') {
@@ -439,409 +441,106 @@ pipeline {
                                 cloneOptions += " -net=\"${vlan}\""
                             }
                             
-                            // GOVC_GUESTINFO_* 환경 변수로 고정 IP 설정
-                            // 이렇게 하면 첫 부팅부터 고정 IP로 올라옴 (DHCP 단계 없음)
                             def cloneCommand = """
                                 export GOVC_URL="${govcUrl}"
                                 export GOVC_USERNAME="${govcUser}"
                                 export GOVC_PASSWORD="${govcPass}"
                                 export GOVC_INSECURE="${env.GOVC_INSECURE}"
                                 
-                                # 고정 IP 설정을 위한 Guest Info 환경 변수
-                                export GOVC_GUESTINFO_IPADDR="${vmIP}"
-                                export GOVC_GUESTINFO_NETMASK="${subnet}"
-                                export GOVC_GUESTINFO_GATEWAY="${gateway}"
-                                export GOVC_GUESTINFO_DNS="${dnsServers}"
-                                
-                                # VM 클론 및 Customization Spec 적용
                                 govc vm.clone ${cloneOptions} "${vmName}"
                             """
                             
-                            echo "VM 클론 명령어 실행 중..."
-                            echo "Template: ${templateName}"
-                            echo "VM Name: ${vmName}"
-                            echo "Customization Spec: ${customizationSpecName}"
-                            echo "고정 IP: ${vmIP}"
-                            echo "Command: govc vm.clone ${cloneOptions} ${vmName}"
+                            sh cloneCommand
+                            echo "✅ VM 클론 완료 (전원 꺼진 상태): ${vmName}"
                             
-                            def customizationApplied = false
-                            try {
-                                sh cloneCommand
-                                customizationApplied = true
-                                echo "✅ VM 클론 및 Customization Spec 적용 완료"
-                                echo "✅ 첫 부팅부터 고정 IP (${vmIP})로 올라옵니다 (DHCP 단계 없음)"
-                            } catch (Exception cloneErr) {
-                                echo "⚠️ Customization Spec 적용 실패: ${cloneErr.message}"
-                                echo "⚠️ 대체 방법: VM 클론 후 SSH로 고정 IP 설정"
+                            // ==========================================
+                            // (2) vm.customize로 고정 IP 설정
+                            // ==========================================
+                            echo ""
+                            echo "Step 2: vCenter Guest Customization 적용 (고정 IP 설정)..."
+                            
+                            def customizeCommand = """
+                                export GOVC_URL="${govcUrl}"
+                                export GOVC_USERNAME="${govcUser}"
+                                export GOVC_PASSWORD="${govcPass}"
+                                export GOVC_INSECURE="${env.GOVC_INSECURE}"
                                 
-                                // 대체 방법: Customization 없이 클론 후 SSH로 설정
-                                try {
-                                    def fallbackCloneOptions = "-vm=\"${templateName}\" -on=false"
-                                    if (datastore && datastore != 'null' && datastore.trim() != '') {
-                                        fallbackCloneOptions += " -ds=\"${datastore}\""
-                                    }
-                                    if (resourcePool && resourcePool != 'null' && resourcePool.trim() != '') {
-                                        fallbackCloneOptions += " -pool=\"${resourcePool}\""
-                                    }
-                                    if (vlan && vlan != 'null' && vlan.trim() != '') {
-                                        fallbackCloneOptions += " -net=\"${vlan}\""
-                                    }
+                                govc vm.customize \\
+                                    -vm "${vmName}" \\
+                                    -type=Linux \\
+                                    -ip="${vmIP}" \\
+                                    -netmask="${subnet}" \\
+                                    -gateway="${gateway}" \\
+                                    -dns-server="${dnsServers}" \\
+                                    "${customizationSpecName}"
+                            """
+                            
+                            sh customizeCommand
+                            echo "✅ vCenter Guest Customization 적용 완료 (IP: ${vmIP})"
+                            
+                            // ==========================================
+                            // (3) 전원 ON + IP 확인
+                            // ==========================================
+                            echo ""
+                            echo "Step 3: VM 전원 켜기 및 IP 확인..."
+                            
+                            def powerOnCommand = """
+                                export GOVC_URL="${govcUrl}"
+                                export GOVC_USERNAME="${govcUser}"
+                                export GOVC_PASSWORD="${govcPass}"
+                                export GOVC_INSECURE="${env.GOVC_INSECURE}"
+                                
+                                govc vm.power -on "${vmName}"
+                            """
+                            
+                            sh powerOnCommand
+                            echo "VM 부팅 대기 중..."
+                            sleep(time: 20, unit: 'SECONDS')
+                            
+                            // IP 확인 (최대 5분 대기)
+                            def maxWait = 300  // 5분
+                            def waitTime = 0
+                            def currentVMIP = ''
+                            
+                            while (waitTime < maxWait && !currentVMIP) {
+                                sleep(time: 10, unit: 'SECONDS')
+                                waitTime += 10
+                                
+                                def ipCheckCommand = """
+                                    export GOVC_URL="${govcUrl}"
+                                    export GOVC_USERNAME="${govcUser}"
+                                    export GOVC_PASSWORD="${govcPass}"
+                                    export GOVC_INSECURE="${env.GOVC_INSECURE}"
                                     
-                                    def fallbackCloneCommand = """
-                                        export GOVC_URL="${govcUrl}"
-                                        export GOVC_USERNAME="${govcUser}"
-                                        export GOVC_PASSWORD="${govcPass}"
-                                        export GOVC_INSECURE="${env.GOVC_INSECURE}"
-                                        
-                                        govc vm.clone ${fallbackCloneOptions} "${vmName}"
-                                    """
-                                    sh fallbackCloneCommand
-                                    echo "✅ VM 클론 완료 (대체 방법 - Customization 없음)"
-                                    
-                                    // 전원 켜기
-                                    def powerOnCommand = """
-                                        export GOVC_URL="${govcUrl}"
-                                        export GOVC_USERNAME="${govcUser}"
-                                        export GOVC_PASSWORD="${govcPass}"
-                                        export GOVC_INSECURE="${env.GOVC_INSECURE}"
-                                        
-                                        govc vm.power -on "${vmName}"
-                                    """
-                                    sh powerOnCommand
-                                    echo "VM 전원 켜기 완료: ${vmName}"
-                                } catch (Exception fallbackErr) {
-                                    error("VM 클론 실패: ${fallbackErr.message}")
+                                    govc vm.ip "${vmName}" | head -1
+                                """
+                                
+                                def ipOutput = sh(
+                                    script: ipCheckCommand,
+                                    returnStdout: true
+                                ).trim()
+                                
+                                if (ipOutput && ipOutput != '') {
+                                    currentVMIP = ipOutput
+                                    echo "✅ VM IP 확인: ${currentVMIP}"
+                                    break
+                                } else {
+                                    echo "VM IP 주소 대기 중... (${waitTime}/${maxWait}초)"
                                 }
                             }
                             
-                            // VM 부팅 대기 및 IP 확인
-                            if (customizationApplied) {
-                                echo "=========================================="
-                                echo "VM 부팅 대기 중 (Customization Spec 적용됨)..."
-                                echo "=========================================="
-                                echo "✅ 첫 부팅부터 고정 IP (${vmIP})로 올라옵니다 (DHCP 단계 없음)"
-                                
-                                // Customization이 적용되면 DHCP 없이 바로 고정 IP로 올라옴
-                                // govc vm.ip -wait 옵션으로 IP 확인 대기
-                                def maxWait = 300  // 5분
-                                def waitTime = 0
-                                def vmIPConfirmed = false
-                                def currentVMIP = ''
-                                
-                                while (waitTime < maxWait && !vmIPConfirmed) {
-                                    sleep(time: 10, unit: 'SECONDS')
-                                    waitTime += 10
-                                    
-                                    def ipCheckCommand = """
-                                        export GOVC_URL="${govcUrl}"
-                                        export GOVC_USERNAME="${govcUser}"
-                                        export GOVC_PASSWORD="${govcPass}"
-                                        export GOVC_INSECURE="${env.GOVC_INSECURE}"
-                                        
-                                        govc vm.ip "${vmName}" | head -1
-                                    """
-                                
-                                    def ipOutput = sh(
-                                        script: ipCheckCommand,
-                                        returnStdout: true
-                                    ).trim()
-                                    
-                                    if (ipOutput && ipOutput != '') {
-                                        currentVMIP = ipOutput
-                                        vmIPConfirmed = true
-                                        echo "✅ VM IP 확인: ${currentVMIP}"
-                                        
-                                        // Customization이 적용되었으므로 할당된 IP와 일치해야 함
-                                        if (currentVMIP == vmIP) {
-                                            echo "✅ 할당된 고정 IP와 일치합니다: ${vmIP}"
-                                            env.NEW_VM_IP = vmIP
-                                        } else {
-                                            echo "⚠️ IP 불일치: 현재=${currentVMIP}, 할당=${vmIP}"
-                                            echo "⚠️ SSH를 통해 IP 재설정 시도 중..."
-                                            // SSH로 IP 재설정 (아래 로직으로)
-                                            vmIPConfirmed = false  // 재설정 필요
-                                        }
-                                    } else {
-                                        echo "VM IP 주소 대기 중... (${waitTime}/${maxWait}초)"
-                                    }
-                                }
-                                
-                                if (!vmIPConfirmed || !currentVMIP) {
-                                    error("VM IP 주소를 확인하지 못했습니다. VM 부팅 상태를 확인하세요.")
-                                }
-                                
-                                // IP가 일치하지 않으면 SSH로 재설정
-                                if (currentVMIP != vmIP) {
-                                    echo "🔧 SSH를 통해 IP 재설정 시도 중..."
-                                } else {
-                                    // IP가 일치하므로 SSH 설정 단계 건너뛰기
-                                    echo "✅ 고정 IP 설정 완료: ${vmIP}"
-                                    return  // 이 stage 종료
-                                }
-                            } else {
-                                // 대체 방법: DHCP로 임시 IP 받은 후 SSH로 고정 IP 설정
-                                echo "=========================================="
-                                echo "VM 부팅 대기 중 (대체 방법 - DHCP 사용)..."
-                                echo "=========================================="
-                                sleep(time: 30, unit: 'SECONDS')
-                                
-                                // VM IP 주소 확인 (DHCP로 받은 임시 IP)
-                                def maxWait = 300  // 5분
-                                def waitTime = 0
-                                def vmIPConfirmed = false
-                                def currentVMIP = ''
-                                
-                                while (waitTime < maxWait && !vmIPConfirmed) {
-                                    sleep(time: 10, unit: 'SECONDS')
-                                    waitTime += 10
-                                    
-                                    def ipCheckCommand = """
-                                        export GOVC_URL="${govcUrl}"
-                                        export GOVC_USERNAME="${govcUser}"
-                                        export GOVC_PASSWORD="${govcPass}"
-                                        export GOVC_INSECURE="${env.GOVC_INSECURE}"
-                                        
-                                        govc vm.ip "${vmName}" | head -1
-                                    """
-                                
-                                    def ipOutput = sh(
-                                        script: ipCheckCommand,
-                                        returnStdout: true
-                                    ).trim()
-                                    
-                                    if (ipOutput && ipOutput != '') {
-                                        currentVMIP = ipOutput
-                                        vmIPConfirmed = true
-                                        echo "VM 현재 IP 주소: ${currentVMIP}"
-                                        echo "⚠️ 임시 DHCP IP 확인됨. 고정 IP로 변경합니다."
-                                    } else {
-                                        echo "VM IP 주소 대기 중... (${waitTime}/${maxWait}초)"
-                                    }
-                                }
-                                
-                                if (!vmIPConfirmed || !currentVMIP) {
-                                    error("VM IP 주소를 확인하지 못했습니다. VM 부팅 상태를 확인하세요.")
-                                }
-                                
-                                // 할당된 IP와 현재 IP가 다르면 SSH로 설정
-                                echo "🔍 IP 비교: 현재=${currentVMIP}, 할당=${vmIP}, 일치=${currentVMIP == vmIP}"
-                                if (currentVMIP != vmIP) {
-                                    echo "⚠️ VM IP가 할당된 IP와 다릅니다. 현재: ${currentVMIP}, 할당: ${vmIP}"
-                                    echo "🔧 SSH를 통해 IP 설정 시도 중..."
-
-                                    // SSH 키 경로 확인 (설정에서 지정한 키 사용)
-                                    def sshKey = null
-
-                                    // 디버깅: 환경 변수 확인
-                                    echo "🐛 DEBUG: env.SSH_KEY_PATH = '${env.SSH_KEY_PATH}'"
-                                    echo "🐛 DEBUG: WORKSPACE = '${env.WORKSPACE}'"
-
-                                    // 1순위: 환경 변수로 전달된 SSH 키 경로 (백엔드 API에서 조회)
-                                    if (env.SSH_KEY_PATH && env.SSH_KEY_PATH != 'null' && env.SSH_KEY_PATH.trim() != '') {
-                                        def sshKeyPath = env.SSH_KEY_PATH.trim()
-                                        echo "🔑 설정에서 지정한 SSH 키 경로: ${sshKeyPath}"
-                                        
-                                        // 여러 가능한 경로 시도
-                                        def possiblePaths = []
-                                        
-                                        // 절대 경로 그대로 시도
-                                        possiblePaths.add(sshKeyPath)
-                                        
-                                        // Jenkins 워크스페이스 기준 상대 경로 시도
-                                        if (env.WORKSPACE) {
-                                            // 경로에서 pemkey/ 이후 부분 추출
-                                            def keyName = sshKeyPath.split('pemkey/')[-1]
-                                            if (keyName) {
-                                                possiblePaths.add("${env.WORKSPACE}/pemkey/${keyName}")
-                                                possiblePaths.add("${env.WORKSPACE}/../pemkey/${keyName}")
-                                            }
-                                        }
-                                        
-                                        // 파일명만 추출하여 여러 위치에서 검색
-                                        def fileName = sshKeyPath.split('/')[-1]
-                                        if (fileName) {
-                                            possiblePaths.add("${env.WORKSPACE}/pemkey/${fileName}")
-                                            possiblePaths.add("${env.WORKSPACE}/../pemkey/${fileName}")
-                                            possiblePaths.add("/home/ubuntu/workspace/vm-autoscaling/pemkey/${fileName}")
-                                            possiblePaths.add("/var/lib/jenkins/workspace/vm-autoscaling/pemkey/${fileName}")
-                                        }
-                                        
-                                        // 각 경로 확인
-                                        for (def path in possiblePaths) {
-                                            def keyExists = sh(
-                                                script: "test -f '${path}' && echo 'exists' || echo 'not found'",
-                                                returnStdout: true
-                                            ).trim()
-                                            echo "  - ${path}: ${keyExists}"
-                                            if (keyExists == 'exists') {
-                                                sshKey = path
-                                                echo "✅ SSH 키 발견: ${sshKey}"
-                                                break
-                                            }
-                                        }
-                                        
-                                        if (!sshKey) {
-                                            echo "⚠️ 설정에서 지정한 SSH 키를 찾을 수 없습니다: ${sshKeyPath}"
-                                        }
-                                    }
-
-                                    // 2순위: 기본 키 목록에서 자동 검색 (Fallback)
-                                    if (!sshKey) {
-                                        echo "🔑 기본 SSH 키 자동 검색 시작..."
-                                        def basePaths = []
-                                        if (env.WORKSPACE) {
-                                            basePaths.add("${env.WORKSPACE}/pemkey")
-                                            basePaths.add("${env.WORKSPACE}/../pemkey")
-                                        }
-                                        basePaths.add("/home/ubuntu/workspace/vm-autoscaling/pemkey")
-                                        basePaths.add("/var/lib/jenkins/workspace/vm-autoscaling/pemkey")
-                                        
-                                        def keyNames = ["danainfra", "dana-cocktail", "jenkins"]
-                                        
-                                        for (def basePath in basePaths) {
-                                            for (def keyName in keyNames) {
-                                                def keyPath = "${basePath}/${keyName}"
-                                                def keyExists = sh(
-                                                    script: "test -f '${keyPath}' && echo 'exists' || echo 'not found'",
-                                                    returnStdout: true
-                                                ).trim()
-                                                echo "  - ${keyPath}: ${keyExists}"
-                                                if (keyExists == 'exists') {
-                                                    sshKey = keyPath
-                                                    echo "✅ SSH 키 발견: ${sshKey}"
-                                                    break
-                                                }
-                                            }
-                                            if (sshKey) break
-                                        }
-                                    }
-
-                                    if (sshKey) {
-                                        echo "🔧 SSH 키 사용: ${sshKey}"
-                                        // 서브넷 마스크를 CIDR로 변환
-                                        def subnetMask = subnet
-                                        def cidr = sh(
-                                            script: """
-                                                python3 -c "
-import ipaddress
-netmask = '${subnetMask}'
-# 서브넷 마스크를 CIDR로 변환
-if netmask == '255.255.255.0':
-    cidr = 24
-elif netmask == '255.255.0.0':
-    cidr = 16
-elif netmask == '255.0.0.0':
-    cidr = 8
-else:
-    # 일반적인 변환
-    cidr = sum(bin(int(x)).count('1') for x in netmask.split('.'))
-print(cidr)
-"
-                                            """,
-                                            returnStdout: true
-                                        ).trim()
-                                        
-                                        echo "Netplan 설정: IP=${vmIP}/${cidr}, Gateway=${gateway}"
-                                        
-                                        // SSH로 Netplan 설정
-                                        def maxRetries = 5
-                                        def retryCount = 0
-                                        def ipConfigured = false
-                                        
-                                        while (retryCount < maxRetries && !ipConfigured) {
-                                            try {
-                                                echo "🔌 SSH 연결 시도 (${retryCount + 1}/${maxRetries}): ubuntu@${currentVMIP}"
-                                                
-                                                // SSH 키 권한 설정 (0600으로 변경)
-                                                sh """
-                                                    chmod 600 ${sshKey} || true
-                                                """
-                                                
-                                                // known_hosts에서 해당 IP 제거 (호스트 키 변경 문제 해결)
-                                                sh """
-                                                    ssh-keygen -f ~/.ssh/known_hosts -R ${currentVMIP} 2>/dev/null || true
-                                                """
-                                                
-                                                // Groovy 변수를 Shell 변수로 설정
-                                                def vmIPVar = vmIP
-                                                def cidrVar = cidr
-                                                def gatewayVar = gateway
-                                                def vmNameVar = vmName
-                                                
-                                                sh """
-                                                    ssh -i ${sshKey} \\
-                                                        -o StrictHostKeyChecking=no \\
-                                                        -o UserKnownHostsFile=/dev/null \\
-                                                        -o ConnectTimeout=10 \\
-                                                        ubuntu@${currentVMIP} bash -s << SSH_SCRIPT_EOF
-# 템플릿의 기존 IP 충돌 방지: 기존 Netplan 설정 백업 및 삭제
-echo "기존 네트워크 설정 초기화 중..."
-sudo rm -f /etc/netplan/*.yaml /etc/netplan/*.yml 2>/dev/null || true
-sudo systemctl stop systemd-networkd 2>/dev/null || true
-sudo systemctl start systemd-networkd 2>/dev/null || true
-sleep 2
-
-# 네트워크 인터페이스 이름 확인 (ens33, ens192, ens160, eth0 등)
-# 우선순위: ens33 > ens192 > ens160 > eth0 > 기타
-INTERFACE=\$(ip -br link show | grep -v lo | grep -E '^(ens33|ens192|ens160|eth0)' | head -1 | cut -d' ' -f1)
-if [ -z "\\\${INTERFACE}" ]; then
-    # 우선순위 인터페이스가 없으면 첫 번째 인터페이스 사용
-    INTERFACE=\$(ip -br link show | grep -v lo | head -1 | cut -d' ' -f1)
-fi
-echo "네트워크 인터페이스: \\\${INTERFACE}"
-
-# 새로운 Netplan 설정 (고정 IP, DHCP 비활성화)
-sudo tee /etc/netplan/01-netcfg.yaml > /dev/null << NETPLAN_EOF
-network:
-  version: 2
-  renderer: networkd
-  ethernets:
-    \\\${INTERFACE}:
-      dhcp4: no
-      dhcp6: no
-      addresses:
-        - ${vmIPVar}/${cidrVar}
-      gateway4: ${gatewayVar}
-      nameservers:
-        addresses:
-          - 10.255.0.10
-NETPLAN_EOF
-
-sudo netplan apply
-sleep 3
-hostnamectl set-hostname ${vmNameVar}
-echo "고정 IP 설정 완료: ${vmIPVar}/${cidrVar}"
-SSH_SCRIPT_EOF
-                                                """
-                                                ipConfigured = true
-                                                echo "✅ VM IP 설정 완료: ${vmIP}"
-                                            } catch (Exception sshErr) {
-                                                retryCount++
-                                                echo "SSH 접속 실패 (${retryCount}/${maxRetries}): ${sshErr.message}"
-                                                if (retryCount < maxRetries) {
-                                                    sleep(time: 10, unit: 'SECONDS')
-                                                }
-                                            }
-                                        }
-                                        
-                                        if (ipConfigured) {
-                                            env.NEW_VM_IP = vmIP
-                                            echo "✅ VM IP가 올바르게 설정되었습니다: ${vmIP}"
-                                        } else {
-                                            echo "⚠️ VM IP 자동 설정 실패. 현재 IP (${currentVMIP})를 사용합니다."
-                                            env.NEW_VM_IP = currentVMIP
-                                        }
-                                    } else {
-                                        echo "❌ SSH 키를 찾을 수 없습니다. 현재 IP (${currentVMIP})를 사용합니다."
-                                        env.NEW_VM_IP = currentVMIP
-                                    }
-                                } else {
-                                    env.NEW_VM_IP = vmIP
-                                    echo "✅ VM IP가 올바르게 설정되어 있습니다: ${vmIP}"
-                                }
+                            if (!currentVMIP) {
+                                error("VM IP 주소를 가져오지 못했습니다. VM 부팅 상태를 확인하세요.")
                             }
-
-                            echo "📌 최종 VM IP: ${env.NEW_VM_IP}"
+                            
+                            // IP 일치 여부 확인
+                            if (currentVMIP != vmIP) {
+                                error("⚠️ Guest Customization IP 불일치: 현재=${currentVMIP}, 기대=${vmIP}")
+                            }
+                            
+                            env.NEW_VM_IP = vmIP
+                            echo "✅ 최종 VM IP: ${env.NEW_VM_IP}"
+                            echo "✅ 첫 부팅부터 고정 IP (${vmIP})로 올라왔습니다 (DHCP 단계 없음)"
                             
                         } catch (Exception e) {
                             echo "VM 클론 실패: ${e.getMessage()}"
