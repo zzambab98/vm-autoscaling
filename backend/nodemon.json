@@ -1,0 +1,35 @@
+{
+  "watch": ["src"],
+  "ext": "js,json",
+  "ignore": ["src/**/*.test.js", "node_modules"],
+  "exec": "node src/server.js",
+  "env": {
+    "NODE_ENV": "development",
+    "PORT": "6010",
+    "GOVC_URL": "https://vc.danacloud.local",
+    "GOVC_USERNAME": "Administrator@VSPHERE.LOCAL",
+    "GOVC_PASSWORD": "VMware1!",
+    "GOVC_INSECURE": "1",
+    "VCENTER_URL": "https://vc.danacloud.local",
+    "VCENTER_USERNAME": "Administrator@VSPHERE.LOCAL",
+    "VCENTER_PASSWORD": "VMware1!",
+    "F5_SERVERS": "10.255.1.80",
+    "F5_USER": "admin",
+    "F5_PASSWORD": "Netcom123!@#",
+    "F5_PARTITION": "Common",
+    "PROMETHEUS_URL": "http://10.255.1.254:9090",
+    "ALERTMANAGER_URL": "http://10.255.1.254:9093",
+    "GRAFANA_URL": "http://10.255.1.254:3000",
+    "JENKINS_URL": "http://10.255.0.103:8080",
+    "JENKINS_WEBHOOK_USER": "danacloud",
+    "JENKINS_WEBHOOK_PASSWORD": "!danacloud12",
+    "JENKINS_DEFAULT_WEBHOOK_TOKEN": "plg-autoscale-token",
+    "BACKEND_API_URL": "http://10.255.48.253:6010",
+    "FRONTEND_BASE_URL": "http://10.255.48.253:5520",
+    "PLG_STACK_SERVER": "10.255.1.254",
+    "PLG_STACK_USER": "ubuntu",
+    "PLG_STACK_SSH_KEY": "/home/ubuntu/workspace/vm-autoscaling/pemkey/danainfra"
+  },
+  "delay": 1000
+}
+

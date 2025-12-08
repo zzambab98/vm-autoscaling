@@ -6,10 +6,19 @@ const fsPromises = require('fs').promises;
 const path = require('path');
 
 const TEMPLATES_DATA_PATH = path.join(__dirname, '../../data/templates.json');
-const VCENTER_URL = process.env.GOVC_URL || process.env.VCENTER_URL;
-const VCENTER_USERNAME = process.env.GOVC_USERNAME || process.env.VCENTER_USERNAME;
-const VCENTER_PASSWORD = process.env.GOVC_PASSWORD || process.env.VCENTER_PASSWORD;
 const DEFAULT_DATASTORE = process.env.GOVC_DATASTORE || process.env.VCENTER_DATASTORE || 'OS-Datastore-Power-Store';
+
+/**
+ * vCenter 연결 정보 가져오기 (런타임에 읽음)
+ */
+function getVCenterConfig() {
+  return {
+    url: process.env.GOVC_URL || process.env.VCENTER_URL,
+    username: process.env.GOVC_USERNAME || process.env.VCENTER_USERNAME,
+    password: process.env.GOVC_PASSWORD || process.env.VCENTER_PASSWORD,
+    insecure: process.env.GOVC_INSECURE || '1'
+  };
+}
 
 /**
  * 데이터 파일 초기화
@@ -29,27 +38,29 @@ async function ensureDataFile() {
  */
 async function getTemplatesFromVCenter() {
   try {
-    if (!VCENTER_URL || !VCENTER_USERNAME || !VCENTER_PASSWORD) {
+    const vcenterConfig = getVCenterConfig();
+    
+    if (!vcenterConfig.url || !vcenterConfig.username || !vcenterConfig.password) {
       console.warn('[Template Service] vCenter 연결 정보가 설정되지 않았습니다.');
-      console.warn(`  GOVC_URL: ${VCENTER_URL ? '설정됨' : '없음'}`);
-      console.warn(`  GOVC_USERNAME: ${VCENTER_USERNAME ? '설정됨' : '없음'}`);
-      console.warn(`  GOVC_PASSWORD: ${VCENTER_PASSWORD ? '설정됨' : '없음'}`);
+      console.warn(`  GOVC_URL: ${vcenterConfig.url ? '설정됨' : '없음'}`);
+      console.warn(`  GOVC_USERNAME: ${vcenterConfig.username ? '설정됨' : '없음'}`);
+      console.warn(`  GOVC_PASSWORD: ${vcenterConfig.password ? '설정됨' : '없음'}`);
       return [];
     }
 
     console.log('[Template Service] vCenter 템플릿 목록 조회 시작...');
-    console.log(`  vCenter URL: ${VCENTER_URL}`);
-    console.log(`  vCenter User: ${VCENTER_USERNAME}`);
+    console.log(`  vCenter URL: ${vcenterConfig.url}`);
+    console.log(`  vCenter User: ${vcenterConfig.username}`);
 
     // vCenter에서 템플릿 목록 조회 (이름에 "template"이 포함된 VM)
     const command = `govc find / -type m -name "*template*"`;
     const { stdout, stderr } = await execPromise(command, {
       env: {
         ...process.env,
-        GOVC_URL: VCENTER_URL,
-        GOVC_USERNAME: VCENTER_USERNAME,
-        GOVC_PASSWORD: VCENTER_PASSWORD,
-        GOVC_INSECURE: process.env.GOVC_INSECURE || '1'
+        GOVC_URL: vcenterConfig.url,
+        GOVC_USERNAME: vcenterConfig.username,
+        GOVC_PASSWORD: vcenterConfig.password,
+        GOVC_INSECURE: vcenterConfig.insecure
       }
     });
 
@@ -149,8 +160,9 @@ async function getTemplateById(templateId) {
  */
 async function convertVmToTemplate(vmName, templateName, metadata = {}) {
   try {
-    // vCenter 연결 정보 확인
-    if (!VCENTER_URL || !VCENTER_USERNAME || !VCENTER_PASSWORD) {
+    // vCenter 연결 정보 확인 (런타임에 읽음)
+    const vcenterConfig = getVCenterConfig();
+    if (!vcenterConfig.url || !vcenterConfig.username || !vcenterConfig.password) {
       throw new Error('vCenter 연결 정보가 설정되지 않았습니다. 환경 변수를 확인하세요.');
     }
 
@@ -161,9 +173,10 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
       const { stdout } = await execPromise(checkVmCommand, {
         env: {
           ...process.env,
-          GOVC_URL: VCENTER_URL,
-          GOVC_USERNAME: VCENTER_USERNAME,
-          GOVC_PASSWORD: VCENTER_PASSWORD
+          GOVC_URL: vcenterConfig.url,
+          GOVC_USERNAME: vcenterConfig.username,
+          GOVC_PASSWORD: vcenterConfig.password,
+          GOVC_INSECURE: vcenterConfig.insecure
         }
       });
       vmInfo = JSON.parse(stdout);
@@ -212,9 +225,10 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
         const { stdout: vmPath } = await execPromise(findCommand, {
           env: {
             ...process.env,
-            GOVC_URL: VCENTER_URL,
-            GOVC_USERNAME: VCENTER_USERNAME,
-            GOVC_PASSWORD: VCENTER_PASSWORD
+            GOVC_URL: vcenterConfig.url,
+            GOVC_USERNAME: vcenterConfig.username,
+            GOVC_PASSWORD: vcenterConfig.password,
+            GOVC_INSECURE: vcenterConfig.insecure
           }
         });
         const vmFullPath = vmPath.trim().split('\n')[0];
@@ -292,9 +306,10 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
         const { stdout: rpOutput } = await execPromise(findRpCommand, {
           env: {
             ...process.env,
-            GOVC_URL: VCENTER_URL,
-            GOVC_USERNAME: VCENTER_USERNAME,
-            GOVC_PASSWORD: VCENTER_PASSWORD
+            GOVC_URL: vcenterConfig.url,
+            GOVC_USERNAME: vcenterConfig.username,
+            GOVC_PASSWORD: vcenterConfig.password,
+            GOVC_INSECURE: vcenterConfig.insecure
           }
         });
         const rpValue = rpOutput.trim();
@@ -386,9 +401,10 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
         await execPromise(powerOffCommand, {
           env: {
             ...process.env,
-            GOVC_URL: VCENTER_URL,
-            GOVC_USERNAME: VCENTER_USERNAME,
-            GOVC_PASSWORD: VCENTER_PASSWORD
+            GOVC_URL: vcenterConfig.url,
+            GOVC_USERNAME: vcenterConfig.username,
+            GOVC_PASSWORD: vcenterConfig.password,
+            GOVC_INSECURE: vcenterConfig.insecure
           },
           timeout: 60000 // 1분 타임아웃
         });
@@ -411,10 +427,10 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
       await execPromise(powerOnCommand, {
         env: {
           ...process.env,
-          GOVC_URL: VCENTER_URL,
-          GOVC_USERNAME: VCENTER_USERNAME,
-          GOVC_PASSWORD: VCENTER_PASSWORD,
-          GOVC_INSECURE: process.env.GOVC_INSECURE || '1'
+            GOVC_URL: vcenterConfig.url,
+            GOVC_USERNAME: vcenterConfig.username,
+            GOVC_PASSWORD: vcenterConfig.password,
+            GOVC_INSECURE: vcenterConfig.insecure
         },
         timeout: 60000
       });
@@ -434,10 +450,10 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
           const { stdout: ipOutput } = await execPromise(ipCheckCommand, {
             env: {
               ...process.env,
-              GOVC_URL: VCENTER_URL,
-              GOVC_USERNAME: VCENTER_USERNAME,
-              GOVC_PASSWORD: VCENTER_PASSWORD,
-              GOVC_INSECURE: process.env.GOVC_INSECURE || '1'
+            GOVC_URL: vcenterConfig.url,
+            GOVC_USERNAME: vcenterConfig.username,
+            GOVC_PASSWORD: vcenterConfig.password,
+            GOVC_INSECURE: vcenterConfig.insecure
             }
           });
           
@@ -569,10 +585,10 @@ TEMPLATE_INIT_EOF`;
       await execPromise(powerOffCommand, {
         env: {
           ...process.env,
-          GOVC_URL: VCENTER_URL,
-          GOVC_USERNAME: VCENTER_USERNAME,
-          GOVC_PASSWORD: VCENTER_PASSWORD,
-          GOVC_INSECURE: process.env.GOVC_INSECURE || '1'
+            GOVC_URL: vcenterConfig.url,
+            GOVC_USERNAME: vcenterConfig.username,
+            GOVC_PASSWORD: vcenterConfig.password,
+            GOVC_INSECURE: vcenterConfig.insecure
         },
         timeout: 60000
       });
@@ -589,10 +605,10 @@ TEMPLATE_INIT_EOF`;
         await execPromise(powerOffCommand, {
           env: {
             ...process.env,
-            GOVC_URL: VCENTER_URL,
-            GOVC_USERNAME: VCENTER_USERNAME,
-            GOVC_PASSWORD: VCENTER_PASSWORD,
-            GOVC_INSECURE: process.env.GOVC_INSECURE || '1'
+            GOVC_URL: vcenterConfig.url,
+            GOVC_USERNAME: vcenterConfig.username,
+            GOVC_PASSWORD: vcenterConfig.password,
+            GOVC_INSECURE: vcenterConfig.insecure
           },
           timeout: 60000
         });
@@ -624,9 +640,10 @@ TEMPLATE_INIT_EOF`;
         const { stdout: vmPath } = await execPromise(findCommand, {
           env: {
             ...process.env,
-            GOVC_URL: VCENTER_URL,
-            GOVC_USERNAME: VCENTER_USERNAME,
-            GOVC_PASSWORD: VCENTER_PASSWORD
+            GOVC_URL: vcenterConfig.url,
+            GOVC_USERNAME: vcenterConfig.username,
+            GOVC_PASSWORD: vcenterConfig.password,
+            GOVC_INSECURE: vcenterConfig.insecure
           }
         });
         const vmFullPath = vmPath.trim().split('\n')[0];
@@ -733,7 +750,8 @@ async function deleteTemplate(templateId) {
     }
 
     // vCenter에서 템플릿 삭제 (디스크에서도 삭제)
-    if (VCENTER_URL && VCENTER_USERNAME && VCENTER_PASSWORD) {
+    const vcenterConfig = getVCenterConfig();
+    if (vcenterConfig.url && vcenterConfig.username && vcenterConfig.password) {
       try {
         console.log(`[Template Service] vCenter에서 템플릿 삭제 시작 (디스크 포함): ${template.name}`);
         // govc vm.destroy는 VM과 템플릿 모두 삭제하며, 디스크 파일도 함께 삭제합니다
@@ -742,10 +760,10 @@ async function deleteTemplate(templateId) {
         await execPromise(deleteCommand, {
           env: {
             ...process.env,
-            GOVC_URL: VCENTER_URL,
-            GOVC_USERNAME: VCENTER_USERNAME,
-            GOVC_PASSWORD: VCENTER_PASSWORD,
-            GOVC_INSECURE: process.env.GOVC_INSECURE || '1'
+            GOVC_URL: vcenterConfig.url,
+            GOVC_USERNAME: vcenterConfig.username,
+            GOVC_PASSWORD: vcenterConfig.password,
+            GOVC_INSECURE: vcenterConfig.insecure
           },
           timeout: 300000 // 5분 타임아웃 (템플릿 삭제는 시간이 걸릴 수 있음)
         });
@@ -784,27 +802,28 @@ async function deleteTemplate(templateId) {
  */
 async function getVmList() {
   try {
-    if (!VCENTER_URL || !VCENTER_USERNAME || !VCENTER_PASSWORD) {
+    const vcenterConfig = getVCenterConfig();
+    if (!vcenterConfig.url || !vcenterConfig.username || !vcenterConfig.password) {
       console.warn('[Template Service] vCenter 연결 정보가 설정되지 않았습니다.');
-      console.warn(`  GOVC_URL: ${VCENTER_URL ? '설정됨' : '없음'}`);
-      console.warn(`  GOVC_USERNAME: ${VCENTER_USERNAME ? '설정됨' : '없음'}`);
-      console.warn(`  GOVC_PASSWORD: ${VCENTER_PASSWORD ? '설정됨' : '없음'}`);
+      console.warn(`  GOVC_URL: ${vcenterConfig.url ? '설정됨' : '없음'}`);
+      console.warn(`  GOVC_USERNAME: ${vcenterConfig.username ? '설정됨' : '없음'}`);
+      console.warn(`  GOVC_PASSWORD: ${vcenterConfig.password ? '설정됨' : '없음'}`);
       throw new Error('vCenter 연결 정보가 설정되지 않았습니다. 환경 변수를 확인하세요.');
     }
 
     console.log('[Template Service] vCenter VM 목록 조회 시작...');
-    console.log(`  vCenter URL: ${VCENTER_URL}`);
-    console.log(`  vCenter User: ${VCENTER_USERNAME}`);
+    console.log(`  vCenter URL: ${vcenterConfig.url}`);
+    console.log(`  vCenter User: ${vcenterConfig.username}`);
 
     // VM 목록 조회: /Datacenter/vm 경로 또는 find 명령 사용
     const command = `govc find / -type m`;
     const { stdout, stderr } = await execPromise(command, {
       env: {
         ...process.env,
-        GOVC_URL: VCENTER_URL,
-        GOVC_USERNAME: VCENTER_USERNAME,
-        GOVC_PASSWORD: VCENTER_PASSWORD,
-        GOVC_INSECURE: process.env.GOVC_INSECURE || '1'
+        GOVC_URL: vcenterConfig.url,
+        GOVC_USERNAME: vcenterConfig.username,
+        GOVC_PASSWORD: vcenterConfig.password,
+        GOVC_INSECURE: vcenterConfig.insecure
       }
     });
 
@@ -832,10 +851,10 @@ async function getVmList() {
         const { stdout: ipOutput } = await execPromise(vmIpCommand, {
           env: {
             ...process.env,
-            GOVC_URL: VCENTER_URL,
-            GOVC_USERNAME: VCENTER_USERNAME,
-            GOVC_PASSWORD: VCENTER_PASSWORD,
-            GOVC_INSECURE: process.env.GOVC_INSECURE || '1'
+            GOVC_URL: vcenterConfig.url,
+            GOVC_USERNAME: vcenterConfig.username,
+            GOVC_PASSWORD: vcenterConfig.password,
+            GOVC_INSECURE: vcenterConfig.insecure
           },
           timeout: 3000 // 3초 타임아웃 (병렬 처리로 짧게 설정)
         });
