@@ -51,14 +51,26 @@ function TemplateList() {
     setMessage(null);
 
     try {
+      console.log(`[TemplateList] 템플릿 삭제 시작: ${templateId} (${templateName})`);
       const result = await templateApi.deleteTemplate(templateId);
+      console.log(`[TemplateList] 템플릿 삭제 응답:`, result);
+      
       if (result.success) {
-        setMessage({ type: 'success', text: result.message });
+        setMessage({ type: 'success', text: result.message || '템플릿이 삭제되었습니다.' });
         setDeleteConfirm(null);
-        await loadTemplates();
+        // 삭제 후 목록 새로고침
+        try {
+          await loadTemplates();
+        } catch (loadError) {
+          console.error('[TemplateList] 목록 새로고침 실패:', loadError);
+          // 목록 새로고침 실패해도 삭제는 성공했으므로 에러 표시하지 않음
+        }
+      } else {
+        setMessage({ type: 'error', text: result.error || result.message || '템플릿 삭제에 실패했습니다.' });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: `템플릿 삭제 실패: ${error.message}` });
+      console.error(`[TemplateList] 템플릿 삭제 오류:`, error);
+      setMessage({ type: 'error', text: `템플릿 삭제 실패: ${error.message || '서버에 연결할 수 없습니다.'}` });
     } finally {
       setLoading(false);
     }

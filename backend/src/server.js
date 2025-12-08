@@ -402,12 +402,18 @@ const server = http.createServer((req, res) => {
   // 템플릿 삭제 API
   if (req.method === 'DELETE' && parsedUrl.pathname.startsWith('/api/templates/')) {
     const templateId = parsedUrl.pathname.split('/').pop();
+    console.log(`[Server] 템플릿 삭제 요청: ${templateId}`);
     (async () => {
       try {
         const result = await deleteTemplate(templateId);
+        console.log(`[Server] 템플릿 삭제 성공: ${templateId}`, result);
         sendJSONResponse(res, 200, result);
       } catch (error) {
-        sendJSONResponse(res, 500, { error: error.message });
+        console.error(`[Server] 템플릿 삭제 실패: ${templateId}`, error);
+        sendJSONResponse(res, 500, { 
+          error: error.message || '템플릿 삭제 중 오류가 발생했습니다.',
+          success: false
+        });
       }
     })();
     return;
