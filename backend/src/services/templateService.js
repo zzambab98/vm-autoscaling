@@ -732,11 +732,13 @@ async function deleteTemplate(templateId) {
       throw new Error(`템플릿 '${templateId}'을 찾을 수 없습니다.`);
     }
 
-    // vCenter에서 템플릿 삭제
+    // vCenter에서 템플릿 삭제 (디스크에서도 삭제)
     if (VCENTER_URL && VCENTER_USERNAME && VCENTER_PASSWORD) {
       try {
-        console.log(`[Template Service] vCenter에서 템플릿 삭제 시작: ${template.name}`);
-        const deleteCommand = `govc object.destroy "${template.name}"`;
+        console.log(`[Template Service] vCenter에서 템플릿 삭제 시작 (디스크 포함): ${template.name}`);
+        // govc vm.destroy는 VM과 템플릿 모두 삭제하며, 디스크 파일도 함께 삭제합니다
+        // 이는 vCenter UI의 "디스크에서 삭제" 옵션과 동일합니다
+        const deleteCommand = `govc vm.destroy "${template.name}"`;
         await execPromise(deleteCommand, {
           env: {
             ...process.env,
@@ -747,7 +749,7 @@ async function deleteTemplate(templateId) {
           },
           timeout: 300000 // 5분 타임아웃 (템플릿 삭제는 시간이 걸릴 수 있음)
         });
-        console.log(`[Template Service] vCenter에서 템플릿 삭제 완료: ${template.name}`);
+        console.log(`[Template Service] vCenter에서 템플릿 삭제 완료 (디스크 포함): ${template.name}`);
       } catch (error) {
         console.error(`[Template Service] vCenter 템플릿 삭제 실패:`, error.message);
         // vCenter 삭제 실패해도 메타데이터는 삭제 (일관성 유지)
