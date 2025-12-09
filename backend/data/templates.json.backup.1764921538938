@@ -1,0 +1,18 @@
+[
+  {
+    "id": "template-1764043685242",
+    "name": "auto-vm-test-template",
+    "originalVmName": "auto-vm-test-01",
+    "description": "",
+    "createdAt": "2025-11-25T04:08:05.242Z",
+    "updatedAt": "2025-11-25T04:08:05.242Z"
+  },
+  {
+    "id": "template-1764130044779",
+    "name": "kube-worker-node-template",
+    "originalVmName": "kube-golden-image",
+    "description": "",
+    "createdAt": "2025-11-26T04:07:24.780Z",
+    "updatedAt": "2025-11-26T04:07:24.780Z"
+  }
+]
