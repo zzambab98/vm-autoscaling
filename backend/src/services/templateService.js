@@ -707,22 +707,18 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
     console.log(`[Template Service] VM 클론 시작: ${vmName} -> ${cloneName}`);
     
     // govc vm.clone 명령어 구성
-    // datastore와 resource pool이 여러 개인 경우 명시적으로 지정 필요
+    // 클론 시 원본 VM이 있는 Datastore를 그대로 사용하는 것이 가장 안전
     let cloneCommand = `govc vm.clone -vm="${vmName}"`;
     
     // Datastore는 반드시 지정해야 함 (여러 Datastore가 있을 경우)
-    if (datastore) {
-      cloneCommand += ` -ds="${datastore}"`;
-      console.log(`[Template Service] Datastore 지정: ${datastore}`);
-    } else {
-      // Datastore가 없으면 VM이 있는 Datastore를 사용
-      // VM의 VmPathName에서 Datastore 추출
+    // 원본 VM이 있는 Datastore를 사용
+    if (!datastore) {
+      // VM의 VmPathName에서 Datastore 추출 (최종 시도)
       if (vmInfo && vmInfo.Files && vmInfo.Files.VmPathName) {
         const vmPathName = vmInfo.Files.VmPathName;
         const match = vmPathName.match(/\[([^\]]+)\]/);
         if (match && match[1]) {
           datastore = match[1];
-          cloneCommand += ` -ds="${datastore}"`;
           console.log(`[Template Service] Datastore 자동 지정 (VmPathName): ${datastore}`);
         }
       }
@@ -731,6 +727,10 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
         throw new Error('Datastore를 찾을 수 없습니다. VM의 Datastore 정보를 확인하세요.');
       }
     }
+    
+    // 클론 시 원본 VM이 있는 Datastore를 사용
+    cloneCommand += ` -ds="${datastore}"`;
+    console.log(`[Template Service] Datastore 지정 (원본 VM Datastore 사용): ${datastore}`);
     
     // Resource Pool도 반드시 지정해야 함 (여러 Resource Pool이 있을 경우)
     if (resourcePool) {
