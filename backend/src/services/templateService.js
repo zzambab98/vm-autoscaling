@@ -307,13 +307,37 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
 
     // VM의 datastore 정보 추출
     let datastore = null;
-    if (vmInfo && vmInfo.Datastore) {
+    
+    // 방법 1: Files.VmPathName에서 Datastore 이름 추출 (가장 정확)
+    if (vmInfo && vmInfo.Files && vmInfo.Files.VmPathName) {
+      const vmPathName = vmInfo.Files.VmPathName;
+      // 형식: [Datastore-Name] path/to/vm.vmx
+      const match = vmPathName.match(/\[([^\]]+)\]/);
+      if (match && match[1]) {
+        datastore = match[1];
+        console.log(`[Template Service] Datastore 찾음 (VmPathName): ${datastore}`);
+      }
+    }
+    
+    // 방법 2: Datastore 필드에서 추출
+    if (!datastore && vmInfo && vmInfo.Datastore) {
       // Datastore가 배열인 경우 첫 번째 사용
       const datastores = Array.isArray(vmInfo.Datastore) ? vmInfo.Datastore : [vmInfo.Datastore];
       if (datastores.length > 0) {
         // Datastore 객체에서 이름 추출
         const dsInfo = datastores[0];
-        datastore = typeof dsInfo === 'string' ? dsInfo : (dsInfo.Value || dsInfo.Name || null);
+        if (typeof dsInfo === 'string') {
+          datastore = dsInfo;
+        } else if (dsInfo && dsInfo.Value) {
+          // Value가 전체 경로일 수 있으므로 이름만 추출
+          const valueParts = dsInfo.Value.split('/');
+          datastore = valueParts[valueParts.length - 1] || dsInfo.Value;
+        } else if (dsInfo && dsInfo.Name) {
+          datastore = dsInfo.Name;
+        }
+        if (datastore) {
+          console.log(`[Template Service] Datastore 찾음 (Datastore 필드): ${datastore}`);
+        }
       }
     }
 
@@ -322,6 +346,8 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
       datastore = DEFAULT_DATASTORE;
       console.log(`[Template Service] Datastore를 기본값으로 사용: ${datastore}`);
     }
+    
+    console.log(`[Template Service] 최종 Datastore: ${datastore}`);
 
     // VM의 resource pool 정보 추출
     let resourcePool = null;
