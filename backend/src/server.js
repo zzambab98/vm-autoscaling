@@ -429,7 +429,7 @@ const server = http.createServer((req, res) => {
   }
 
   // VM 목록 조회 API
-  if (req.method === 'GET' && parsedUrl.pathname === '/api/vms') {
+  if (req.method === 'GET' && (parsedUrl.pathname === '/api/vms' || parsedUrl.pathname === '/api/templates/vms')) {
     (async () => {
       try {
         const vms = await getVmList();
