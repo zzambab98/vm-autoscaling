@@ -368,6 +368,20 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // VM 목록 조회 API (템플릿 상세 조회보다 먼저 체크)
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/templates/vms') {
+    (async () => {
+      try {
+        const vms = await getVmList();
+        sendJSONResponse(res, 200, { success: true, vms });
+      } catch (error) {
+        console.error('[Server] VM 목록 조회 API 에러:', error);
+        sendJSONResponse(res, 500, { success: false, error: error.message, vms: [] });
+      }
+    })();
+    return;
+  }
+
   // 템플릿 상세 조회 API
   if (req.method === 'GET' && parsedUrl.pathname.startsWith('/api/templates/')) {
     const templateId = parsedUrl.pathname.split('/').pop();
@@ -429,7 +443,7 @@ const server = http.createServer((req, res) => {
   }
 
   // VM 목록 조회 API
-  if (req.method === 'GET' && (parsedUrl.pathname === '/api/vms' || parsedUrl.pathname === '/api/templates/vms')) {
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/vms') {
     (async () => {
       try {
         const vms = await getVmList();
