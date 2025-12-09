@@ -805,24 +805,70 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
       throw new Error('Resource Pool을 찾을 수 없습니다. VM의 Resource Pool 정보를 확인하세요.');
     }
     
+    // VM의 전체 경로 찾기 (클론 시 전체 경로 사용이 더 안정적)
+    let vmFullPath = null;
+    try {
+      const findVmCommand = `govc find . -type m -name "${vmName}"`;
+      const { stdout: vmPathOutput } = await execPromise(findVmCommand, {
+        env: {
+          ...process.env,
+          GOVC_URL: vcenterConfig.url,
+          GOVC_USERNAME: vcenterConfig.username,
+          GOVC_PASSWORD: vcenterConfig.password,
+          GOVC_INSECURE: vcenterConfig.insecure
+        }
+      });
+      vmFullPath = vmPathOutput.trim().split('\n')[0];
+      if (vmFullPath) {
+        console.log(`[Template Service] VM 전체 경로: ${vmFullPath}`);
+      }
+    } catch (error) {
+      console.warn(`[Template Service] VM 전체 경로 찾기 실패, VM 이름 사용:`, error.message);
+    }
+    
     // govc vm.clone 명령어 구성
     // 클론 시 원본 VM이 있는 Datastore를 그대로 사용하는 것이 가장 안전
-    // 명령어 형식: govc vm.clone -vm="원본VM" -ds="Datastore" -pool="ResourcePool" -on=false "클론이름"
-    const cloneCommand = `govc vm.clone -vm="${vmName}" -ds="${datastore}" -pool="${resourcePool}" -on=false "${cloneName}"`;
+    // VM 전체 경로를 사용하면 더 안정적
+    const vmIdentifier = vmFullPath || `"${vmName}"`;
+    const cloneCommand = `govc vm.clone -vm=${vmIdentifier} -ds="${datastore}" -pool="${resourcePool}" -on=false "${cloneName}"`;
     
     console.log(`[Template Service] Datastore 지정 (원본 VM Datastore 사용): ${datastore}`);
     console.log(`[Template Service] Resource Pool 지정: ${resourcePool}`);
     console.log(`[Template Service] 클론 명령어: ${cloneCommand}`);
-    await execPromise(cloneCommand, {
-      env: {
-        ...process.env,
-        GOVC_URL: vcenterConfig.url,
-        GOVC_USERNAME: vcenterConfig.username,
-        GOVC_PASSWORD: vcenterConfig.password,
-        GOVC_INSECURE: vcenterConfig.insecure
-      },
-      timeout: 600000 // 10분 타임아웃
-    });
+    
+    try {
+      await execPromise(cloneCommand, {
+        env: {
+          ...process.env,
+          GOVC_URL: vcenterConfig.url,
+          GOVC_USERNAME: vcenterConfig.username,
+          GOVC_PASSWORD: vcenterConfig.password,
+          GOVC_INSECURE: vcenterConfig.insecure
+        },
+        timeout: 600000 // 10분 타임아웃
+      });
+    } catch (cloneError) {
+      // 클론 실패 시 원본 VM 전원 상태 복원 (필요한 경우)
+      if (!vmWasPoweredOn) {
+        try {
+          console.log(`[Template Service] 클론 실패, 원본 VM 전원 끄기 시도: ${vmName}`);
+          const powerOffCommand = `govc vm.power -off -force "${vmName}"`;
+          await execPromise(powerOffCommand, {
+            env: {
+              ...process.env,
+              GOVC_URL: vcenterConfig.url,
+              GOVC_USERNAME: vcenterConfig.username,
+              GOVC_PASSWORD: vcenterConfig.password,
+              GOVC_INSECURE: vcenterConfig.insecure
+            },
+            timeout: 30000
+          });
+        } catch (restoreError) {
+          console.warn(`[Template Service] 원본 VM 전원 복원 실패:`, restoreError.message);
+        }
+      }
+      throw cloneError; // 원래 에러를 다시 throw
+    }
 
     // 클론된 VM의 전원 상태 확인 및 강제 종료 (안전장치)
     console.log(`[Template Service] 클론된 VM 전원 상태 확인: ${cloneName}`);
