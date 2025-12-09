@@ -326,15 +326,106 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
     // VM의 resource pool 정보 추출
     let resourcePool = null;
     
+    /**
+     * Resource Pool 경로를 전체 경로로 변환하는 함수
+     * @param {string} rpValue - Resource Pool 값 (예: "ResourcePool:resgroup-10" 또는 "/Datacenter/host/Cluster/Resources")
+     * @returns {Promise<string|null>} 전체 경로 또는 null
+     */
+    const convertResourcePoolToPath = async (rpValue) => {
+      if (!rpValue || rpValue === 'null' || rpValue === '') {
+        return null;
+      }
+      
+      // 이미 전체 경로 형식인 경우 (예: "/Datacenter/host/Cluster/Resources")
+      if (rpValue.startsWith('/')) {
+        return rpValue;
+      }
+      
+      // ResourcePool:resgroup-XX 형식인 경우 전체 경로로 변환
+      if (rpValue.startsWith('ResourcePool:')) {
+        try {
+          // resgroup ID 추출
+          const resgroupId = rpValue.replace('ResourcePool:', '');
+          
+          // govc object.collect로 해당 resgroup의 전체 경로 찾기
+          const collectCommand = `govc object.collect -s "${rpValue}" name`;
+          const { stdout: rpName } = await execPromise(collectCommand, {
+            env: {
+              ...process.env,
+              GOVC_URL: vcenterConfig.url,
+              GOVC_USERNAME: vcenterConfig.username,
+              GOVC_PASSWORD: vcenterConfig.password,
+              GOVC_INSECURE: vcenterConfig.insecure
+            }
+          });
+          
+          // Resource Pool의 부모 경로를 찾아서 전체 경로 구성
+          // 먼저 Resource Pool의 부모(클러스터 또는 호스트) 찾기
+          const parentCommand = `govc object.collect -s "${rpValue}" parent`;
+          const { stdout: parentPath } = await execPromise(parentCommand, {
+            env: {
+              ...process.env,
+              GOVC_URL: vcenterConfig.url,
+              GOVC_USERNAME: vcenterConfig.username,
+              GOVC_PASSWORD: vcenterConfig.password,
+              GOVC_INSECURE: vcenterConfig.insecure
+            }
+          });
+          
+          const parent = parentPath.trim();
+          const rpNameValue = rpName.trim();
+          
+          if (parent && parent.startsWith('/') && rpNameValue) {
+            const fullPath = `${parent}/${rpNameValue}`;
+            console.log(`[Template Service] Resource Pool 경로 변환 성공: ${rpValue} -> ${fullPath}`);
+            return fullPath;
+          }
+          
+          // 대안: govc find로 직접 찾기
+          const findCommand = `govc find . -type p | grep -i "${resgroupId}" | head -1`;
+          const { stdout: rpPath } = await execPromise(findCommand, {
+            env: {
+              ...process.env,
+              GOVC_URL: vcenterConfig.url,
+              GOVC_USERNAME: vcenterConfig.username,
+              GOVC_PASSWORD: vcenterConfig.password,
+              GOVC_INSECURE: vcenterConfig.insecure
+            },
+            shell: true
+          });
+          
+          const fullPath = rpPath.trim().split('\n')[0];
+          if (fullPath && fullPath.startsWith('/')) {
+            console.log(`[Template Service] Resource Pool 경로 변환 성공 (find): ${rpValue} -> ${fullPath}`);
+            return fullPath;
+          }
+        } catch (error) {
+          console.warn(`[Template Service] Resource Pool 경로 변환 실패 (${rpValue}):`, error.message);
+        }
+      }
+      
+      // 그 외의 경우 그대로 반환 (이름만 있는 경우 등)
+      return rpValue;
+    };
+    
     // 방법 1: VM 정보에서 직접 추출
     if (vmInfo && vmInfo.ResourcePool) {
       const rpInfo = vmInfo.ResourcePool;
+      let rpValue = null;
+      
       if (typeof rpInfo === 'string') {
-        resourcePool = rpInfo;
+        rpValue = rpInfo;
       } else if (rpInfo && rpInfo.Value) {
-        resourcePool = rpInfo.Value;
+        rpValue = rpInfo.Value;
       } else if (rpInfo && rpInfo.Name) {
-        resourcePool = rpInfo.Name;
+        rpValue = rpInfo.Name;
+      }
+      
+      if (rpValue) {
+        resourcePool = await convertResourcePoolToPath(rpValue);
+        if (resourcePool) {
+          console.log(`[Template Service] Resource Pool 찾음 (VM Info): ${resourcePool}`);
+        }
       }
     }
     
@@ -368,8 +459,10 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
           });
           const rpValue = rpOutput.trim();
           if (rpValue && rpValue !== '' && rpValue !== 'null') {
-            resourcePool = rpValue;
-            console.log(`[Template Service] Resource Pool 찾음 (VM 경로): ${resourcePool}`);
+            resourcePool = await convertResourcePoolToPath(rpValue);
+            if (resourcePool) {
+              console.log(`[Template Service] Resource Pool 찾음 (VM 경로): ${resourcePool}`);
+            }
           }
         }
       } catch (error) {
