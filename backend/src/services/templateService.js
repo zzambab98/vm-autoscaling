@@ -797,11 +797,26 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
     
     // govc vm.clone 명령어 구성
     // VM 이름을 사용하는 것이 더 안정적 (전체 경로는 때때로 문제를 일으킬 수 있음)
-    // 클론 시 원본 VM이 있는 Datastore를 그대로 사용하는 것이 가장 안전
-    const cloneCommand = `govc vm.clone -vm="${vmName}" -ds="${datastore}" -pool="${resourcePool}" -on=false "${cloneName}"`;
+    // 클론 시 Datastore를 지정하지 않으면 원본 VM이 있는 Datastore를 자동으로 사용
+    // 여러 Datastore가 있을 경우에만 명시적으로 지정
+    let cloneCommand = `govc vm.clone -vm="${vmName}"`;
     
-    console.log(`[Template Service] Datastore 지정 (원본 VM Datastore 사용): ${datastore}`);
+    // Datastore 지정은 선택사항 (지정하지 않으면 원본 VM의 Datastore 사용)
+    // 하지만 여러 Datastore가 있을 경우 필수이므로, 원본 VM의 Datastore를 사용
+    if (datastore) {
+      cloneCommand += ` -ds="${datastore}"`;
+      console.log(`[Template Service] Datastore 지정 (원본 VM Datastore 사용): ${datastore}`);
+    } else {
+      console.log(`[Template Service] Datastore 미지정 (원본 VM Datastore 자동 사용)`);
+    }
+    
+    // Resource Pool은 필수 (여러 Resource Pool이 있을 경우)
+    cloneCommand += ` -pool="${resourcePool}"`;
     console.log(`[Template Service] Resource Pool 지정: ${resourcePool}`);
+    
+    // 클론은 전원 꺼진 상태로 생성
+    cloneCommand += ` -on=false "${cloneName}"`;
+    
     console.log(`[Template Service] 클론 명령어: ${cloneCommand}`);
     
     try {
