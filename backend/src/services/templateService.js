@@ -702,13 +702,11 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
     
     // 방법 2: VM을 클론하여 템플릿으로 변환 (새 이름 사용)
     // 더 안전한 방법: VM을 클론한 후 템플릿으로 변환
-    const cloneName = `${templateName}-temp-${Date.now()}`;
+    // templateName에서 공백 제거 및 정리
+    const cleanTemplateName = templateName.trim().replace(/\s+/g, '-');
+    const cloneName = `${cleanTemplateName}-temp-${Date.now()}`;
     
     console.log(`[Template Service] VM 클론 시작: ${vmName} -> ${cloneName}`);
-    
-    // govc vm.clone 명령어 구성
-    // 클론 시 원본 VM이 있는 Datastore를 그대로 사용하는 것이 가장 안전
-    let cloneCommand = `govc vm.clone -vm="${vmName}"`;
     
     // Datastore는 반드시 지정해야 함 (여러 Datastore가 있을 경우)
     // 원본 VM이 있는 Datastore를 사용
@@ -728,22 +726,18 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
       }
     }
     
-    // 클론 시 원본 VM이 있는 Datastore를 사용
-    cloneCommand += ` -ds="${datastore}"`;
-    console.log(`[Template Service] Datastore 지정 (원본 VM Datastore 사용): ${datastore}`);
-    
     // Resource Pool도 반드시 지정해야 함 (여러 Resource Pool이 있을 경우)
-    if (resourcePool) {
-      cloneCommand += ` -pool="${resourcePool}"`;
-      console.log(`[Template Service] Resource Pool 지정: ${resourcePool}`);
-    } else {
+    if (!resourcePool) {
       throw new Error('Resource Pool을 찾을 수 없습니다. VM의 Resource Pool 정보를 확인하세요.');
     }
     
-    // 템플릿용 클론은 전원을 끈 상태로 생성 (-on=false)
-    // 네트워크 설정 없이 생성하여 IP 중복 방지
-    cloneCommand += ` -on=false "${cloneName}"`;
+    // govc vm.clone 명령어 구성
+    // 클론 시 원본 VM이 있는 Datastore를 그대로 사용하는 것이 가장 안전
+    // 명령어 형식: govc vm.clone -vm="원본VM" -ds="Datastore" -pool="ResourcePool" -on=false "클론이름"
+    const cloneCommand = `govc vm.clone -vm="${vmName}" -ds="${datastore}" -pool="${resourcePool}" -on=false "${cloneName}"`;
     
+    console.log(`[Template Service] Datastore 지정 (원본 VM Datastore 사용): ${datastore}`);
+    console.log(`[Template Service] Resource Pool 지정: ${resourcePool}`);
     console.log(`[Template Service] 클론 명령어: ${cloneCommand}`);
     await execPromise(cloneCommand, {
       env: {
