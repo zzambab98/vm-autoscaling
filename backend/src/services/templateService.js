@@ -306,7 +306,7 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
       throw new Error(`VM '${vmName}'을 찾을 수 없습니다.`);
     }
     
-    // VM이 사용 가능한 상태인지 확인 (다른 작업이 진행 중이 아닌지)
+    // VM이 사용 가능한 상태인지 확인 및 전원 상태 처리
     console.log(`[Template Service] VM 사용 가능 상태 확인: ${vmName}`);
     let vmWasPoweredOn = false;
     let retryCount = 0;
@@ -342,15 +342,63 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
         const powerStateLower = powerState.trim().toLowerCase();
         const isPoweredOn = powerStateLower.includes('on') || powerStateLower.includes('powered on');
         
-        // VM이 사용 가능한 상태인지 확인 (전원이 켜져 있거나, 꺼져 있어도 다른 작업이 없으면 OK)
+        // VM이 사용 가능한 상태인지 확인 (다른 작업이 없으면 OK)
         if (taskStatus.toLowerCase().includes('ready') || !taskStatus.toLowerCase().includes('busy')) {
           if (isPoweredOn) {
+            // 전원이 켜져 있으면 템플릿 생성을 위해 전원 끄기
             vmWasPoweredOn = true;
-            console.log(`[Template Service] VM이 전원이 켜져 있고 사용 가능한 상태입니다: ${vmName}`);
+            console.log(`[Template Service] VM이 전원이 켜져 있습니다. 템플릿 생성을 위해 전원을 끕니다: ${vmName}`);
+            
+            const powerOffCommand = `govc vm.power -off -force "${vmName}"`;
+            await execPromise(powerOffCommand, {
+              env: {
+                ...process.env,
+                GOVC_URL: vcenterConfig.url,
+                GOVC_USERNAME: vcenterConfig.username,
+                GOVC_PASSWORD: vcenterConfig.password,
+                GOVC_INSECURE: vcenterConfig.insecure
+              },
+              timeout: 60000 // 1분 타임아웃
+            });
+            
+            // VM이 완전히 꺼질 때까지 대기 (최대 2분)
+            console.log(`[Template Service] VM 전원 끄기 대기 중...`);
+            let waitTime = 0;
+            const maxWait = 120; // 2분
+            
+            while (waitTime < maxWait) {
+              await new Promise(resolve => setTimeout(resolve, 5000)); // 5초 대기
+              waitTime += 5;
+              
+              try {
+                const checkPowerCommand = `govc vm.power -get "${vmName}"`;
+                const { stdout: checkPowerState } = await execPromise(checkPowerCommand, {
+                  env: {
+                    ...process.env,
+                    GOVC_URL: vcenterConfig.url,
+                    GOVC_USERNAME: vcenterConfig.username,
+                    GOVC_PASSWORD: vcenterConfig.password,
+                    GOVC_INSECURE: vcenterConfig.insecure
+                  }
+                });
+                
+                const checkPowerStateLower = checkPowerState.trim().toLowerCase();
+                const isStillPoweredOn = checkPowerStateLower.includes('on') || checkPowerStateLower.includes('powered on');
+                
+                if (!isStillPoweredOn) {
+                  console.log(`[Template Service] VM 전원 꺼짐 확인 (${waitTime}초)`);
+                  break;
+                }
+              } catch (error) {
+                // 전원 상태 확인 실패는 무시하고 계속 대기
+              }
+            }
+            
+            console.log(`[Template Service] VM이 전원이 꺼진 상태입니다. 클론 작업을 진행합니다: ${vmName}`);
             break;
           } else {
-            // 전원이 꺼져 있어도 클론은 가능 (전원 켜지 않음)
-            console.log(`[Template Service] VM이 전원이 꺼져 있지만 클론 가능한 상태입니다: ${vmName}`);
+            // 전원이 이미 꺼져 있으면 바로 진행
+            console.log(`[Template Service] VM이 전원이 꺼져 있어 클론 가능한 상태입니다: ${vmName}`);
             break;
           }
         } else {
