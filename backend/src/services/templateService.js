@@ -304,6 +304,80 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
     } catch (error) {
       throw new Error(`VM '${vmName}'을 찾을 수 없습니다.`);
     }
+    
+    // VM 전원 상태 확인 및 필요시 켜기 (클론 작업을 위해)
+    let vmWasPoweredOn = false;
+    try {
+      const powerStateCommand = `govc vm.power -get "${vmName}"`;
+      const { stdout: powerState } = await execPromise(powerStateCommand, {
+        env: {
+          ...process.env,
+          GOVC_URL: vcenterConfig.url,
+          GOVC_USERNAME: vcenterConfig.username,
+          GOVC_PASSWORD: vcenterConfig.password,
+          GOVC_INSECURE: vcenterConfig.insecure
+        }
+      });
+      
+      const powerStateLower = powerState.trim().toLowerCase();
+      const isPoweredOn = powerStateLower.includes('on') || powerStateLower.includes('powered on');
+      
+      if (!isPoweredOn) {
+        console.log(`[Template Service] VM이 전원이 꺼져 있습니다. 클론 작업을 위해 전원을 켭니다: ${vmName}`);
+        const powerOnCommand = `govc vm.power -on "${vmName}"`;
+        await execPromise(powerOnCommand, {
+          env: {
+            ...process.env,
+            GOVC_URL: vcenterConfig.url,
+            GOVC_USERNAME: vcenterConfig.username,
+            GOVC_PASSWORD: vcenterConfig.password,
+            GOVC_INSECURE: vcenterConfig.insecure
+          },
+          timeout: 60000 // 1분 타임아웃
+        });
+        
+        // VM이 완전히 부팅될 때까지 대기 (최대 2분)
+        console.log(`[Template Service] VM 부팅 대기 중...`);
+        let waitTime = 0;
+        const maxWait = 120; // 2분
+        
+        while (waitTime < maxWait) {
+          await new Promise(resolve => setTimeout(resolve, 5000)); // 5초 대기
+          waitTime += 5;
+          
+          try {
+            const checkPowerCommand = `govc vm.power -get "${vmName}"`;
+            const { stdout: checkPowerState } = await execPromise(checkPowerCommand, {
+              env: {
+                ...process.env,
+                GOVC_URL: vcenterConfig.url,
+                GOVC_USERNAME: vcenterConfig.username,
+                GOVC_PASSWORD: vcenterConfig.password,
+                GOVC_INSECURE: vcenterConfig.insecure
+              }
+            });
+            
+            const checkPowerStateLower = checkPowerState.trim().toLowerCase();
+            if (checkPowerStateLower.includes('on') || checkPowerStateLower.includes('powered on')) {
+              console.log(`[Template Service] VM 전원 켜짐 확인 (${waitTime}초)`);
+              vmWasPoweredOn = true;
+              break;
+            }
+          } catch (error) {
+            // 전원 상태 확인 실패는 무시하고 계속 대기
+          }
+        }
+        
+        if (!vmWasPoweredOn) {
+          console.warn(`[Template Service] VM 전원 켜기 확인 실패, 클론 작업 계속 진행`);
+        }
+      } else {
+        vmWasPoweredOn = true;
+        console.log(`[Template Service] VM이 이미 전원이 켜져 있습니다: ${vmName}`);
+      }
+    } catch (error) {
+      console.warn(`[Template Service] VM 전원 상태 확인/켜기 실패 (클론 작업 계속 진행):`, error.message);
+    }
 
     // VM의 datastore 정보 추출
     let datastore = null;
