@@ -327,20 +327,59 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
           shell: true
         });
         
-        // VM 전원 상태 확인
-        const powerStateCommand = `govc vm.power -get "${vmName}"`;
-        const { stdout: powerState } = await execPromise(powerStateCommand, {
-          env: {
-            ...process.env,
-            GOVC_URL: vcenterConfig.url,
-            GOVC_USERNAME: vcenterConfig.username,
-            GOVC_PASSWORD: vcenterConfig.password,
-            GOVC_INSECURE: vcenterConfig.insecure
+        // VM 전원 상태 확인 (govc object.collect 사용)
+        let isPoweredOn = false;
+        try {
+          // VM 전체 경로 찾기
+          const findVmPathCommand = `govc find . -type m -name "${vmName}"`;
+          const { stdout: vmPathOutput } = await execPromise(findVmPathCommand, {
+            env: {
+              ...process.env,
+              GOVC_URL: vcenterConfig.url,
+              GOVC_USERNAME: vcenterConfig.username,
+              GOVC_PASSWORD: vcenterConfig.password,
+              GOVC_INSECURE: vcenterConfig.insecure
+            }
+          });
+          const vmFullPath = vmPathOutput.trim().split('\n')[0];
+          
+          if (vmFullPath) {
+            const powerStateCommand = `govc object.collect -s "${vmFullPath}" runtime.powerState`;
+            const { stdout: powerState } = await execPromise(powerStateCommand, {
+              env: {
+                ...process.env,
+                GOVC_URL: vcenterConfig.url,
+                GOVC_USERNAME: vcenterConfig.username,
+                GOVC_PASSWORD: vcenterConfig.password,
+                GOVC_INSECURE: vcenterConfig.insecure
+              }
+            });
+            
+            const powerStateValue = powerState.trim().toLowerCase();
+            // poweredOn, poweredOff 등
+            isPoweredOn = powerStateValue === 'poweredon' || powerStateValue.includes('poweredon');
           }
-        });
-        
-        const powerStateLower = powerState.trim().toLowerCase();
-        const isPoweredOn = powerStateLower.includes('on') || powerStateLower.includes('powered on');
+        } catch (error) {
+          console.warn(`[Template Service] VM 전원 상태 확인 실패:`, error.message);
+          // 전원 상태 확인 실패 시 VM info로 확인 시도
+          try {
+            const vmInfoCommand = `govc vm.info "${vmName}" | grep -i "Power state:" | awk '{print $3}'`;
+            const { stdout: powerStateText } = await execPromise(vmInfoCommand, {
+              env: {
+                ...process.env,
+                GOVC_URL: vcenterConfig.url,
+                GOVC_USERNAME: vcenterConfig.username,
+                GOVC_PASSWORD: vcenterConfig.password,
+                GOVC_INSECURE: vcenterConfig.insecure
+              },
+              shell: true
+            });
+            const powerStateLower = powerStateText.trim().toLowerCase();
+            isPoweredOn = powerStateLower.includes('poweredon') || powerStateLower.includes('on');
+          } catch (error2) {
+            console.warn(`[Template Service] VM 전원 상태 확인 실패 (대체 방법):`, error2.message);
+          }
+        }
         
         // VM이 사용 가능한 상태인지 확인 (다른 작업이 없으면 OK)
         if (taskStatus.toLowerCase().includes('ready') || !taskStatus.toLowerCase().includes('busy')) {
@@ -371,8 +410,9 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
               waitTime += 5;
               
               try {
-                const checkPowerCommand = `govc vm.power -get "${vmName}"`;
-                const { stdout: checkPowerState } = await execPromise(checkPowerCommand, {
+                // VM 전체 경로 찾기
+                const findVmPathCommand = `govc find . -type m -name "${vmName}"`;
+                const { stdout: vmPathOutput } = await execPromise(findVmPathCommand, {
                   env: {
                     ...process.env,
                     GOVC_URL: vcenterConfig.url,
@@ -381,13 +421,27 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
                     GOVC_INSECURE: vcenterConfig.insecure
                   }
                 });
+                const vmFullPath = vmPathOutput.trim().split('\n')[0];
                 
-                const checkPowerStateLower = checkPowerState.trim().toLowerCase();
-                const isStillPoweredOn = checkPowerStateLower.includes('on') || checkPowerStateLower.includes('powered on');
-                
-                if (!isStillPoweredOn) {
-                  console.log(`[Template Service] VM 전원 꺼짐 확인 (${waitTime}초)`);
-                  break;
+                if (vmFullPath) {
+                  const checkPowerCommand = `govc object.collect -s "${vmFullPath}" runtime.powerState`;
+                  const { stdout: checkPowerState } = await execPromise(checkPowerCommand, {
+                    env: {
+                      ...process.env,
+                      GOVC_URL: vcenterConfig.url,
+                      GOVC_USERNAME: vcenterConfig.username,
+                      GOVC_PASSWORD: vcenterConfig.password,
+                      GOVC_INSECURE: vcenterConfig.insecure
+                    }
+                  });
+                  
+                  const checkPowerStateValue = checkPowerState.trim().toLowerCase();
+                  const isStillPoweredOn = checkPowerStateValue === 'poweredon' || checkPowerStateValue.includes('poweredon');
+                  
+                  if (!isStillPoweredOn) {
+                    console.log(`[Template Service] VM 전원 꺼짐 확인 (${waitTime}초)`);
+                    break;
+                  }
                 }
               } catch (error) {
                 // 전원 상태 확인 실패는 무시하고 계속 대기
