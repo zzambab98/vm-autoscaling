@@ -795,24 +795,52 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
       throw new Error('Resource Pool을 찾을 수 없습니다. VM의 Resource Pool 정보를 확인하세요.');
     }
     
+    // VM이 있는 호스트 정보 추출 (클론 시 같은 호스트 사용하여 Datastore 접근 문제 방지)
+    let vmHost = null;
+    try {
+      // govc vm.info로 호스트 정보 추출
+      const hostInfoCommand = `govc vm.info "${vmName}" | grep -i "^  Host:" | awk '{print $2}'`;
+      const { stdout: hostOutput } = await execPromise(hostInfoCommand, {
+        env: {
+          ...process.env,
+          GOVC_URL: vcenterConfig.url,
+          GOVC_USERNAME: vcenterConfig.username,
+          GOVC_PASSWORD: vcenterConfig.password,
+          GOVC_INSECURE: vcenterConfig.insecure
+        },
+        shell: true
+      });
+      const hostValue = hostOutput.trim();
+      if (hostValue && hostValue !== '') {
+        vmHost = hostValue;
+        console.log(`[Template Service] VM 호스트 찾음: ${vmHost}`);
+      }
+    } catch (error) {
+      console.warn(`[Template Service] VM 호스트 정보 추출 실패:`, error.message);
+    }
+    
     // govc vm.clone 명령어 구성
     // VM 이름을 사용하는 것이 더 안정적 (전체 경로는 때때로 문제를 일으킬 수 있음)
-    // 클론 시 Datastore를 지정하지 않으면 원본 VM이 있는 Datastore를 자동으로 사용
-    // 여러 Datastore가 있을 경우에만 명시적으로 지정
     let cloneCommand = `govc vm.clone -vm="${vmName}"`;
     
-    // Datastore 지정은 선택사항 (지정하지 않으면 원본 VM의 Datastore 사용)
-    // 하지만 여러 Datastore가 있을 경우 필수이므로, 원본 VM의 Datastore를 사용
+    // Datastore는 필수 (여러 Datastore가 있을 경우)
     if (datastore) {
       cloneCommand += ` -ds="${datastore}"`;
       console.log(`[Template Service] Datastore 지정 (원본 VM Datastore 사용): ${datastore}`);
     } else {
-      console.log(`[Template Service] Datastore 미지정 (원본 VM Datastore 자동 사용)`);
+      throw new Error('Datastore를 찾을 수 없습니다. VM의 Datastore 정보를 확인하세요.');
     }
     
     // Resource Pool은 필수 (여러 Resource Pool이 있을 경우)
     cloneCommand += ` -pool="${resourcePool}"`;
     console.log(`[Template Service] Resource Pool 지정: ${resourcePool}`);
+    
+    // 호스트 지정 (선택사항, 지정하지 않으면 자동 선택)
+    // 같은 호스트에 클론하면 Datastore 접근 문제를 방지할 수 있음
+    if (vmHost) {
+      cloneCommand += ` -host="${vmHost}"`;
+      console.log(`[Template Service] 호스트 지정 (원본 VM 호스트 사용): ${vmHost}`);
+    }
     
     // 클론은 전원 꺼진 상태로 생성
     cloneCommand += ` -on=false "${cloneName}"`;
