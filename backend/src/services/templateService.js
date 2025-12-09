@@ -308,8 +308,49 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
     // VM의 datastore 정보 추출
     let datastore = null;
     
-    // 방법 1: Files.VmPathName에서 Datastore 이름 추출 (가장 정확)
-    if (vmInfo && vmInfo.Files && vmInfo.Files.VmPathName) {
+    // 방법 1: VM 경로를 찾아서 object.collect로 VmPathName 조회 (가장 정확)
+    try {
+      const findCommand = `govc find . -type m -name "${vmName}"`;
+      const { stdout: vmPath } = await execPromise(findCommand, {
+        env: {
+          ...process.env,
+          GOVC_URL: vcenterConfig.url,
+          GOVC_USERNAME: vcenterConfig.username,
+          GOVC_PASSWORD: vcenterConfig.password,
+          GOVC_INSECURE: vcenterConfig.insecure
+        }
+      });
+      const vmFullPath = vmPath.trim().split('\n')[0];
+      
+      if (vmFullPath) {
+        // VM의 VmPathName 직접 조회
+        const vmPathNameCommand = `govc object.collect -s "${vmFullPath}" config.files.vmPathName`;
+        const { stdout: vmPathName } = await execPromise(vmPathNameCommand, {
+          env: {
+            ...process.env,
+            GOVC_URL: vcenterConfig.url,
+            GOVC_USERNAME: vcenterConfig.username,
+            GOVC_PASSWORD: vcenterConfig.password,
+            GOVC_INSECURE: vcenterConfig.insecure
+          }
+        });
+        
+        const vmPathNameValue = vmPathName.trim();
+        if (vmPathNameValue) {
+          // 형식: [Datastore-Name] path/to/vm.vmx
+          const match = vmPathNameValue.match(/\[([^\]]+)\]/);
+          if (match && match[1]) {
+            datastore = match[1];
+            console.log(`[Template Service] Datastore 찾음 (object.collect): ${datastore}`);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('[Template Service] Datastore 조회 실패 (object.collect):', error.message);
+    }
+    
+    // 방법 2: Files.VmPathName에서 Datastore 이름 추출
+    if (!datastore && vmInfo && vmInfo.Files && vmInfo.Files.VmPathName) {
       const vmPathName = vmInfo.Files.VmPathName;
       // 형식: [Datastore-Name] path/to/vm.vmx
       const match = vmPathName.match(/\[([^\]]+)\]/);
@@ -319,7 +360,7 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
       }
     }
     
-    // 방법 2: Datastore 필드에서 추출
+    // 방법 3: Datastore 필드에서 추출
     if (!datastore && vmInfo && vmInfo.Datastore) {
       // Datastore가 배열인 경우 첫 번째 사용
       const datastores = Array.isArray(vmInfo.Datastore) ? vmInfo.Datastore : [vmInfo.Datastore];
