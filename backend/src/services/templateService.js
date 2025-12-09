@@ -360,9 +360,10 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
           const { stdout: rpOutput } = await execPromise(rpCommand, {
             env: {
               ...process.env,
-              GOVC_URL: VCENTER_URL,
-              GOVC_USERNAME: VCENTER_USERNAME,
-              GOVC_PASSWORD: VCENTER_PASSWORD
+              GOVC_URL: vcenterConfig.url,
+              GOVC_USERNAME: vcenterConfig.username,
+              GOVC_PASSWORD: vcenterConfig.password,
+              GOVC_INSECURE: vcenterConfig.insecure
             }
           });
           const rpValue = rpOutput.trim();
@@ -398,9 +399,10 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
           const { stdout: parentOutput } = await execPromise(parentCommand, {
             env: {
               ...process.env,
-              GOVC_URL: VCENTER_URL,
-              GOVC_USERNAME: VCENTER_USERNAME,
-              GOVC_PASSWORD: VCENTER_PASSWORD
+              GOVC_URL: vcenterConfig.url,
+              GOVC_USERNAME: vcenterConfig.username,
+              GOVC_PASSWORD: vcenterConfig.password,
+              GOVC_INSECURE: vcenterConfig.insecure
             }
           });
           const parentValue = parentOutput.trim();
@@ -496,9 +498,10 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
     await execPromise(cloneCommand, {
       env: {
         ...process.env,
-        GOVC_URL: VCENTER_URL,
-        GOVC_USERNAME: VCENTER_USERNAME,
-        GOVC_PASSWORD: VCENTER_PASSWORD
+        GOVC_URL: vcenterConfig.url,
+        GOVC_USERNAME: vcenterConfig.username,
+        GOVC_PASSWORD: vcenterConfig.password,
+        GOVC_INSECURE: vcenterConfig.insecure
       },
       timeout: 600000 // 10분 타임아웃
     });
@@ -510,9 +513,10 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
       const { stdout: powerState } = await execPromise(powerStateCommand, {
         env: {
           ...process.env,
-          GOVC_URL: VCENTER_URL,
-          GOVC_USERNAME: VCENTER_USERNAME,
-          GOVC_PASSWORD: VCENTER_PASSWORD
+          GOVC_URL: vcenterConfig.url,
+          GOVC_USERNAME: vcenterConfig.username,
+          GOVC_PASSWORD: vcenterConfig.password,
+          GOVC_INSECURE: vcenterConfig.insecure
         }
       });
       
@@ -745,9 +749,10 @@ TEMPLATE_INIT_EOF`;
     await execPromise(markTemplateCommand, {
       env: {
         ...process.env,
-        GOVC_URL: VCENTER_URL,
-        GOVC_USERNAME: VCENTER_USERNAME,
-        GOVC_PASSWORD: VCENTER_PASSWORD
+        GOVC_URL: vcenterConfig.url,
+        GOVC_USERNAME: vcenterConfig.username,
+        GOVC_PASSWORD: vcenterConfig.password,
+        GOVC_INSECURE: vcenterConfig.insecure
       }
     });
 
@@ -775,9 +780,10 @@ TEMPLATE_INIT_EOF`;
           await execPromise(renameCommand, {
             env: {
               ...process.env,
-              GOVC_URL: VCENTER_URL,
-              GOVC_USERNAME: VCENTER_USERNAME,
-              GOVC_PASSWORD: VCENTER_PASSWORD
+              GOVC_URL: vcenterConfig.url,
+              GOVC_USERNAME: vcenterConfig.username,
+              GOVC_PASSWORD: vcenterConfig.password,
+              GOVC_INSECURE: vcenterConfig.insecure
             }
           });
           console.log(`[Template Service] 템플릿 이름 변경 완료: ${templateName}`);
