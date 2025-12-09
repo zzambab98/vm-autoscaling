@@ -6,7 +6,8 @@ const fsPromises = require('fs').promises;
 const path = require('path');
 
 const TEMPLATES_DATA_PATH = path.join(__dirname, '../../data/templates.json');
-const DEFAULT_DATASTORE = process.env.GOVC_DATASTORE || process.env.VCENTER_DATASTORE || 'OS-Datastore-Power-Store';
+// Datastore는 환경 변수에서만 가져오거나 VM에서 동적으로 추출 (하드코딩 제거)
+const DEFAULT_DATASTORE = process.env.GOVC_DATASTORE || process.env.VCENTER_DATASTORE || null;
 
 // vCenter 연결 상태 관리
 let vCenterConnectionState = {
@@ -446,10 +447,17 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
       }
     }
 
-    // 환경변수 또는 기본값에서 datastore 확인
-    if (!datastore) {
+    // 환경변수에서 datastore 확인 (하드코딩된 기본값 제거)
+    if (!datastore && DEFAULT_DATASTORE) {
       datastore = DEFAULT_DATASTORE;
-      console.log(`[Template Service] Datastore를 기본값으로 사용: ${datastore}`);
+      console.log(`[Template Service] Datastore를 환경 변수에서 사용: ${datastore}`);
+    }
+    
+    // Datastore가 없으면 에러 발생 (하드코딩된 기본값 사용하지 않음)
+    if (!datastore) {
+      console.error('[Template Service] Datastore를 찾을 수 없습니다.');
+      console.error('[Template Service] VM Info:', JSON.stringify(vmInfo, null, 2));
+      throw new Error('Datastore를 찾을 수 없습니다. VM의 Datastore 정보를 확인하거나 환경 변수 GOVC_DATASTORE를 설정하세요.');
     }
     
     console.log(`[Template Service] 최종 Datastore: ${datastore}`);
