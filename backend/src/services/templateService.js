@@ -669,18 +669,34 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
     // datastore와 resource pool이 여러 개인 경우 명시적으로 지정 필요
     let cloneCommand = `govc vm.clone -vm="${vmName}"`;
     
+    // Datastore는 반드시 지정해야 함 (여러 Datastore가 있을 경우)
     if (datastore) {
       cloneCommand += ` -ds="${datastore}"`;
       console.log(`[Template Service] Datastore 지정: ${datastore}`);
     } else {
-      console.warn('[Template Service] Datastore가 지정되지 않았습니다. 기본 datastore를 사용합니다.');
+      // Datastore가 없으면 VM이 있는 Datastore를 사용
+      // VM의 VmPathName에서 Datastore 추출
+      if (vmInfo && vmInfo.Files && vmInfo.Files.VmPathName) {
+        const vmPathName = vmInfo.Files.VmPathName;
+        const match = vmPathName.match(/\[([^\]]+)\]/);
+        if (match && match[1]) {
+          datastore = match[1];
+          cloneCommand += ` -ds="${datastore}"`;
+          console.log(`[Template Service] Datastore 자동 지정 (VmPathName): ${datastore}`);
+        }
+      }
+      
+      if (!datastore) {
+        throw new Error('Datastore를 찾을 수 없습니다. VM의 Datastore 정보를 확인하세요.');
+      }
     }
     
+    // Resource Pool도 반드시 지정해야 함 (여러 Resource Pool이 있을 경우)
     if (resourcePool) {
       cloneCommand += ` -pool="${resourcePool}"`;
       console.log(`[Template Service] Resource Pool 지정: ${resourcePool}`);
     } else {
-      console.warn('[Template Service] Resource Pool이 지정되지 않았습니다. 기본 resource pool을 사용합니다.');
+      throw new Error('Resource Pool을 찾을 수 없습니다. VM의 Resource Pool 정보를 확인하세요.');
     }
     
     // 템플릿용 클론은 전원을 끈 상태로 생성 (-on=false)
