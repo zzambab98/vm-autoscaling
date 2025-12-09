@@ -543,11 +543,85 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
       resourcePool = process.env.GOVC_RESOURCE_POOL || process.env.VCENTER_RESOURCE_POOL;
     }
     
+    // Resource Pool이 ResourcePool: 형식이면 클러스터의 기본 Resource Pool 사용
+    if (resourcePool && resourcePool.startsWith('ResourcePool:')) {
+      console.warn(`[Template Service] Resource Pool 경로 변환 실패, 클러스터 기본 Resource Pool 사용: ${resourcePool}`);
+      resourcePool = null; // 다시 찾기
+    }
+    
+    // resource pool이 없거나 변환 실패한 경우 클러스터의 기본 resource pool 사용
+    if (!resourcePool) {
+      try {
+        // VM의 호스트를 통해 클러스터의 기본 resource pool 찾기
+        if (vmInfo && vmInfo.Runtime && vmInfo.Runtime.Host) {
+          const hostInfo = vmInfo.Runtime.Host;
+          let hostValue = null;
+          
+          if (typeof hostInfo === 'string') {
+            hostValue = hostInfo;
+          } else if (hostInfo && hostInfo.Value) {
+            hostValue = hostInfo.Value;
+          } else if (hostInfo && hostInfo.Name) {
+            hostValue = hostInfo.Name;
+          }
+          
+          if (hostValue) {
+            // 호스트의 부모(클러스터) 찾기
+            const parentCommand = `govc object.collect -s "${hostValue}" parent`;
+            const { stdout: parentOutput } = await execPromise(parentCommand, {
+              env: {
+                ...process.env,
+                GOVC_URL: vcenterConfig.url,
+                GOVC_USERNAME: vcenterConfig.username,
+                GOVC_PASSWORD: vcenterConfig.password,
+                GOVC_INSECURE: vcenterConfig.insecure
+              }
+            });
+            const parentValue = parentOutput.trim();
+            
+            if (parentValue && parentValue !== 'null' && parentValue !== '') {
+              // 클러스터의 기본 resource pool (Resources) 사용
+              const clusterRpPath = `${parentValue}/Resources`;
+              resourcePool = clusterRpPath;
+              console.log(`[Template Service] Resource Pool 찾음 (클러스터 기본, Fallback): ${resourcePool}`);
+            }
+          }
+        }
+        
+        // 여전히 없으면 모든 클러스터의 기본 resource pool 찾기
+        if (!resourcePool) {
+          const findRpCommand = `govc find . -type p -name Resources | head -1`;
+          const { stdout: rpOutput } = await execPromise(findRpCommand, {
+            env: {
+              ...process.env,
+              GOVC_URL: vcenterConfig.url,
+              GOVC_USERNAME: vcenterConfig.username,
+              GOVC_PASSWORD: vcenterConfig.password,
+              GOVC_INSECURE: vcenterConfig.insecure
+            }
+          });
+          const rpValue = rpOutput.trim();
+          if (rpValue && rpValue !== '') {
+            resourcePool = rpValue;
+            console.log(`[Template Service] Resource Pool 찾음 (기본 Resources, Fallback): ${resourcePool}`);
+          }
+        }
+      } catch (error) {
+        console.warn('[Template Service] Resource Pool Fallback 실패:', error.message);
+      }
+    }
+    
     // resource pool이 없으면 에러 발생 (상세한 디버깅 정보 포함)
     if (!resourcePool) {
       console.error('[Template Service] Resource Pool을 찾을 수 없습니다.');
       console.error('[Template Service] VM Info:', JSON.stringify(vmInfo, null, 2));
       throw new Error('Resource Pool을 찾을 수 없습니다. 환경변수 GOVC_RESOURCE_POOL을 설정하거나 VM의 Resource Pool 정보를 확인하세요. 예: export GOVC_RESOURCE_POOL="/Datacenter/host/Cluster-01/Resources"');
+    }
+    
+    // 최종 검증: Resource Pool이 전체 경로 형식인지 확인
+    if (!resourcePool.startsWith('/')) {
+      console.error(`[Template Service] Resource Pool이 올바른 형식이 아닙니다: ${resourcePool}`);
+      throw new Error(`Resource Pool 경로 형식 오류: ${resourcePool}. 전체 경로 형식이 필요합니다 (예: /Datacenter/host/Cluster/Resources)`);
     }
     
     console.log(`[Template Service] 최종 Resource Pool: ${resourcePool}`);
