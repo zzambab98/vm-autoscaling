@@ -8,6 +8,19 @@ const path = require('path');
 const TEMPLATES_DATA_PATH = path.join(__dirname, '../../data/templates.json');
 const DEFAULT_DATASTORE = process.env.GOVC_DATASTORE || process.env.VCENTER_DATASTORE || 'OS-Datastore-Power-Store';
 
+// vCenter 연결 상태 관리
+let vCenterConnectionState = {
+  lastCheckTime: null,
+  lastSuccessTime: null,
+  isConnected: false,
+  consecutiveFailures: 0,
+  maxConsecutiveFailures: 3
+};
+
+// 연결 상태 확인 주기 (밀리초)
+const CONNECTION_CHECK_INTERVAL = 30000; // 30초
+const CONNECTION_CHECK_TIMEOUT = 10000; // 10초
+
 /**
  * vCenter 연결 정보 가져오기 (런타임에 읽음)
  */
@@ -18,6 +31,113 @@ function getVCenterConfig() {
     password: process.env.GOVC_PASSWORD || process.env.VCENTER_PASSWORD,
     insecure: process.env.GOVC_INSECURE || '1'
   };
+}
+
+/**
+ * vCenter 연결 상태 확인
+ * @returns {Promise<boolean>} 연결 성공 여부
+ */
+async function checkVCenterConnection() {
+  const now = Date.now();
+  
+  // 최근에 확인했고 성공했으면 캐시된 결과 반환
+  if (vCenterConnectionState.isConnected && 
+      vCenterConnectionState.lastSuccessTime && 
+      (now - vCenterConnectionState.lastSuccessTime) < CONNECTION_CHECK_INTERVAL) {
+    return true;
+  }
+  
+  // 최근에 확인했으면 바로 재확인하지 않음 (너무 자주 호출 방지)
+  if (vCenterConnectionState.lastCheckTime && 
+      (now - vCenterConnectionState.lastCheckTime) < 5000) {
+    return vCenterConnectionState.isConnected;
+  }
+  
+  vCenterConnectionState.lastCheckTime = now;
+  
+  try {
+    const vcenterConfig = getVCenterConfig();
+    
+    if (!vcenterConfig.url || !vcenterConfig.username || !vcenterConfig.password) {
+      console.warn('[Template Service] vCenter 연결 정보가 설정되지 않았습니다.');
+      vCenterConnectionState.isConnected = false;
+      vCenterConnectionState.consecutiveFailures++;
+      return false;
+    }
+    
+    // 간단한 연결 테스트: govc about 명령 사용
+    const testCommand = `govc about`;
+    await execPromise(testCommand, {
+      env: {
+        ...process.env,
+        GOVC_URL: vcenterConfig.url,
+        GOVC_USERNAME: vcenterConfig.username,
+        GOVC_PASSWORD: vcenterConfig.password,
+        GOVC_INSECURE: vcenterConfig.insecure
+      },
+      timeout: CONNECTION_CHECK_TIMEOUT
+    });
+    
+    // 연결 성공
+    vCenterConnectionState.isConnected = true;
+    vCenterConnectionState.lastSuccessTime = now;
+    vCenterConnectionState.consecutiveFailures = 0;
+    console.log('[Template Service] ✅ vCenter 연결 확인 성공');
+    return true;
+    
+  } catch (error) {
+    // 연결 실패
+    vCenterConnectionState.isConnected = false;
+    vCenterConnectionState.consecutiveFailures++;
+    console.error(`[Template Service] ❌ vCenter 연결 확인 실패 (연속 실패: ${vCenterConnectionState.consecutiveFailures}회):`, error.message);
+    
+    // 연속 실패가 너무 많으면 경고
+    if (vCenterConnectionState.consecutiveFailures >= vCenterConnectionState.maxConsecutiveFailures) {
+      console.error(`[Template Service] ⚠️ vCenter 연결이 ${vCenterConnectionState.consecutiveFailures}회 연속 실패했습니다. 환경 변수를 확인하세요.`);
+    }
+    
+    return false;
+  }
+}
+
+/**
+ * vCenter 연결 상태 확인 후 재시도 로직 포함
+ * @param {Function} operation - 실행할 vCenter 작업 함수
+ * @param {number} maxRetries - 최대 재시도 횟수 (기본값: 3)
+ * @param {number} retryDelay - 재시도 대기 시간 (밀리초, 기본값: 2000)
+ * @returns {Promise<any>} 작업 결과
+ */
+async function executeWithVCenterConnection(operation, maxRetries = 3, retryDelay = 2000) {
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // 연결 상태 확인
+      const isConnected = await checkVCenterConnection();
+      
+      if (!isConnected && attempt > 1) {
+        // 재시도 전에 잠시 대기
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+      
+      // 작업 실행
+      return await operation();
+      
+    } catch (error) {
+      lastError = error;
+      console.warn(`[Template Service] vCenter 작업 실패 (시도 ${attempt}/${maxRetries}):`, error.message);
+      
+      // 마지막 시도가 아니면 재시도
+      if (attempt < maxRetries) {
+        // 연결 상태 초기화하여 다음 시도에서 다시 확인
+        vCenterConnectionState.isConnected = false;
+        await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
+      }
+    }
+  }
+  
+  // 모든 재시도 실패
+  throw lastError || new Error('vCenter 작업 실패: 알 수 없는 오류');
 }
 
 /**
@@ -37,7 +157,7 @@ async function ensureDataFile() {
  * @returns {Promise<Array>} 템플릿 목록
  */
 async function getTemplatesFromVCenter() {
-  try {
+  return executeWithVCenterConnection(async () => {
     const vcenterConfig = getVCenterConfig();
     
     if (!vcenterConfig.url || !vcenterConfig.username || !vcenterConfig.password) {
@@ -61,7 +181,8 @@ async function getTemplatesFromVCenter() {
         GOVC_USERNAME: vcenterConfig.username,
         GOVC_PASSWORD: vcenterConfig.password,
         GOVC_INSECURE: vcenterConfig.insecure
-      }
+      },
+      timeout: 30000 // 30초 타임아웃
     });
 
     if (stderr && stderr.trim()) {
@@ -80,7 +201,7 @@ async function getTemplatesFromVCenter() {
         source: 'vcenter'
       };
     });
-  } catch (error) {
+  }, 3, 2000).catch(error => {
     console.error('[Template Service] vCenter 템플릿 목록 조회 실패:', error.message);
     console.error('[Template Service] 에러 상세:', {
       code: error.code,
@@ -89,7 +210,7 @@ async function getTemplatesFromVCenter() {
       stderr: error.stderr
     });
     return [];
-  }
+  });
 }
 
 /**
@@ -801,7 +922,7 @@ async function deleteTemplate(templateId) {
  * @returns {Promise<Array>} VM 목록
  */
 async function getVmList() {
-  try {
+  return executeWithVCenterConnection(async () => {
     const vcenterConfig = getVCenterConfig();
     if (!vcenterConfig.url || !vcenterConfig.username || !vcenterConfig.password) {
       console.warn('[Template Service] vCenter 연결 정보가 설정되지 않았습니다.');
@@ -824,7 +945,8 @@ async function getVmList() {
         GOVC_USERNAME: vcenterConfig.username,
         GOVC_PASSWORD: vcenterConfig.password,
         GOVC_INSECURE: vcenterConfig.insecure
-      }
+      },
+      timeout: 30000 // 30초 타임아웃
     });
 
     if (stderr && stderr.trim()) {
@@ -888,12 +1010,47 @@ async function getVmList() {
     vmList.sort((a, b) => a.name.localeCompare(b.name, 'en', { numeric: true }));
     
     return vmList;
-  } catch (error) {
+  }, 3, 2000).catch(error => {
     console.error('[Template Service] VM 목록 조회 실패:', error);
     console.error('[Template Service] 에러 상세:', error.message);
     console.error('[Template Service] Stack:', error.stack);
     throw error; // 에러를 다시 throw하여 API에서 에러 메시지를 반환할 수 있도록
-  }
+  });
+}
+
+/**
+ * vCenter 연결 상태 조회
+ * @returns {object} 연결 상태 정보
+ */
+function getVCenterConnectionState() {
+  return {
+    ...vCenterConnectionState,
+    lastCheckTime: vCenterConnectionState.lastCheckTime ? new Date(vCenterConnectionState.lastCheckTime).toISOString() : null,
+    lastSuccessTime: vCenterConnectionState.lastSuccessTime ? new Date(vCenterConnectionState.lastSuccessTime).toISOString() : null
+  };
+}
+
+/**
+ * vCenter 연결 상태 초기화 및 주기적 확인 시작
+ */
+function startVCenterConnectionMonitor() {
+  console.log('[Template Service] vCenter 연결 모니터링 시작...');
+  
+  // 서버 시작 시 즉시 연결 확인
+  checkVCenterConnection().then(connected => {
+    if (connected) {
+      console.log('[Template Service] ✅ 초기 vCenter 연결 확인 성공');
+    } else {
+      console.warn('[Template Service] ⚠️ 초기 vCenter 연결 확인 실패');
+    }
+  });
+  
+  // 주기적으로 연결 상태 확인 (30초마다)
+  setInterval(async () => {
+    await checkVCenterConnection();
+  }, CONNECTION_CHECK_INTERVAL);
+  
+  console.log(`[Template Service] vCenter 연결 모니터링이 ${CONNECTION_CHECK_INTERVAL / 1000}초마다 실행됩니다.`);
 }
 
 module.exports = {
@@ -902,7 +1059,10 @@ module.exports = {
   convertVmToTemplate,
   saveTemplateMetadata,
   deleteTemplate,
-  getVmList
+  getVmList,
+  getVCenterConnectionState,
+  checkVCenterConnection,
+  startVCenterConnectionMonitor
 };
 
 

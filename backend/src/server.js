@@ -14,7 +14,7 @@ const {
   uninstallPromtailOnMultipleServers
 } = require('./services/nodeExporterService');
 const { addPrometheusJob, getPrometheusJobs, getPrometheusTargets } = require('./services/prometheusMonitoringService');
-const { getTemplates, getTemplateById, convertVmToTemplate, deleteTemplate, getVmList } = require('./services/templateService');
+const { getTemplates, getTemplateById, convertVmToTemplate, deleteTemplate, getVmList, startVCenterConnectionMonitor, getVCenterConnectionState } = require('./services/templateService');
 const { saveConfig, getConfigs, getConfigById, updateConfig, deleteConfig, setConfigEnabled } = require('./services/autoscalingService');
 const { createAlertRule, deleteAlertRule, getAlertRules } = require('./services/prometheusAlertService');
 const { addRoutingRule, deleteRoutingRule, getRoutingRules } = require('./services/alertmanagerService');
@@ -51,6 +51,15 @@ const server = http.createServer((req, res) => {
   // Health Check
   if (req.method === 'GET' && parsedUrl.pathname === '/health') {
     return sendJSONResponse(res, 200, { status: 'ok', timestamp: new Date().toISOString() });
+  }
+
+  // vCenter 연결 상태 조회 API
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/vcenter/connection-status') {
+    const state = getVCenterConnectionState();
+    return sendJSONResponse(res, 200, {
+      success: true,
+      connectionState: state
+    });
   }
 
   // Node Exporter 설치 API
@@ -990,5 +999,8 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`[VM Autoscaling Backend] Server running on port ${PORT}`);
   console.log(`[VM Autoscaling Backend] Health check: http://localhost:${PORT}/health`);
+  
+  // vCenter 연결 모니터링 시작
+  startVCenterConnectionMonitor();
 });
 
