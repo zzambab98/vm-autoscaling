@@ -317,41 +317,62 @@ except Exception as e:
 
                         echo "제거할 VM 수: ${removeCount}"
 
+                        // 타임스탬프 추출 함수
+                        def getTimestamp = { vmName ->
+                            // 패턴: prefix-YYYYMMDDHHMM 형식 (12자리 숫자)
+                            def match = vmName =~ /.*-(\d{12})$/
+                            if (match) {
+                                return match[0][1]
+                            }
+                            return null
+                        }
+                        
                         // VM 목록 출력 (정렬 전)
                         echo ""
                         echo "정렬 전 VM 목록:"
                         vmInfo.each { vm ->
-                            def timestamp = vm.name.replaceAll(/.*-(\d+)$/, '$1')
-                            echo "  - ${vm.name} (${vm.ip}) - 타임스탬프: ${timestamp == vm.name ? '없음' : timestamp}"
+                            def timestamp = getTimestamp(vm.name)
+                            def vmType = timestamp ? '스케일아웃 생성' : '최초 생성'
+                            echo "  - ${vm.name} (${vm.ip}) - 타임스탬프: ${timestamp ?: '없음'} [${vmType}]"
                         }
 
-                        // 가장 최신 VM부터 제거 (VM 이름의 타임스탬프 기준 내림차순 정렬)
-                        // VM 이름이 prefix-timestamp 형식이라고 가정
+                        // 가장 최신 VM부터 제거 (스케일아웃으로 생성된 VM 우선, 타임스탬프 없는 VM은 보호)
+                        // 정렬 순서:
+                        // 1. 타임스탬프가 있는 VM (스케일아웃 생성) - 타임스탬프 내림차순 (최신이 먼저)
+                        // 2. 타임스탬프가 없는 VM (최초 생성) - 보호 (맨 뒤)
                         def sortedVmInfo = vmInfo.sort { a, b ->
-                            // 타임스탬프 부분 추출하여 비교 (내림차순)
-                            def aTimestamp = a.name.replaceAll(/.*-(\d+)$/, '$1')
-                            def bTimestamp = b.name.replaceAll(/.*-(\d+)$/, '$1')
+                            def aTimestamp = getTimestamp(a.name)
+                            def bTimestamp = getTimestamp(b.name)
                             
-                            // 타임스탬프가 없으면 맨 뒤로
-                            if (!aTimestamp || aTimestamp == a.name) {
-                                return 1
+                            // 둘 다 타임스탬프가 있으면 내림차순 정렬 (큰 숫자가 먼저 = 최신이 먼저)
+                            if (aTimestamp && bTimestamp) {
+                                return bTimestamp <=> aTimestamp
                             }
-                            if (!bTimestamp || bTimestamp == b.name) {
+                            
+                            // a만 타임스탬프가 있으면 a가 먼저 (스케일아웃 생성 VM 우선)
+                            if (aTimestamp && !bTimestamp) {
                                 return -1
                             }
                             
-                            return bTimestamp <=> aTimestamp  // 내림차순 정렬 (큰 숫자가 먼저)
+                            // b만 타임스탬프가 있으면 b가 먼저
+                            if (!aTimestamp && bTimestamp) {
+                                return 1
+                            }
+                            
+                            // 둘 다 타임스탬프가 없으면 순서 유지 (최초 생성 VM은 보호)
+                            return 0
                         }
 
                         def vmsToRemove = sortedVmInfo.take(removeCount)
 
                         echo ""
                         echo "=========================================="
-                        echo "제거 대상 VM (가장 최신부터):"
+                        echo "제거 대상 VM (스케일아웃 생성 VM 우선, 최신부터):"
                         echo "=========================================="
                         vmsToRemove.eachWithIndex { vm, idx ->
-                            def timestamp = vm.name.replaceAll(/.*-(\d+)$/, '$1')
-                            echo "  ${idx + 1}. ${vm.name} (${vm.ip}) - 타임스탬프: ${timestamp == vm.name ? '없음' : timestamp}"
+                            def timestamp = getTimestamp(vm.name)
+                            def vmType = timestamp ? '스케일아웃 생성' : '최초 생성'
+                            echo "  ${idx + 1}. ${vm.name} (${vm.ip}) - 타임스탬프: ${timestamp ?: '없음'} [${vmType}]"
                         }
                         echo "=========================================="
 
