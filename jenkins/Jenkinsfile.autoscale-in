@@ -228,26 +228,34 @@ except Exception as e:
                         
                         echo "VM Prefix로 필터링: ${vmPrefix}"
                         
-                        // 한 번에 모든 VM 정보 조회 (VM Prefix로 필터링)
+                        // 한 번에 모든 VM 정보 조회 (VM Prefix로 필터링, 템플릿 제외)
                         def vmListCommand = """
                             export GOVC_URL="${VCENTER_SERVER_CRED}"
                             export GOVC_USERNAME="${VCENTER_USER_CRED}"
                             export GOVC_PASSWORD="${VCENTER_PASSWORD_CRED}"
                             export GOVC_INSECURE=1
                             
-                            # VM Prefix로 필터링하여 조회 (vCLS 제외)
+                            # VM Prefix로 필터링하여 조회 (vCLS, template 제외)
                             if [ -n "${vmPrefix}" ]; then
-                                govc find / -type m -name "${vmPrefix}-*" 2>/dev/null | grep -v vCLS | while read vm_path; do
+                                govc find / -type m -name "${vmPrefix}-*" 2>/dev/null | grep -v vCLS | grep -v template | while read vm_path; do
                                     vm_name=\$(basename "\$vm_path")
+                                    # 템플릿인지 확인 (이름에 template이 포함되어 있으면 제외)
+                                    if echo "\$vm_name" | grep -qi template; then
+                                        continue
+                                    fi
                                     vm_ip=\$(govc vm.ip "\$vm_path" 2>/dev/null || echo "")
                                     if [ -n "\$vm_ip" ]; then
                                         echo "\${vm_name}|\${vm_ip}"
                                     fi
                                 done
                             else
-                                # Prefix가 없으면 모든 VM 조회 (vCLS 제외)
-                                govc find / -type m 2>/dev/null | grep -v vCLS | while read vm_path; do
+                                # Prefix가 없으면 모든 VM 조회 (vCLS, template 제외)
+                                govc find / -type m 2>/dev/null | grep -v vCLS | grep -v template | while read vm_path; do
                                     vm_name=\$(basename "\$vm_path")
+                                    # 템플릿인지 확인
+                                    if echo "\$vm_name" | grep -qi template; then
+                                        continue
+                                    fi
                                     vm_ip=\$(govc vm.ip "\$vm_path" 2>/dev/null || echo "")
                                     if [ -n "\$vm_ip" ]; then
                                         echo "\${vm_name}|\${vm_ip}"
