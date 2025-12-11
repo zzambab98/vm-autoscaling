@@ -540,6 +540,33 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Prometheus Job에서 Target 제거 API
+  if (req.method === 'POST' && parsedUrl.pathname.includes('/api/prometheus/jobs/') && parsedUrl.pathname.endsWith('/targets/remove')) {
+    const pathParts = parsedUrl.pathname.split('/');
+    const jobName = decodeURIComponent(pathParts[pathParts.length - 3]);
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const { target } = payload;
+        
+        if (!target) {
+          sendJSONResponse(res, 400, { error: 'target 파라미터가 필요합니다.' });
+          return;
+        }
+        
+        const { removeTargetFromJob } = require('./services/prometheusMonitoringService');
+        const result = await removeTargetFromJob(jobName, target);
+        sendJSONResponse(res, 200, result);
+      } catch (error) {
+        console.error(`[Server] Prometheus Target 제거 실패:`, error);
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    });
+    return;
+  }
+
   // Prometheus Job 삭제 API
   if (req.method === 'DELETE' && parsedUrl.pathname.startsWith('/api/prometheus/jobs/')) {
     const jobName = decodeURIComponent(parsedUrl.pathname.split('/').pop());

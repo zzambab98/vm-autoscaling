@@ -403,7 +403,7 @@ except Exception as e:
         stage('Remove from F5 Pool') {
             steps {
                 script {
-                    echo "=== F5 Pool에서 Member 제거 ==="
+                    echo "=== F5 Pool에서 Member 및 Node 제거 ==="
                     
                     def vmsToRemove = env.VMS_TO_REMOVE.split(',')
                     def memberPort = env.VIP_PORT ?: params.VIP_PORT ?: '80'
@@ -418,6 +418,7 @@ except Exception as e:
                         for (def vmIp in vmsToRemove) {
                             echo "F5 Pool에서 제거 중: ${vmIp}:${memberPort}"
                             
+                            // 1. Pool에서 Member 제거
                             sh """
                                 python3 scripts/remove-f5-pool-member.py \
                                     --pool ${f5PoolName} \
@@ -425,10 +426,43 @@ except Exception as e:
                                     --vip ${vip} \
                                     --server ${f5Server} \
                                     --username ${F5_USERNAME} \
-                                    --password ${F5_PASSWORD} || echo "F5 제거 실패 (계속 진행): ${vmIp}"
+                                    --password ${F5_PASSWORD} || echo "F5 Pool Member 제거 실패 (계속 진행): ${vmIp}"
                             """
                             
-                            echo "F5 Pool에서 제거 완료: ${vmIp}:${memberPort}"
+                            echo "F5 Pool Member에서 제거 완료: ${vmIp}:${memberPort}"
+                            
+                            // 2. Node 삭제
+                            echo "F5 Node 삭제 중: ${vmIp}"
+                            sh """
+                                python3 -c "
+import requests
+import sys
+
+f5_server = '${f5Server}'
+username = '${F5_USERNAME}'
+password = '${F5_PASSWORD}'
+node_name = '${vmIp}'
+
+# F5 BigIP REST API로 Node 삭제
+url = f'https://{f5_server}/mgmt/tm/ltm/node/~Common~{node_name}'
+auth = (username, password)
+
+try:
+    response = requests.delete(url, auth=auth, verify=False)
+    if response.status_code == 200:
+        print(f'✅ F5 Node 삭제 성공: {node_name}')
+    elif response.status_code == 404:
+        print(f'⚠️ F5 Node가 존재하지 않음: {node_name}')
+    else:
+        print(f'❌ F5 Node 삭제 실패: {node_name} (HTTP {response.status_code})')
+        print(f'응답: {response.text}')
+except Exception as e:
+    print(f'❌ F5 Node 삭제 중 오류: {node_name} - {str(e)}')
+    sys.exit(1)
+" || echo "F5 Node 삭제 실패 (계속 진행): ${vmIp}"
+                            """
+                            
+                            echo "F5 Node 삭제 완료: ${vmIp}"
                         }
                     }
                 }
@@ -495,21 +529,74 @@ except Exception as e:
                     
                     def vmsToRemove = env.VMS_TO_REMOVE.split(',')
                     def jobName = env.PROMETHEUS_JOB_NAME ?: params.PROMETHEUS_JOB_NAME
+                    def backendUrl = env.BACKEND_API_URL ?: 'http://10.255.48.253:6010'
                     
-                    // Prometheus 설정 파일에서 target 제거
+                    // 백엔드 API를 통해 Prometheus에서 target 제거
                     for (def vmIp in vmsToRemove) {
-                        echo "Prometheus에서 제거 중: ${vmIp}:9100"
+                        echo "Prometheus에서 제거 중: ${vmIp}:9100 (Job: ${jobName})"
                         
-                        sh """
-                            ssh -i "${PLG_STACK_SSH_KEY}" \
-                                -o StrictHostKeyChecking=no \
-                                ${PLG_STACK_USER}@${PLG_STACK_SERVER} \
-                                'sudo sed -i "/${vmIp}:9100/d" /home/ubuntu/plg-stack/prometheus/prometheus.yml && \
-                                 sudo docker restart prometheus' || echo "Prometheus 제거 실패 (계속 진행): ${vmIp}"
-                        """
-                        
-                        echo "Prometheus에서 제거 완료: ${vmIp}:9100"
+                        try {
+                            def response = sh(
+                                script: """
+                                    curl -sf -X POST \
+                                        -H "Content-Type: application/json" \
+                                        -d '{"jobName": "${jobName}", "target": "${vmIp}:9100"}' \
+                                        "${backendUrl}/api/prometheus/jobs/${jobName}/targets/remove"
+                                """,
+                                returnStdout: true
+                            ).trim()
+                            
+                            echo "✅ Prometheus 제거 성공: ${vmIp}:9100"
+                            echo "응답: ${response}"
+                            
+                            // Prometheus에서 실제로 제거되었는지 확인
+                            sleep(3)
+                            def checkResponse = sh(
+                                script: """
+                                    curl -s "${PLG_STACK_SERVER}:9090/api/v1/targets" | \
+                                    python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    found = False
+    for target in data.get('data', {}).get('activeTargets', []):
+        instance = target.get('labels', {}).get('instance', '')
+        if '${vmIp}:9100' in instance and target.get('labels', {}).get('job') == '${jobName}':
+            found = True
+            break
+    print('FOUND' if found else 'NOT_FOUND')
+except:
+    print('ERROR')
+"
+                                """,
+                                returnStdout: true
+                            ).trim()
+                            
+                            if (checkResponse == 'NOT_FOUND') {
+                                echo "✅ Prometheus에서 제거 확인됨: ${vmIp}:9100"
+                            } else if (checkResponse == 'FOUND') {
+                                echo "⚠️ Prometheus에서 아직 제거되지 않음: ${vmIp}:9100"
+                            } else {
+                                echo "⚠️ Prometheus 확인 실패: ${vmIp}:9100"
+                            }
+                        } catch (Exception e) {
+                            echo "❌ Prometheus 제거 실패 (계속 진행): ${vmIp} - ${e.getMessage()}"
+                        }
                     }
+                }
+            }
+        }
+        
+        stage('Remove from Grafana') {
+            steps {
+                script {
+                    echo "=== Grafana 대시보드 확인 ==="
+                    echo "Grafana 대시보드는 Prometheus에서 제거되면 자동으로 반영됩니다."
+                    echo "Prometheus에서 제거 확인 후 Grafana 대시보드도 자동으로 업데이트됩니다."
+                    
+                    // Grafana 대시보드는 Job별로 생성되며, Prometheus 쿼리를 사용하므로
+                    // Prometheus에서 target이 제거되면 대시보드에서도 자동으로 해당 instance가 사라집니다.
+                    // 별도의 제거 작업이 필요하지 않습니다.
                 }
             }
         }
@@ -540,14 +627,46 @@ except Exception as e:
                                 export GOVC_PASSWORD="${VCENTER_PASSWORD_CRED}"
                                 export GOVC_INSECURE=1
                                 
-                                # VM 전원 끄기
-                                govc vm.power -off "${vmName}" || echo "전원 끄기 실패 (계속 진행): ${vmName}"
+                                # VM 경로 찾기
+                                VM_PATH=\$(govc find / -type m -name "${vmName}" | head -1)
                                 
-                                # 잠시 대기
-                                sleep 5
+                                if [ -z "\$VM_PATH" ]; then
+                                    echo "⚠️ VM을 찾을 수 없습니다: ${vmName}"
+                                    exit 0
+                                fi
+                                
+                                echo "VM 경로: \$VM_PATH"
+                                
+                                # VM 전원 끄기
+                                echo "VM 전원 끄는 중: ${vmName}"
+                                govc vm.power -off "\$VM_PATH" || echo "전원 끄기 실패 (계속 진행): ${vmName}"
+                                
+                                # 전원이 완전히 꺼질 때까지 대기 (최대 30초)
+                                echo "VM 전원 종료 대기 중..."
+                                for i in {1..30}; do
+                                    POWER_STATE=\$(govc vm.info "\$VM_PATH" | grep "Power state:" | awk '{print \$3}')
+                                    if [ "\$POWER_STATE" = "poweredOff" ]; then
+                                        echo "✅ VM 전원이 꺼졌습니다: ${vmName}"
+                                        break
+                                    fi
+                                    sleep 1
+                                done
                                 
                                 # VM 삭제
-                                govc object.destroy "${vmName}" || echo "VM 삭제 실패: ${vmName}"
+                                echo "VM 삭제 중: ${vmName}"
+                                govc object.destroy "\$VM_PATH" && echo "✅ VM 삭제 성공: ${vmName}" || {
+                                    echo "❌ VM 삭제 실패: ${vmName}"
+                                    exit 1
+                                }
+                                
+                                # 삭제 확인
+                                sleep 2
+                                CHECK_PATH=\$(govc find / -type m -name "${vmName}" 2>/dev/null | head -1)
+                                if [ -z "\$CHECK_PATH" ]; then
+                                    echo "✅ VM 삭제 확인됨: ${vmName}"
+                                else
+                                    echo "⚠️ VM이 아직 존재함: ${vmName}"
+                                fi
                             """
                             
                             echo "VM 삭제 완료: ${vmName}"
