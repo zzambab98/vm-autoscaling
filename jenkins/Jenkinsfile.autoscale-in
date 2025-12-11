@@ -63,16 +63,52 @@ if configs:
                         ).trim()
                         
                         if (configResponse) {
-                            def configData = readJSON text: configResponse
-                            env.AUTOSCALE_CONFIG_ID = configData.id ?: configId
-                            env.SERVICE_NAME = configData.serviceName ?: serviceName
-                            env.PROMETHEUS_JOB_NAME = configData.monitoring?.prometheusJobName ?: prometheusJobName
-                            env.VM_PREFIX = configData.vmPrefix ?: params.VM_PREFIX ?: ''
-                            env.F5_POOL_NAME = configData.f5?.poolName ?: params.F5_POOL_NAME ?: ''
-                            env.VIP = configData.f5?.vip ?: params.VIP ?: ''
-                            env.VIP_PORT = configData.f5?.vipPort ?: params.VIP_PORT ?: '80'
-                            env.MIN_VMS = configData.scaling?.minVms?.toString() ?: params.MIN_VMS ?: '2'
-                            env.SCALE_IN_STEP = configData.scaling?.scaleInStep?.toString() ?: params.SCALE_IN_STEP ?: '1'
+                            // Python을 사용하여 JSON 파싱
+                            def configDataJson = sh(
+                                script: """
+                                    echo '${configResponse}' | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    print('ID:' + str(data.get('id', '')))
+    print('SERVICE_NAME:' + str(data.get('serviceName', '')))
+    print('PROMETHEUS_JOB_NAME:' + str(data.get('monitoring', {}).get('prometheusJobName', '')))
+    print('VM_PREFIX:' + str(data.get('vmPrefix', '')))
+    print('F5_POOL_NAME:' + str(data.get('f5', {}).get('poolName', '')))
+    print('VIP:' + str(data.get('f5', {}).get('vip', '')))
+    print('VIP_PORT:' + str(data.get('f5', {}).get('vipPort', '80')))
+    print('MIN_VMS:' + str(data.get('scaling', {}).get('minVms', 2)))
+    print('SCALE_IN_STEP:' + str(data.get('scaling', {}).get('scaleInStep', 1)))
+except Exception as e:
+    print('ERROR:' + str(e))
+    sys.exit(1)
+"
+                                """,
+                                returnStdout: true
+                            ).trim()
+                            
+                            // 파싱된 값 추출
+                            def configMap = [:]
+                            configDataJson.split('\n').each { line ->
+                                def parts = line.split(':', 2)
+                                if (parts.size() == 2) {
+                                    configMap[parts[0]] = parts[1]
+                                }
+                            }
+                            
+                            if (configMap['ERROR']) {
+                                error("JSON 파싱 실패: ${configMap['ERROR']}")
+                            }
+                            
+                            env.AUTOSCALE_CONFIG_ID = configMap['ID'] ?: configId
+                            env.SERVICE_NAME = configMap['SERVICE_NAME'] ?: serviceName
+                            env.PROMETHEUS_JOB_NAME = configMap['PROMETHEUS_JOB_NAME'] ?: prometheusJobName
+                            env.VM_PREFIX = configMap['VM_PREFIX'] ?: params.VM_PREFIX ?: ''
+                            env.F5_POOL_NAME = configMap['F5_POOL_NAME'] ?: params.F5_POOL_NAME ?: ''
+                            env.VIP = configMap['VIP'] ?: params.VIP ?: ''
+                            env.VIP_PORT = configMap['VIP_PORT'] ?: params.VIP_PORT ?: '80'
+                            env.MIN_VMS = configMap['MIN_VMS'] ?: params.MIN_VMS ?: '2'
+                            env.SCALE_IN_STEP = configMap['SCALE_IN_STEP'] ?: params.SCALE_IN_STEP ?: '1'
                             
                             echo "✅ 백엔드에서 설정 조회 완료"
                             echo "SERVICE_NAME: ${env.SERVICE_NAME}"
