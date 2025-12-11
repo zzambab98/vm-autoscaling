@@ -281,13 +281,13 @@ except Exception as e:
 
                         echo "제거할 VM 수: ${removeCount}"
 
-                        // 가장 오래된 VM부터 제거 (VM 이름의 타임스탬프 기준 정렬)
+                        // 가장 최신 VM부터 제거 (VM 이름의 타임스탬프 기준 내림차순 정렬)
                         // VM 이름이 prefix-timestamp 형식이라고 가정
                         def sortedVmInfo = vmInfo.sort { a, b ->
-                            // 타임스탬프 부분 추출하여 비교
+                            // 타임스탬프 부분 추출하여 비교 (내림차순)
                             def aTimestamp = a.name.replaceAll(/.*-(\d+)$/, '$1')
                             def bTimestamp = b.name.replaceAll(/.*-(\d+)$/, '$1')
-                            return aTimestamp <=> bTimestamp
+                            return bTimestamp <=> aTimestamp  // 내림차순 정렬
                         }
 
                         def vmsToRemove = sortedVmInfo.take(removeCount)
