@@ -23,6 +23,7 @@ pipeline {
         PLG_STACK_SERVER = credentials('plg-stack-server')
         PLG_STACK_USER = credentials('plg-stack-user')
         PLG_STACK_SSH_KEY = credentials('plg-stack-ssh-key')
+        BACKEND_API_URL = 'http://10.255.48.253:6010'
     }
     
     stages {
@@ -309,10 +310,6 @@ print(json.dumps(targets))
                 }
             }
         }
-    }
-    
-    environment {
-        BACKEND_API_URL = 'http://10.255.48.253:6010'
     }
     
     post {
