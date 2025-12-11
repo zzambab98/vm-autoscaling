@@ -200,9 +200,9 @@ pipeline {
                                                 echo "⚠️ Template 이름이 비어있습니다. 기본값 사용: auto-vm-test-template"
                                                 env.VCENTER_TEMPLATE = 'auto-vm-test-template'
                                             }
-                                        } catch (JSONException jsonErr) {
+                                        } catch (Exception jsonErr) {
                                             echo "⚠️ JSON 파싱 실패: ${jsonErr.message}"
-                                            echo "⚠️ 응답 본문: ${responseBody}"
+                                            echo "⚠️ 응답 본문: ${responseBody.take(500)}"
                                             echo "⚠️ 기본값 사용: auto-vm-test-template"
                                             env.VCENTER_TEMPLATE = 'auto-vm-test-template'
                                         }
