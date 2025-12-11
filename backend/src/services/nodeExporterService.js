@@ -11,27 +11,37 @@ const { addPrometheusJob } = require('./prometheusMonitoringService');
  */
 async function installNodeExporter(serverIp, options = {}) {
   const {
-    sshUser = 'ubuntu',
+    sshUser = process.env.DEFAULT_SSH_USER || 'ubuntu',
     sshKey = null,
     sshPassword = null,
-    nodeExporterVersion = '1.7.0',
+    nodeExporterVersion = process.env.NODE_EXPORTER_VERSION || '1.7.0',
     autoRegisterPrometheus = false, // Prometheus 자동 등록 옵션
     prometheusJobName = null, // Job 이름 (자동 생성 또는 지정)
     prometheusLabels = {}, // 추가 labels (service, environment 등)
-    installPromtail = true, // Promtail도 함께 설치 (기본값: true)
+    installPromtail = false, // Promtail은 별도로 설치하므로 기본값 false로 변경
     lokiUrl = null // Loki 서버 URL
   } = options;
 
   try {
-    // SSH 접속 명령어 구성
+    // SSH 접속 테스트
     let sshCommand = '';
     if (sshKey) {
-      sshCommand = `ssh -i "${sshKey}" -o StrictHostKeyChecking=no ${sshUser}@${serverIp}`;
+      sshCommand = `ssh -i "${sshKey}" -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUser}@${serverIp}`;
     } else if (sshPassword) {
       // sshpass 사용 (설치 필요)
-      sshCommand = `sshpass -p '${sshPassword}' ssh -o StrictHostKeyChecking=no ${sshUser}@${serverIp}`;
+      sshCommand = `sshpass -p '${sshPassword}' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUser}@${serverIp}`;
     } else {
       throw new Error('SSH Key 또는 Password가 필요합니다.');
+    }
+
+    // SSH 연결 테스트
+    try {
+      const testCommand = `${sshCommand} "echo 'SSH connection test'"`;
+      await execPromise(testCommand, { timeout: 10000 });
+      console.log(`[Node Exporter] SSH 연결 확인 완료: ${serverIp}`);
+    } catch (sshError) {
+      console.error(`[Node Exporter] SSH 연결 실패 (${serverIp}):`, sshError.message);
+      throw new Error(`SSH 연결 실패: ${sshError.message}. SSH 키 및 사용자 정보를 확인하세요.`);
     }
 
     // Node Exporter 설치 스크립트를 임시 파일로 전송하여 실행
@@ -80,12 +90,13 @@ sudo systemctl daemon-reload
 sudo systemctl start node_exporter
 sudo systemctl enable node_exporter
 
-# 방화벽 설정 (UFW 또는 iptables)
-sudo ufw allow 9100/tcp 2>/dev/null || sudo iptables -A INPUT -p tcp --dport 9100 -j ACCEPT 2>/dev/null || true
+    # 방화벽 설정 (UFW 또는 iptables)
+    NODE_EXPORTER_PORT=\${NODE_EXPORTER_PORT:-9100}
+    sudo ufw allow \${NODE_EXPORTER_PORT}/tcp 2>/dev/null || sudo iptables -A INPUT -p tcp --dport \${NODE_EXPORTER_PORT} -j ACCEPT 2>/dev/null || true
 
-# 설치 확인
-sleep 2
-curl -s http://localhost:9100/metrics | head -5 || echo "Node Exporter 설치 완료 (메트릭 확인 실패)"
+    # 설치 확인
+    sleep 2
+    curl -s http://localhost:\${NODE_EXPORTER_PORT}/metrics | head -5 || echo "Node Exporter 설치 완료 (메트릭 확인 실패)"
 `;
 
     // 스크립트를 base64로 인코딩하여 전송
@@ -94,10 +105,15 @@ curl -s http://localhost:9100/metrics | head -5 || echo "Node Exporter 설치 �
     // 원격에서 스크립트를 디코딩하고 실행
     const command = `${sshCommand} "echo '${scriptBase64}' | base64 -d | bash"`;
     
+    console.log(`[Node Exporter] 설치 시작: ${serverIp} (버전: ${nodeExporterVersion})`);
     const { stdout, stderr } = await execPromise(command, {
-      timeout: 300000, // 5분 타임아웃
+      timeout: parseInt(process.env.NODE_EXPORTER_INSTALL_TIMEOUT) || 300000, // 기본 5분 타임아웃
       maxBuffer: 10 * 1024 * 1024 // 10MB
     });
+
+    if (stderr && stderr.trim() && !stderr.includes('WARNING')) {
+      console.warn(`[Node Exporter] 설치 중 경고 (${serverIp}):`, stderr);
+    }
 
     const result = {
       success: true,
@@ -133,51 +149,36 @@ curl -s http://localhost:9100/metrics | head -5 || echo "Node Exporter 설치 �
       }
     }
 
-    // Prometheus 자동 등록 옵션이 활성화된 경우
-    if (autoRegisterPrometheus) {
-      try {
-        // Job 이름 자동 생성 또는 사용자 지정
-        let finalJobName = prometheusJobName;
-        if (!finalJobName) {
-          // 자동 생성 규칙: serverIp의 마지막 옥텟을 사용하여 job 이름 생성
-          // 예: 10.255.48.230 -> node-exporter-230 또는 사용자 지정 규칙
-          const ipParts = serverIp.split('.');
-          const lastOctet = ipParts[ipParts.length - 1];
-          finalJobName = `node-exporter-${lastOctet}`;
-        }
-
-        // Prometheus Job 등록
-        const prometheusResult = await addPrometheusJob({
-          jobName: finalJobName,
-          targets: [`${serverIp}:9100`],
-          labels: {
-            instance: serverIp,
-            service: prometheusLabels.service || 'node-exporter',
-            environment: prometheusLabels.environment || 'production',
-            ...prometheusLabels
-          }
-        });
-
-        result.prometheusRegistered = true;
-        result.prometheusJobName = finalJobName;
-        result.message += ` Prometheus Job '${finalJobName}'에 자동 등록되었습니다.`;
-        console.log(`[Node Exporter] Prometheus 자동 등록 완료: ${serverIp} -> ${finalJobName}`);
-      } catch (prometheusError) {
-        // Prometheus 등록 실패해도 Node Exporter 설치 성공으로 처리
-        console.warn(`[Node Exporter] Prometheus 자동 등록 실패 (${serverIp}):`, prometheusError.message);
-        result.prometheusError = prometheusError.message;
-        result.message += ` (Prometheus 자동 등록 실패: ${prometheusError.message})`;
-      }
-    }
+    // Prometheus 자동 등록은 제거됨 (PLG Stack 모니터링 등록 메뉴에서 수행)
 
     return result;
   } catch (error) {
     console.error(`[Node Exporter] 설치 실패 (${serverIp}):`, error);
+    console.error(`[Node Exporter] 에러 상세:`, {
+      message: error.message,
+      code: error.code,
+      stderr: error.stderr,
+      stdout: error.stdout
+    });
+    
+    // 사용자 친화적인 에러 메시지 생성
+    let userFriendlyError = error.message;
+    if (error.message.includes('timeout')) {
+      userFriendlyError = '설치 시간 초과: 네트워크 연결이 느리거나 서버 응답이 없습니다.';
+    } else if (error.message.includes('Permission denied') || error.message.includes('Authentication failed')) {
+      userFriendlyError = 'SSH 인증 실패: 올바른 SSH 키를 선택했는지 확인하세요.';
+    } else if (error.message.includes('Connection refused') || error.message.includes('Could not resolve')) {
+      userFriendlyError = '서버 연결 실패: 서버 IP 주소와 네트워크 연결을 확인하세요.';
+    } else if (error.message.includes('SSH 연결 실패')) {
+      userFriendlyError = error.message; // 이미 사용자 친화적인 메시지
+    }
+    
     return {
       success: false,
       serverIp: serverIp,
-      error: error.message,
-      details: error.stderr || error.stdout
+      error: userFriendlyError,
+      details: error.stderr || error.stdout || error.message,
+      originalError: error.message // 디버깅용
     };
   }
 }
@@ -190,7 +191,7 @@ curl -s http://localhost:9100/metrics | head -5 || echo "Node Exporter 설치 �
  */
 async function checkNodeExporterStatus(serverIp, options = {}) {
   const {
-    sshUser = 'ubuntu',
+    sshUser = process.env.DEFAULT_SSH_USER || 'ubuntu',
     sshKey = null,
     sshPassword = null
   } = options;
@@ -198,21 +199,36 @@ async function checkNodeExporterStatus(serverIp, options = {}) {
   try {
     let sshCommand = '';
     if (sshKey) {
-      sshCommand = `ssh -i "${sshKey}" -o StrictHostKeyChecking=no ${sshUser}@${serverIp}`;
+      sshCommand = `ssh -i "${sshKey}" -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUser}@${serverIp}`;
     } else if (sshPassword) {
-      sshCommand = `sshpass -p '${sshPassword}' ssh -o StrictHostKeyChecking=no ${sshUser}@${serverIp}`;
+      sshCommand = `sshpass -p '${sshPassword}' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUser}@${serverIp}`;
     } else {
       throw new Error('SSH Key 또는 Password가 필요합니다.');
     }
 
+    // SSH 연결 테스트
+    try {
+      const testCommand = `${sshCommand} "echo 'SSH connection test'"`;
+      await execPromise(testCommand, { timeout: 10000 });
+    } catch (sshError) {
+      console.error(`[Node Exporter] 상태 확인 - SSH 연결 실패 (${serverIp}):`, sshError.message);
+      throw new Error(`SSH 연결 실패: ${sshError.message}`);
+    }
+
     // 상태 확인 스크립트 (Node Exporter + Promtail)
+    const nodeExporterPort = process.env.NODE_EXPORTER_PORT || '9100';
+    const promtailPort = process.env.PROMTAIL_PORT || '9080';
     const checkScript = `#!/bin/bash
+# 포트 설정
+NODE_EXPORTER_PORT=${nodeExporterPort}
+PROMTAIL_PORT=${promtailPort}
+
 # Node Exporter 상태
 systemctl is-active node_exporter 2>/dev/null || echo "inactive"
 systemctl is-enabled node_exporter 2>/dev/null || echo "disabled"
 # Node Exporter 바이너리 파일 존재 확인
 test -f /usr/local/bin/node_exporter && echo "binary_exists" || echo "binary_not_found"
-curl -s http://localhost:9100/metrics | head -1 2>/dev/null || echo "not_responding"
+curl -s http://localhost:\${NODE_EXPORTER_PORT}/metrics | head -1 2>/dev/null || echo "not_responding"
 
 # Promtail 상태
 systemctl is-active promtail 2>/dev/null || echo "inactive"
@@ -222,7 +238,7 @@ test -f /usr/local/bin/promtail && echo "binary_exists" || echo "binary_not_foun
 # Promtail 설정 파일 존재 확인
 test -f /etc/promtail/config.yml && echo "config_exists" || echo "config_not_found"
 # Promtail HTTP 엔드포인트 확인
-curl -s http://localhost:9080/ready 2>&1 | head -1 || echo "not_responding"
+curl -s http://localhost:\${PROMTAIL_PORT}/ready 2>&1 | head -1 || echo "not_responding"
 # Promtail 서비스 상태 상세 확인 (에러 메시지 포함)
 systemctl status promtail --no-pager -l 2>&1 | head -20 || echo "status_check_failed"
 # Promtail 설정 파일에서 Loki URL 확인
@@ -232,7 +248,14 @@ grep -E "^\\s*url:" /etc/promtail/config.yml 2>/dev/null | head -1 || echo "loki
     // 스크립트를 base64로 인코딩하여 전송
     const scriptBase64 = Buffer.from(checkScript).toString('base64');
     const command = `${sshCommand} "echo '${scriptBase64}' | base64 -d | bash"`;
-    const { stdout } = await execPromise(command, { timeout: 10000 });
+    console.log(`[Node Exporter] 상태 확인 시작: ${serverIp}`);
+    const { stdout, stderr } = await execPromise(command, { 
+      timeout: parseInt(process.env.NODE_EXPORTER_STATUS_CHECK_TIMEOUT) || 15000 // 기본 15초
+    });
+    
+    if (stderr && stderr.trim()) {
+      console.warn(`[Node Exporter] 상태 확인 중 경고 (${serverIp}):`, stderr);
+    }
 
     const lines = stdout.trim().split('\n');
     
@@ -314,13 +337,33 @@ grep -E "^\\s*url:" /etc/promtail/config.yml 2>/dev/null | head -1 || echo "loki
     };
   } catch (error) {
     console.error(`[Node Exporter] 상태 확인 실패 (${serverIp}):`, error);
+    console.error(`[Node Exporter] 상태 확인 에러 상세:`, {
+      message: error.message,
+      code: error.code,
+      stderr: error.stderr,
+      stdout: error.stdout
+    });
+    
+    // 사용자 친화적인 에러 메시지 생성
+    let userFriendlyError = error.message;
+    if (error.message.includes('timeout')) {
+      userFriendlyError = '상태 확인 시간 초과: 서버 응답이 없습니다.';
+    } else if (error.message.includes('Permission denied') || error.message.includes('Authentication failed')) {
+      userFriendlyError = 'SSH 인증 실패: 올바른 SSH 키를 선택했는지 확인하세요.';
+    } else if (error.message.includes('Connection refused') || error.message.includes('Could not resolve')) {
+      userFriendlyError = '서버 연결 실패: 서버 IP 주소와 네트워크 연결을 확인하세요.';
+    } else if (error.message.includes('SSH 연결 실패')) {
+      userFriendlyError = error.message; // 이미 사용자 친화적인 메시지
+    }
+    
     return {
       success: false,
       serverIp: serverIp,
       nodeExporter: { installed: false },
       promtail: { installed: false },
       installed: false,
-      error: error.message
+      error: userFriendlyError,
+      originalError: error.message // 디버깅용
     };
   }
 }
@@ -350,75 +393,7 @@ async function installNodeExporterOnMultipleServers(serverIps, options = {}) {
     }))
   );
 
-  // Prometheus 자동 등록이 활성화된 경우
-  if (autoRegisterPrometheus && results.some(r => r.success)) {
-    try {
-      const successfulServers = results
-        .filter(r => r.success)
-        .map(r => r.serverIp);
-
-      if (groupByJob && successfulServers.length > 0) {
-        // 여러 서버를 하나의 Job으로 그룹화
-        let finalJobName = prometheusJobName;
-        if (!finalJobName) {
-          // 자동 생성: 첫 번째 서버의 IP 기반 또는 사용자 지정 규칙
-          const firstIp = successfulServers[0];
-          const ipParts = firstIp.split('.');
-          const subnet = ipParts.slice(0, 3).join('.');
-          finalJobName = `node-exporter-${subnet}`;
-        }
-
-        const targets = successfulServers.map(ip => `${ip}:9100`);
-        
-        await addPrometheusJob({
-          jobName: finalJobName,
-          targets: targets,
-          labels: {
-            service: prometheusLabels.service || 'node-exporter',
-            environment: prometheusLabels.environment || 'production',
-            ...prometheusLabels
-          }
-        });
-
-        // 결과에 Prometheus 등록 정보 추가
-        results.forEach((result, index) => {
-          if (result.success) {
-            result.prometheusRegistered = true;
-            result.prometheusJobName = finalJobName;
-            result.message += ` Prometheus Job '${finalJobName}'에 자동 등록되었습니다.`;
-          }
-        });
-
-        console.log(`[Node Exporter] Prometheus 그룹 등록 완료: ${successfulServers.length}개 서버 -> ${finalJobName}`);
-      } else {
-        // 각 서버를 개별 Job으로 등록
-        for (const result of results) {
-          if (result.success && !result.prometheusRegistered) {
-            const finalJobName = prometheusJobName || `node-exporter-${result.serverIp.split('.').pop()}`;
-            try {
-              await addPrometheusJob({
-                jobName: finalJobName,
-                targets: [`${result.serverIp}:9100`],
-                labels: {
-                  instance: result.serverIp,
-                  service: prometheusLabels.service || 'node-exporter',
-                  environment: prometheusLabels.environment || 'production',
-                  ...prometheusLabels
-                }
-              });
-              result.prometheusRegistered = true;
-              result.prometheusJobName = finalJobName;
-              result.message += ` Prometheus Job '${finalJobName}'에 자동 등록되었습니다.`;
-            } catch (err) {
-              console.warn(`[Node Exporter] Prometheus 개별 등록 실패 (${result.serverIp}):`, err.message);
-            }
-          }
-        }
-      }
-    } catch (prometheusError) {
-      console.warn(`[Node Exporter] Prometheus 그룹 등록 실패:`, prometheusError.message);
-    }
-  }
+  // Prometheus 자동 등록은 제거됨 (PLG Stack 모니터링 등록 메뉴에서 수행)
 
   return {
     success: results.every(r => r.success),
@@ -441,19 +416,20 @@ async function installNodeExporterOnMultipleServers(serverIps, options = {}) {
  */
 async function installPromtail(serverIp, options = {}) {
   const {
-    sshUser = 'ubuntu',
+    sshUser = process.env.DEFAULT_SSH_USER || 'ubuntu',
     sshKey = null,
     sshPassword = null,
-    promtailVersion = '2.9.3',
+    promtailVersion = process.env.PROMTAIL_VERSION || '2.9.3',
     lokiUrl = null // Loki 서버 URL (예: http://10.255.1.254:3100/loki/api/v1/push)
   } = options;
 
   // Loki URL이 없으면 환경 변수에서 가져오기
   const finalLokiUrl = lokiUrl || process.env.LOKI_URL || 'http://10.255.1.254:3100/loki/api/v1/push';
+  const promtailPort = process.env.PROMTAIL_PORT || '9080';
 
   // Promtail 설정 파일 내용 생성
   const promtailConfig = `server:
-  http_listen_port: 9080
+  http_listen_port: ${promtailPort}
   grpc_listen_port: 0
 
 positions:
@@ -809,13 +785,27 @@ echo "=== Starting Promtail service ==="
 /usr/bin/sudo /bin/systemctl start promtail
 /usr/bin/sudo /bin/systemctl enable promtail
 
-sleep 2
-if systemctl is-active promtail > /dev/null 2>&1; then
-  echo "=== Promtail installation completed successfully ==="
-else
-  echo "WARNING: Promtail service is not active"
-  systemctl status promtail --no-pager || true
-fi
+sleep 3
+# 서비스 상태 확인 (최대 3회 재시도)
+RETRY_COUNT=0
+MAX_RETRIES=3
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+  if systemctl is-active promtail > /dev/null 2>&1; then
+    echo "=== Promtail installation completed successfully ==="
+    echo "=== Promtail service is active ==="
+    exit 0
+  fi
+  RETRY_COUNT=$((RETRY_COUNT + 1))
+  if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+    echo "WARNING: Promtail service is not active, retrying... ($RETRY_COUNT/$MAX_RETRIES)"
+    /usr/bin/sudo /bin/systemctl restart promtail
+    sleep 2
+  fi
+done
+# 최종 확인 실패 시 에러 출력
+echo "ERROR: Promtail service failed to start after $MAX_RETRIES attempts"
+systemctl status promtail --no-pager || true
+exit 1
 `;
 
     // Write script to temp file and execute via scp + ssh
@@ -854,14 +844,45 @@ fi
       fs.unlinkSync(tmpScriptPath);
       fs.unlinkSync(tmpExportScriptPath);
 
-      return {
-        success: true,
-        serverIp: serverIp,
-        message: `Promtail이 성공적으로 설치되었습니다.`,
-        lokiUrl: finalLokiUrl,
-        output: stdout,
-        error: stderr || null
-      };
+      // 설치 스크립트의 종료 코드 확인 (0이면 성공, 1이면 실패)
+      const exitCodeMatch = stdout.match(/exit (\d+)/) || stderr?.match(/exit (\d+)/);
+      const exitCode = exitCodeMatch ? parseInt(exitCodeMatch[1]) : 0;
+      
+      // 서비스가 실제로 실행 중인지 확인
+      const serviceCheckCommand = `${sshCommand} "systemctl is-active promtail 2>/dev/null || echo 'inactive'"`;
+      let serviceActive = false;
+      try {
+        const { stdout: serviceStatus } = await execPromise(serviceCheckCommand, { timeout: 10000 });
+        serviceActive = serviceStatus.trim() === 'active';
+      } catch (checkError) {
+        console.warn(`[Promtail] 서비스 상태 확인 실패 (${serverIp}):`, checkError.message);
+      }
+
+      if (exitCode === 0 && serviceActive) {
+        return {
+          success: true,
+          serverIp: serverIp,
+          message: `Promtail이 성공적으로 설치되었습니다.`,
+          lokiUrl: finalLokiUrl,
+          output: stdout,
+          error: stderr || null
+        };
+      } else {
+        // 설치 스크립트는 성공했지만 서비스가 실행되지 않은 경우
+        const errorMsg = serviceActive 
+          ? '설치 스크립트 실행 중 오류 발생'
+          : 'Promtail 서비스가 시작되지 않았습니다';
+        
+        console.error(`[Promtail] 설치 실패 (${serverIp}): exitCode=${exitCode}, serviceActive=${serviceActive}`);
+        return {
+          success: false,
+          serverIp: serverIp,
+          error: errorMsg,
+          details: stdout + (stderr ? '\n' + stderr : ''),
+          exitCode: exitCode,
+          serviceActive: serviceActive
+        };
+      }
     } catch (executeError) {
       // Clean up local temp files on error
       if (fs.existsSync(tmpScriptPath)) {
@@ -920,11 +941,13 @@ async function installPromtailOnMultipleServers(serverIps, options = {}) {
  */
 async function updatePromtailConfig(serverIp, options = {}) {
   const {
-    sshUser = 'ubuntu',
+    sshUser = process.env.DEFAULT_SSH_USER || 'ubuntu',
     sshKey = null,
     sshPassword = null,
     lokiUrl = null
   } = options;
+  
+  const promtailPort = process.env.PROMTAIL_PORT || '9080';
 
   const finalLokiUrl = lokiUrl || process.env.LOKI_URL || 'http://10.255.1.254:3100/loki/api/v1/push';
 
@@ -949,7 +972,7 @@ HOSTNAME=\$(hostname)
 sudo mkdir -p /etc/promtail
 sudo tee /etc/promtail/config.yml > /dev/null <<CONFIGEOF
 server:
-  http_listen_port: 9080
+  http_listen_port: ${promtailPort}
   grpc_listen_port: 0
 
 positions:
@@ -1100,9 +1123,10 @@ async function updatePromtailConfigOnMultipleServers(serverIps, options = {}) {
  */
 async function uninstallNodeExporter(serverIp, options = {}) {
   const {
-    sshUser = 'ubuntu',
+    sshUser = process.env.DEFAULT_SSH_USER || 'ubuntu',
     sshKey = null,
-    sshPassword = null
+    sshPassword = null,
+    vmName = null // VM 이름 (Prometheus Job 및 Grafana 대시보드 삭제용)
   } = options;
 
   try {
@@ -1144,12 +1168,61 @@ echo "Node Exporter 삭제 완료"
       maxBuffer: 10 * 1024 * 1024
     });
 
+    // Prometheus Job 및 Grafana 대시보드 삭제
+    let prometheusDeleted = false;
+    let grafanaDeleted = false;
+    
+    if (vmName) {
+      try {
+        const { deletePrometheusJob } = require('./prometheusMonitoringService');
+        // VM 이름을 jobName으로 사용하여 Prometheus Job 삭제
+        await deletePrometheusJob(vmName);
+        prometheusDeleted = true;
+        grafanaDeleted = true; // deletePrometheusJob 내부에서 Grafana 대시보드도 삭제
+        console.log(`[Node Exporter] Prometheus Job 및 Grafana 대시보드 삭제 완료: ${vmName}`);
+      } catch (promError) {
+        console.warn(`[Node Exporter] Prometheus Job 삭제 실패 (${vmName}):`, promError.message);
+        // Prometheus Job 삭제 실패해도 Node Exporter 삭제는 성공으로 처리
+      }
+    } else {
+      // VM 이름이 없으면 Prometheus Job 목록에서 해당 IP를 가진 Job 찾기
+      try {
+        const { getPrometheusJobs, deletePrometheusJob } = require('./prometheusMonitoringService');
+        const jobsResult = await getPrometheusJobs();
+        const nodeExporterPort = process.env.NODE_EXPORTER_PORT || '9100';
+        const targetToFind = `${serverIp}:${nodeExporterPort}`;
+        
+        // 해당 IP를 가진 Job 찾기
+        const matchingJob = jobsResult.jobs?.find(job => 
+          job.targets && job.targets.includes(targetToFind)
+        );
+        
+        if (matchingJob) {
+          await deletePrometheusJob(matchingJob.jobName);
+          prometheusDeleted = true;
+          grafanaDeleted = true;
+          console.log(`[Node Exporter] Prometheus Job 및 Grafana 대시보드 삭제 완료: ${matchingJob.jobName}`);
+        } else {
+          console.warn(`[Node Exporter] Prometheus Job을 찾을 수 없음 (${serverIp})`);
+        }
+      } catch (promError) {
+        console.warn(`[Node Exporter] Prometheus Job 조회/삭제 실패 (${serverIp}):`, promError.message);
+      }
+    }
+
+    const messages = ['Node Exporter가 성공적으로 삭제되었습니다.'];
+    if (prometheusDeleted) {
+      messages.push('Prometheus Job 및 Grafana 대시보드도 삭제되었습니다.');
+    }
+
     return {
       success: true,
       serverIp: serverIp,
-      message: 'Node Exporter가 성공적으로 삭제되었습니다.',
+      message: messages.join(' '),
       output: stdout,
-      error: stderr || null
+      error: stderr || null,
+      prometheusDeleted: prometheusDeleted,
+      grafanaDeleted: grafanaDeleted
     };
   } catch (error) {
     console.error(`[Node Exporter] 삭제 실패 (${serverIp}):`, error);
@@ -1288,6 +1361,379 @@ async function uninstallPromtailOnMultipleServers(serverIps, options = {}) {
   };
 }
 
+/**
+ * JMX Exporter 설치
+ * @param {string} serverIp - 서버 IP 주소
+ * @param {object} options - 설치 옵션
+ * @returns {Promise<object>} 설치 결과
+ */
+async function installJmxExporter(serverIp, options = {}) {
+  const {
+    sshUser = process.env.DEFAULT_SSH_USER || 'ubuntu',
+    sshKey = null,
+    sshPassword = null,
+    jmxExporterVersion = process.env.JMX_EXPORTER_VERSION || '0.20.2',
+    jmxExporterPort = process.env.JMX_EXPORTER_PORT || '9404',
+    javaAppPort = process.env.JAVA_APP_JMX_PORT || '9999' // Java 애플리케이션 JMX 포트
+  } = options;
+
+  try {
+    // SSH 접속 테스트
+    let sshCommand = '';
+    if (sshKey) {
+      sshCommand = `ssh -i "${sshKey}" -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUser}@${serverIp}`;
+    } else if (sshPassword) {
+      sshCommand = `sshpass -p '${sshPassword}' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUser}@${serverIp}`;
+    } else {
+      throw new Error('SSH Key 또는 Password가 필요합니다.');
+    }
+
+    // SSH 연결 테스트
+    try {
+      const testCommand = `${sshCommand} "echo 'SSH connection test'"`;
+      await execPromise(testCommand, { timeout: 10000 });
+      console.log(`[JMX Exporter] SSH 연결 확인 완료: ${serverIp}`);
+    } catch (sshError) {
+      console.error(`[JMX Exporter] SSH 연결 실패 (${serverIp}):`, sshError.message);
+      throw new Error(`SSH 연결 실패: ${sshError.message}. SSH 키 및 사용자 정보를 확인하세요.`);
+    }
+
+    // JMX Exporter 설치 스크립트
+    const installScript = `#!/bin/bash
+set -e
+
+# 기존 JMX Exporter 서비스 중지 (이미 설치된 경우)
+sudo systemctl stop jmx_exporter 2>/dev/null || true
+sudo systemctl disable jmx_exporter 2>/dev/null || true
+
+# 실행 중인 프로세스 종료
+sudo pkill -f jmx_prometheus_httpserver 2>/dev/null || true
+sleep 2
+
+# JMX Exporter 다운로드
+cd /tmp
+wget -q https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_httpserver/${jmxExporterVersion}/jmx_prometheus_httpserver-${jmxExporterVersion}-jar-with-dependencies.jar -O jmx_prometheus_httpserver.jar
+
+# JMX Exporter 디렉토리 생성
+sudo mkdir -p /opt/jmx_exporter
+sudo cp jmx_prometheus_httpserver.jar /opt/jmx_exporter/
+sudo chmod +x /opt/jmx_exporter/jmx_prometheus_httpserver.jar
+
+# JMX Exporter 설정 파일 생성
+sudo tee /opt/jmx_exporter/config.yml > /dev/null <<'CONFIGEOF'
+---
+rules:
+  - pattern: ".*"
+CONFIGEOF
+
+# systemd 서비스 파일 생성
+sudo tee /etc/systemd/system/jmx_exporter.service > /dev/null <<'SERVICEEOF'
+[Unit]
+Description=JMX Exporter
+After=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/java -jar /opt/jmx_exporter/jmx_prometheus_httpserver.jar ${javaAppPort} /opt/jmx_exporter/config.yml
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+SERVICEEOF
+
+# systemd 리로드 및 서비스 시작
+sudo systemctl daemon-reload
+sudo systemctl start jmx_exporter
+sudo systemctl enable jmx_exporter
+
+# 방화벽 설정 (UFW 또는 iptables)
+JMX_EXPORTER_PORT=\${JMX_EXPORTER_PORT:-${jmxExporterPort}}
+sudo ufw allow \${JMX_EXPORTER_PORT}/tcp 2>/dev/null || sudo iptables -A INPUT -p tcp --dport \${JMX_EXPORTER_PORT} -j ACCEPT 2>/dev/null || true
+
+# 설치 확인
+sleep 3
+for i in {1..3}; do
+  if curl -s http://localhost:\${JMX_EXPORTER_PORT}/metrics | head -5 > /dev/null 2>&1; then
+    echo "JMX Exporter 설치 완료"
+    exit 0
+  fi
+  echo "JMX Exporter 시작 대기 중... (\${i}/3)"
+  sleep 2
+done
+echo "JMX Exporter 설치 완료 (메트릭 확인 실패 - Java 애플리케이션이 실행 중이지 않을 수 있습니다)"
+`;
+
+    console.log(`[JMX Exporter] 설치 시작: ${serverIp} (버전: ${jmxExporterVersion}, 포트: ${jmxExporterPort})`);
+
+    // 스크립트를 임시 파일로 전송하여 실행
+    const tempScriptFile = `/tmp/jmx_exporter_install_${Date.now()}.sh`;
+    await fs.writeFile(tempScriptFile, installScript);
+    await execPromise(`chmod +x ${tempScriptFile}`);
+
+    // 스크립트를 원격 서버로 복사
+    const scpCommand = sshKey
+      ? `scp -i "${sshKey}" -o StrictHostKeyChecking=no ${tempScriptFile} ${sshUser}@${serverIp}:/tmp/jmx_exporter_install.sh`
+      : `sshpass -p '${sshPassword}' scp -o StrictHostKeyChecking=no ${tempScriptFile} ${sshUser}@${serverIp}:/tmp/jmx_exporter_install.sh`;
+    
+    await execPromise(scpCommand);
+
+    // 원격 서버에서 스크립트 실행
+    const installTimeout = parseInt(process.env.JMX_EXPORTER_INSTALL_TIMEOUT || process.env.NODE_EXPORTER_INSTALL_TIMEOUT || '300000');
+    const { stdout, stderr } = await execPromise(
+      `${sshCommand} "bash /tmp/jmx_exporter_install.sh"`,
+      { timeout: installTimeout }
+    );
+
+    // 임시 파일 삭제
+    await fs.unlink(tempScriptFile).catch(() => {});
+
+    if (stderr) {
+      console.warn(`[JMX Exporter] 설치 중 경고 (${serverIp}):`, stderr);
+    }
+
+    return {
+      success: true,
+      serverIp: serverIp,
+      version: jmxExporterVersion,
+      port: jmxExporterPort,
+      message: `JMX Exporter가 성공적으로 설치되었습니다. (포트: ${jmxExporterPort})`
+    };
+  } catch (error) {
+    console.error(`[JMX Exporter] 설치 실패 (${serverIp}):`, error);
+    
+    let userFriendlyError = error.message;
+    if (error.code === 'ETIMEDOUT' || error.signal === 'SIGTERM') {
+      userFriendlyError = '설치 시간 초과: 네트워크 연결이 느리거나 서버 응답이 없습니다.';
+    } else if (error.message.includes('SSH 연결 실패')) {
+      userFriendlyError = error.message;
+    } else if (error.message.includes('Permission denied')) {
+      userFriendlyError = '권한 오류: SSH 키 또는 사용자 권한을 확인하세요.';
+    }
+
+    throw new Error(`JMX Exporter 설치 실패: ${userFriendlyError}`);
+  }
+}
+
+/**
+ * JMX Exporter 설치 상태 확인
+ * @param {string} serverIp - 서버 IP 주소
+ * @param {object} options - 확인 옵션
+ * @returns {Promise<object>} 상태 정보
+ */
+async function checkJmxExporterStatus(serverIp, options = {}) {
+  const {
+    sshUser = process.env.DEFAULT_SSH_USER || 'ubuntu',
+    sshKey = null,
+    sshPassword = null,
+    jmxExporterPort = process.env.JMX_EXPORTER_PORT || '9404'
+  } = options;
+
+  try {
+    let sshCommand = '';
+    if (sshKey) {
+      sshCommand = `ssh -i "${sshKey}" -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUser}@${serverIp}`;
+    } else if (sshPassword) {
+      sshCommand = `sshpass -p '${sshPassword}' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUser}@${serverIp}`;
+    } else {
+      throw new Error('SSH Key 또는 Password가 필요합니다.');
+    }
+
+    // SSH 연결 테스트
+    try {
+      const testCommand = `${sshCommand} "echo 'SSH connection test'"`;
+      await execPromise(testCommand, { timeout: 10000 });
+    } catch (sshError) {
+      return {
+        installed: false,
+        running: false,
+        error: `SSH 연결 실패: ${sshError.message}`
+      };
+    }
+
+    // 바이너리 파일 존재 확인
+    const checkBinaryCommand = `${sshCommand} "test -f /opt/jmx_exporter/jmx_prometheus_httpserver.jar && echo 'exists' || echo 'not_exists'"`;
+    const { stdout: binaryCheck } = await execPromise(checkBinaryCommand);
+    const binaryExists = binaryCheck.trim() === 'exists';
+
+    // 서비스 상태 확인
+    const checkServiceCommand = `${sshCommand} "systemctl is-active jmx_exporter 2>/dev/null || echo 'inactive'"`;
+    const { stdout: serviceStatus } = await execPromise(checkServiceCommand);
+    const serviceActive = serviceStatus.trim() === 'active';
+
+    // 메트릭 엔드포인트 확인
+    let metricsAvailable = false;
+    if (serviceActive) {
+      try {
+        const metricsCheckTimeout = parseInt(process.env.JMX_EXPORTER_STATUS_CHECK_TIMEOUT || process.env.NODE_EXPORTER_STATUS_CHECK_TIMEOUT || '15000');
+        const metricsCheckCommand = `${sshCommand} "timeout ${metricsCheckTimeout / 1000} curl -s http://localhost:${jmxExporterPort}/metrics | head -1 || echo 'unavailable'"`;
+        const { stdout: metricsCheck } = await execPromise(metricsCheckCommand);
+        metricsAvailable = metricsCheck.trim() !== 'unavailable' && metricsCheck.trim().length > 0;
+      } catch (metricsError) {
+        metricsAvailable = false;
+      }
+    }
+
+    // 설치됨 판단: 바이너리와 설정 파일이 모두 존재해야 함
+    const installed = binaryExists;
+
+    return {
+      installed: installed,
+      running: serviceActive && metricsAvailable,
+      binaryExists: binaryExists,
+      serviceActive: serviceActive,
+      metricsAvailable: metricsAvailable,
+      port: jmxExporterPort
+    };
+  } catch (error) {
+    console.error(`[JMX Exporter] 상태 확인 실패 (${serverIp}):`, error);
+    return {
+      installed: false,
+      running: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 여러 서버에 JMX Exporter 설치
+ * @param {Array<string>} serverIps - 서버 IP 주소 목록
+ * @param {object} options - 설치 옵션
+ * @returns {Promise<object>} 설치 결과
+ */
+async function installJmxExporterOnMultipleServers(serverIps, options = {}) {
+  const results = await Promise.allSettled(
+    serverIps.map(serverIp => installJmxExporter(serverIp, options))
+  );
+
+  const successResults = [];
+  const failedResults = [];
+
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      successResults.push(result.value);
+    } else {
+      failedResults.push({
+        serverIp: serverIps[index],
+        error: result.reason.message
+      });
+    }
+  });
+
+  return {
+    success: failedResults.length === 0,
+    total: serverIps.length,
+    successCount: successResults.length,
+    failedCount: failedResults.length,
+    results: successResults,
+    failures: failedResults
+  };
+}
+
+/**
+ * JMX Exporter 삭제
+ * @param {string} serverIp - 서버 IP 주소
+ * @param {object} options - 삭제 옵션
+ * @returns {Promise<object>} 삭제 결과
+ */
+async function uninstallJmxExporter(serverIp, options = {}) {
+  const {
+    sshUser = process.env.DEFAULT_SSH_USER || 'ubuntu',
+    sshKey = null,
+    sshPassword = null
+  } = options;
+
+  try {
+    let sshCommand = '';
+    if (sshKey) {
+      sshCommand = `ssh -i "${sshKey}" -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUser}@${serverIp}`;
+    } else if (sshPassword) {
+      sshCommand = `sshpass -p '${sshPassword}' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${sshUser}@${serverIp}`;
+    } else {
+      throw new Error('SSH Key 또는 Password가 필요합니다.');
+    }
+
+    // JMX Exporter 삭제 스크립트
+    const uninstallScript = `#!/bin/bash
+set -e
+
+# 서비스 중지 및 비활성화
+sudo systemctl stop jmx_exporter 2>/dev/null || true
+sudo systemctl disable jmx_exporter 2>/dev/null || true
+
+# 실행 중인 프로세스 종료
+sudo pkill -f jmx_prometheus_httpserver 2>/dev/null || true
+sleep 2
+
+# 서비스 파일 삭제
+sudo rm -f /etc/systemd/system/jmx_exporter.service
+sudo systemctl daemon-reload
+
+# 설치 디렉토리 삭제
+sudo rm -rf /opt/jmx_exporter
+
+echo "JMX Exporter 삭제 완료"
+`;
+
+    const tempScriptFile = `/tmp/jmx_exporter_uninstall_${Date.now()}.sh`;
+    await fs.writeFile(tempScriptFile, uninstallScript);
+    await execPromise(`chmod +x ${tempScriptFile}`);
+
+    const scpCommand = sshKey
+      ? `scp -i "${sshKey}" -o StrictHostKeyChecking=no ${tempScriptFile} ${sshUser}@${serverIp}:/tmp/jmx_exporter_uninstall.sh`
+      : `sshpass -p '${sshPassword}' scp -o StrictHostKeyChecking=no ${tempScriptFile} ${sshUser}@${serverIp}:/tmp/jmx_exporter_uninstall.sh`;
+    
+    await execPromise(scpCommand);
+    await execPromise(`${sshCommand} "bash /tmp/jmx_exporter_uninstall.sh"`);
+    await fs.unlink(tempScriptFile).catch(() => {});
+
+    return {
+      success: true,
+      serverIp: serverIp,
+      message: 'JMX Exporter가 삭제되었습니다.'
+    };
+  } catch (error) {
+    console.error(`[JMX Exporter] 삭제 실패 (${serverIp}):`, error);
+    throw new Error(`JMX Exporter 삭제 실패: ${error.message}`);
+  }
+}
+
+/**
+ * 여러 서버에서 JMX Exporter 삭제
+ * @param {Array<string>} serverIps - 서버 IP 주소 목록
+ * @param {object} options - 삭제 옵션
+ * @returns {Promise<object>} 삭제 결과
+ */
+async function uninstallJmxExporterOnMultipleServers(serverIps, options = {}) {
+  const results = await Promise.allSettled(
+    serverIps.map(serverIp => uninstallJmxExporter(serverIp, options))
+  );
+
+  const successResults = [];
+  const failedResults = [];
+
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      successResults.push(result.value);
+    } else {
+      failedResults.push({
+        serverIp: serverIps[index],
+        error: result.reason.message
+      });
+    }
+  });
+
+  return {
+    success: failedResults.length === 0,
+    total: serverIps.length,
+    successCount: successResults.length,
+    failedCount: failedResults.length,
+    results: successResults,
+    failures: failedResults
+  };
+}
+
 module.exports = {
   installNodeExporter,
   checkNodeExporterStatus,
@@ -1299,7 +1745,12 @@ module.exports = {
   uninstallNodeExporter,
   uninstallNodeExporterOnMultipleServers,
   uninstallPromtail,
-  uninstallPromtailOnMultipleServers
+  uninstallPromtailOnMultipleServers,
+  installJmxExporter,
+  checkJmxExporterStatus,
+  installJmxExporterOnMultipleServers,
+  uninstallJmxExporter,
+  uninstallJmxExporterOnMultipleServers
 };
 
 

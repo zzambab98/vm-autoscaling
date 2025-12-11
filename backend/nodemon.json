@@ -28,9 +28,28 @@
     "FRONTEND_BASE_URL": "http://10.255.48.253:5520",
     "PLG_STACK_SERVER": "10.255.1.254",
     "PLG_STACK_USER": "ubuntu",
-    "PLG_STACK_SSH_KEY": "/home/ubuntu/workspace/vm-autoscaling/pemkey/danainfra"
+    "PLG_STACK_SSH_KEY": "/home/ubuntu/workspace/vm-autoscaling/pemkey/danainfra",
+    "SSH_KEY_DIR": "/home/ubuntu/workspace/vm-autoscaling/pemkey",
+    "DEFAULT_SSH_USER": "ubuntu",
+    "DEFAULT_SSH_KEY": "/home/ubuntu/workspace/vm-autoscaling/pemkey/dana-cocktail",
+    "NODE_EXPORTER_VERSION": "1.7.0",
+    "NODE_EXPORTER_PORT": "9100",
+    "NODE_EXPORTER_INSTALL_TIMEOUT": "300000",
+    "NODE_EXPORTER_STATUS_CHECK_TIMEOUT": "15000",
+    "PROMTAIL_VERSION": "2.9.3",
+    "PROMTAIL_PORT": "9080",
+    "LOKI_URL": "http://10.255.1.254:3100/loki/api/v1/push",
+    "JMX_EXPORTER_VERSION": "0.20.2",
+    "JMX_EXPORTER_PORT": "9404",
+    "JAVA_APP_JMX_PORT": "9999",
+    "JMX_EXPORTER_INSTALL_TIMEOUT": "300000",
+    "JMX_EXPORTER_STATUS_CHECK_TIMEOUT": "15000",
+    "GRAFANA_USER": "admin",
+    "GRAFANA_PASSWORD": "admin123",
+    "GRAFANA_PROMETHEUS_DATASOURCE": "Prometheus"
   },
   "delay": 1000
 }
+
 
 

@@ -1456,12 +1456,18 @@ async function getVmList() {
       })
       .filter(vm => !vm.name.startsWith('vCLS-')); // vCLS-로 시작하는 VM 제외
     
-    // 병렬로 IP 조회 (Promise.all 사용)
+    // 병렬로 IP 조회 (Promise.all 사용, 재시도 로직 포함)
     const vmListPromises = vmPaths.map(async ({ name, path }) => {
       let ips = [];
+      const maxRetries = 3;
+      const retryDelay = 5000; // 5초 대기
+      const timeout = 15000; // 15초 타임아웃
+      
+      // VM 전원 상태 확인
+      let isPoweredOn = false;
       try {
-        const vmIpCommand = `govc vm.ip "${name}"`;
-        const { stdout: ipOutput } = await execPromise(vmIpCommand, {
+        const powerStateCommand = `govc object.collect -s "${path}" runtime.powerState`;
+        const { stdout: powerStateOutput } = await execPromise(powerStateCommand, {
           env: {
             ...process.env,
             GOVC_URL: vcenterConfig.url,
@@ -1469,22 +1475,98 @@ async function getVmList() {
             GOVC_PASSWORD: vcenterConfig.password,
             GOVC_INSECURE: vcenterConfig.insecure
           },
-          timeout: 3000 // 3초 타임아웃 (병렬 처리로 짧게 설정)
+          timeout: 5000
         });
-        
-        // govc vm.ip는 한 줄에 하나씩 IP를 반환 (여러 개일 수 있음)
-        const ipLines = ipOutput.trim().split('\n').filter(line => line.trim());
-        ipLines.forEach(ip => {
-          const ipStr = ip.trim();
-          // IPv4 주소만 추가 (IPv6 제외)
-          if (ipStr && /^\d+\.\d+\.\d+\.\d+$/.test(ipStr) && !ips.includes(ipStr)) {
-            ips.push(ipStr);
-          }
-        });
+        isPoweredOn = powerStateOutput.trim() === 'poweredOn';
       } catch (error) {
-        // IP 조회 실패는 경고만 출력 (VM 목록은 계속 반환)
-        // VM이 꺼져 있거나 Guest Tools가 설치되지 않은 경우 IP를 가져올 수 없음
-        // 타임아웃이나 에러는 무시하고 계속 진행
+        // 전원 상태 확인 실패는 무시하고 계속 진행
+        console.warn(`[Template Service] VM 전원 상태 확인 실패 (${name}):`, error.message);
+      }
+      
+      // IP 조회 재시도 로직 (전원이 켜진 경우에만 재시도)
+      if (isPoweredOn) {
+        let allIpAddresses = []; // IPv4와 IPv6 모두 저장 (디버깅용)
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            const vmIpCommand = `govc vm.ip "${name}"`;
+            const { stdout: ipOutput } = await execPromise(vmIpCommand, {
+              env: {
+                ...process.env,
+                GOVC_URL: vcenterConfig.url,
+                GOVC_USERNAME: vcenterConfig.username,
+                GOVC_PASSWORD: vcenterConfig.password,
+                GOVC_INSECURE: vcenterConfig.insecure
+              },
+              timeout: timeout
+            });
+            
+            // govc vm.ip는 한 줄에 하나씩 IP를 반환 (여러 개일 수 있음)
+            const ipLines = ipOutput.trim().split('\n').filter(line => line.trim());
+            let hasIPv4 = false;
+            
+            ipLines.forEach(ip => {
+              const ipStr = ip.trim();
+              if (ipStr) {
+                allIpAddresses.push(ipStr);
+                // IPv4 주소만 추가 (IPv6 제외)
+                if (/^\d+\.\d+\.\d+\.\d+$/.test(ipStr) && !ips.includes(ipStr)) {
+                  ips.push(ipStr);
+                  hasIPv4 = true;
+                }
+              }
+            });
+            
+            // IPv4를 성공적으로 가져왔으면 재시도 중단
+            if (ips.length > 0) {
+              console.log(`[Template Service] VM IP 조회 성공 (${name}): IPv4=${ips.join(', ')}`);
+              break;
+            }
+            
+            // IPv4가 없지만 IPv6는 있는 경우 로그 출력
+            if (allIpAddresses.length > 0 && attempt === maxRetries) {
+              console.warn(`[Template Service] VM IP 조회 완료 (${name}): IPv4 없음, IPv6만 있음: ${allIpAddresses.join(', ')}`);
+            }
+            
+            // 마지막 시도가 아니면 대기 후 재시도
+            if (attempt < maxRetries) {
+              console.log(`[Template Service] VM IP 조회 재시도 (${name}, 시도 ${attempt}/${maxRetries}): IPv4 대기 중...`);
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+            }
+          } catch (error) {
+            // 마지막 시도가 아니면 재시도
+            if (attempt < maxRetries) {
+              console.warn(`[Template Service] VM IP 조회 실패 (${name}, 시도 ${attempt}/${maxRetries}), 재시도 중...:`, error.message);
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+            } else {
+              console.warn(`[Template Service] VM IP 조회 최종 실패 (${name}):`, error.message);
+            }
+          }
+        }
+      } else {
+        // 전원이 꺼진 경우 한 번만 시도
+        try {
+          const vmIpCommand = `govc vm.ip "${name}"`;
+          const { stdout: ipOutput } = await execPromise(vmIpCommand, {
+            env: {
+              ...process.env,
+              GOVC_URL: vcenterConfig.url,
+              GOVC_USERNAME: vcenterConfig.username,
+              GOVC_PASSWORD: vcenterConfig.password,
+              GOVC_INSECURE: vcenterConfig.insecure
+            },
+            timeout: timeout
+          });
+          
+          const ipLines = ipOutput.trim().split('\n').filter(line => line.trim());
+          ipLines.forEach(ip => {
+            const ipStr = ip.trim();
+            if (ipStr && /^\d+\.\d+\.\d+\.\d+$/.test(ipStr) && !ips.includes(ipStr)) {
+              ips.push(ipStr);
+            }
+          });
+        } catch (error) {
+          // 전원이 꺼진 VM의 IP 조회 실패는 정상적인 상황
+        }
       }
       
       return {

@@ -379,19 +379,19 @@ pipeline {
                         string(credentialsId: 'vcenter-user', variable: 'VCENTER_USER_CRED'),
                         string(credentialsId: 'vcenter-password', variable: 'VCENTER_PASSWORD_CRED')
                     ]) {
-                        echo "=========================================="
-                        echo "vCenter VM 클론 시작 (govc 사용)"
-                        echo "=========================================="
-                        
-                        def templateName = env.VCENTER_TEMPLATE
-                        def vmName = env.NEW_VM_NAME
-                        def vmIP = env.NEW_VM_IP
-                        def subnet = env.SUBNET
-                        def gateway = env.GATEWAY
-                        def vlan = env.VLAN
+                    echo "=========================================="
+                    echo "vCenter VM 클론 시작 (govc 사용)"
+                    echo "=========================================="
+                    
+                    def templateName = env.VCENTER_TEMPLATE
+                    def vmName = env.NEW_VM_NAME
+                    def vmIP = env.NEW_VM_IP
+                    def subnet = env.SUBNET
+                    def gateway = env.GATEWAY
+                    def vlan = env.VLAN
                         def datastore = env.FINAL_DATASTORE ?: env.VCENTER_DATASTORE
                         def resourcePool = env.FINAL_RESOURCE_POOL ?: env.VCENTER_RESOURCE_POOL
-                        
+                    
                         // vCenter Credentials 재확인
                         def govcUrl = env.GOVC_URL ?: VCENTER_SERVER_CRED ?: 'https://vc.danacloud.local'
                         def govcUser = env.GOVC_USERNAME ?: VCENTER_USER_CRED ?: 'svc-auto'
@@ -425,22 +425,22 @@ pipeline {
                             echo "Step 1: VM 클론 (전원 꺼진 상태)..."
                             
                             def cloneOptions = "-vm=\"${templateName}\" -on=false"
-                            
-                            // Datastore 지정
+                        
+                        // Datastore 지정
                             if (datastore && datastore != 'null' && datastore.trim() != '') {
                                 cloneOptions += " -ds=\"${datastore}\""
-                            }
-                            
-                            // Resource Pool 지정
+                        }
+                        
+                        // Resource Pool 지정
                             if (resourcePool && resourcePool != 'null' && resourcePool.trim() != '') {
                                 cloneOptions += " -pool=\"${resourcePool}\""
-                            }
-                            
-                            // Network/VLAN 지정
+                        }
+                        
+                        // Network/VLAN 지정
                             if (vlan && vlan != 'null' && vlan.trim() != '') {
                                 cloneOptions += " -net=\"${vlan}\""
-                            }
-                            
+                        }
+                        
                             def cloneCommand = """
                                 export GOVC_URL="${govcUrl}"
                                 export GOVC_USERNAME="${govcUser}"
@@ -452,7 +452,7 @@ pipeline {
                             
                             sh cloneCommand
                             echo "✅ VM 클론 완료 (전원 꺼진 상태): ${vmName}"
-                            
+                        
                             // ==========================================
                             // (2) vm.customize로 고정 IP 설정
                             // ==========================================
@@ -484,51 +484,51 @@ pipeline {
                             echo ""
                             echo "Step 3: VM 전원 켜기 및 IP 확인..."
                             
-                            def powerOnCommand = """
+                        def powerOnCommand = """
                                 export GOVC_URL="${govcUrl}"
                                 export GOVC_USERNAME="${govcUser}"
                                 export GOVC_PASSWORD="${govcPass}"
-                                export GOVC_INSECURE="${env.GOVC_INSECURE}"
-                                
-                                govc vm.power -on "${vmName}"
-                            """
+                            export GOVC_INSECURE="${env.GOVC_INSECURE}"
                             
-                            sh powerOnCommand
+                            govc vm.power -on "${vmName}"
+                        """
+                        
+                        sh powerOnCommand
                             echo "VM 부팅 대기 중..."
                             sleep(time: 20, unit: 'SECONDS')
-                            
+                        
                             // IP 확인 (최대 5분 대기)
-                            def maxWait = 300  // 5분
-                            def waitTime = 0
+                        def maxWait = 300  // 5분
+                        def waitTime = 0
                             def currentVMIP = ''
-                            
+                        
                             while (waitTime < maxWait && !currentVMIP) {
-                                sleep(time: 10, unit: 'SECONDS')
-                                waitTime += 10
-                                
-                                def ipCheckCommand = """
+                            sleep(time: 10, unit: 'SECONDS')
+                            waitTime += 10
+                            
+                            def ipCheckCommand = """
                                     export GOVC_URL="${govcUrl}"
                                     export GOVC_USERNAME="${govcUser}"
                                     export GOVC_PASSWORD="${govcPass}"
-                                    export GOVC_INSECURE="${env.GOVC_INSECURE}"
-                                    
-                                    govc vm.ip "${vmName}" | head -1
-                                """
+                                export GOVC_INSECURE="${env.GOVC_INSECURE}"
                                 
-                                def ipOutput = sh(
-                                    script: ipCheckCommand,
-                                    returnStdout: true
-                                ).trim()
-                                
-                                if (ipOutput && ipOutput != '') {
+                                govc vm.ip "${vmName}" | head -1
+                            """
+                            
+                            def ipOutput = sh(
+                                script: ipCheckCommand,
+                                returnStdout: true
+                            ).trim()
+                            
+                            if (ipOutput && ipOutput != '') {
                                     currentVMIP = ipOutput
                                     echo "✅ VM IP 확인: ${currentVMIP}"
                                     break
-                                } else {
-                                    echo "VM IP 주소 대기 중... (${waitTime}/${maxWait}초)"
-                                }
+                            } else {
+                                echo "VM IP 주소 대기 중... (${waitTime}/${maxWait}초)"
                             }
-                            
+                        }
+                        
                             if (!currentVMIP) {
                                 error("VM IP 주소를 가져오지 못했습니다. VM 부팅 상태를 확인하세요.")
                             }
@@ -541,10 +541,10 @@ pipeline {
                             env.NEW_VM_IP = vmIP
                             echo "✅ 최종 VM IP: ${env.NEW_VM_IP}"
                             echo "✅ 첫 부팅부터 고정 IP (${vmIP})로 올라왔습니다 (DHCP 단계 없음)"
-                            
-                        } catch (Exception e) {
-                            echo "VM 클론 실패: ${e.getMessage()}"
-                            error("VM 클론 중 오류 발생: ${e.getMessage()}")
+                        
+                    } catch (Exception e) {
+                        echo "VM 클론 실패: ${e.getMessage()}"
+                        error("VM 클론 중 오류 발생: ${e.getMessage()}")
                         }
                     }
                 }

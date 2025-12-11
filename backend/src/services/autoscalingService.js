@@ -256,21 +256,44 @@ async function deleteConfig(configId) {
     }
 
     // 관련 리소스 정리
+    const cleanupErrors = [];
     try {
       const { deleteAlertRule } = require('./prometheusAlertService');
       const { deleteRoutingRule } = require('./alertmanagerService');
       const { deleteJenkinsJob } = require('./jenkinsService');
 
       // Alert Rule 삭제
-      await deleteAlertRule(config.serviceName);
+      try {
+        await deleteAlertRule(config.serviceName);
+        console.log(`[Autoscaling Service] Alert Rule 삭제 완료: ${config.serviceName}`);
+      } catch (alertError) {
+        cleanupErrors.push(`Alert Rule 삭제 실패: ${alertError.message}`);
+        console.error(`[Autoscaling Service] Alert Rule 삭제 실패:`, alertError);
+      }
 
       // 라우팅 규칙 삭제
-      await deleteRoutingRule(config.serviceName);
+      try {
+        await deleteRoutingRule(config.serviceName);
+        console.log(`[Autoscaling Service] 라우팅 규칙 삭제 완료: ${config.serviceName}`);
+      } catch (routingError) {
+        cleanupErrors.push(`라우팅 규칙 삭제 실패: ${routingError.message}`);
+        console.error(`[Autoscaling Service] 라우팅 규칙 삭제 실패:`, routingError);
+      }
 
       // Jenkins Job 삭제 (스케일아웃 + 스케일인)
-      await deleteJenkinsJob(config.serviceName);
+      try {
+        await deleteJenkinsJob(config.serviceName);
+        console.log(`[Autoscaling Service] Jenkins Job 삭제 완료: ${config.serviceName}`);
+      } catch (jenkinsError) {
+        cleanupErrors.push(`Jenkins Job 삭제 실패: ${jenkinsError.message}`);
+        console.error(`[Autoscaling Service] Jenkins Job 삭제 실패:`, jenkinsError);
+      }
+
+      if (cleanupErrors.length > 0) {
+        console.warn(`[Autoscaling Service] 일부 리소스 정리 실패:`, cleanupErrors.join(', '));
+      }
     } catch (error) {
-      console.error(`[Autoscaling Service] 리소스 정리 실패:`, error);
+      console.error(`[Autoscaling Service] 리소스 정리 중 예외 발생:`, error);
       // 정리 실패해도 설정은 삭제됨
     }
 

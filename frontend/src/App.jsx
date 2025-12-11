@@ -150,9 +150,6 @@ function App() {
         ))}
       </nav>
 
-      <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>
-        {activeTabMeta?.summary || 'DanaIX 운영 도구'}
-      </p>
 
       {activeTab === 'templates' && (
         <ErrorBoundary>

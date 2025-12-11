@@ -21,14 +21,14 @@ function AutoscalingConfigList({ onEdit, onView }) {
         setConfigs(result.configs || []);
       } else {
         if (!preserveOnError) {
-          setConfigs([]);
+        setConfigs([]);
         }
         setMessage({ type: 'error', text: '설정 목록을 불러올 수 없습니다.' });
       }
     } catch (error) {
       console.error('설정 목록 조회 실패:', error);
       if (!preserveOnError) {
-        setConfigs([]);
+      setConfigs([]);
       }
       setMessage({ type: 'error', text: `설정 목록 조회 실패: ${error.message || '알 수 없는 오류'}` });
     } finally {
@@ -145,26 +145,28 @@ function AutoscalingConfigList({ onEdit, onView }) {
           등록된 설정이 없습니다.
         </div>
       ) : (
-        <table className="table autoscaling-table">
+        <table className="table autoscaling-table" style={{ tableLayout: 'fixed', width: '100%' }}>
           <thead>
             <tr>
-              <th>서비스 이름</th>
-              <th>템플릿 ID</th>
-              <th>상태</th>
-              <th>CPU 임계값</th>
-              <th>Memory 임계값</th>
-              <th>VM 범위</th>
-              <th>생성일</th>
-              <th>작업</th>
+              <th style={{ width: '12%' }}>서비스 이름</th>
+              <th style={{ width: '18%' }}>템플릿 ID</th>
+              <th style={{ width: '7%' }}>상태</th>
+              <th style={{ width: '9%' }}>CPU 임계값</th>
+              <th style={{ width: '10%' }}>Memory 임계값</th>
+              <th style={{ width: '9%' }}>VM 범위</th>
+              <th style={{ width: '12%' }}>생성일</th>
+              <th style={{ width: '23%' }}>작업</th>
             </tr>
           </thead>
           <tbody>
             {configs.map(config => (
               <tr key={config.id}>
-                <td>
+                <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={config.serviceName}>
                   <strong>{config.serviceName}</strong>
                 </td>
-                <td>{config.templateId || '-'}</td>
+                <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={config.templateId || '-'}>
+                  {config.templateId || '-'}
+                </td>
                 <td>
                   <span 
                     style={{ 
@@ -183,12 +185,12 @@ function AutoscalingConfigList({ onEdit, onView }) {
                 <td>
                   {config.scaling?.minVms || '-'} ~ {config.scaling?.maxVms || '-'}
                 </td>
-                <td>
+                <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={config.createdAt ? new Date(config.createdAt).toLocaleString('ko-KR') : '-'}>
                   {config.createdAt 
                     ? new Date(config.createdAt).toLocaleString('ko-KR')
                     : '-'}
                 </td>
-                <td className="actions-cell">
+                <td className="actions-cell" style={{ overflow: 'visible', whiteSpace: 'normal' }}>
                   <div className="autoscaling-actions">
                     {onEdit && (
                       <button

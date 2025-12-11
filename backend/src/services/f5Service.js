@@ -242,8 +242,156 @@ async function getF5VirtualServers() {
   }
 }
 
+/**
+ * F5 Pool에 멤버 추가 (POST 요청)
+ * @param {string} f5Server - F5 서버 IP
+ * @param {string} token - 인증 토큰
+ * @param {string} path - API 경로
+ * @param {object} data - POST 데이터
+ * @returns {Promise<object>} API 응답
+ */
+async function f5ApiCallPost(f5Server, token, path, data) {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify(data);
+    const options = {
+      hostname: f5Server,
+      port: 443,
+      path: path,
+      method: 'POST',
+      headers: {
+        'X-F5-Auth-Token': token,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      },
+      rejectUnauthorized: false
+    };
+
+    const req = https.request(options, (res) => {
+      let responseData = '';
+
+      res.on('data', (chunk) => {
+        responseData += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            const response = responseData ? JSON.parse(responseData) : {};
+            resolve(response);
+          } else {
+            reject(new Error(`F5 API 호출 실패: ${res.statusCode} - ${responseData}`));
+          }
+        } catch (error) {
+          reject(new Error(`F5 API 응답 파싱 실패: ${error.message}`));
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      reject(new Error(`F5 API 요청 실패: ${error.message}`));
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
+/**
+ * F5 Pool에 멤버 제거 (DELETE 요청)
+ * @param {string} f5Server - F5 서버 IP
+ * @param {string} token - 인증 토큰
+ * @param {string} path - API 경로
+ * @returns {Promise<object>} API 응답
+ */
+async function f5ApiCallDelete(f5Server, token, path) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: f5Server,
+      port: 443,
+      path: path,
+      method: 'DELETE',
+      headers: {
+        'X-F5-Auth-Token': token,
+        'Content-Type': 'application/json'
+      },
+      rejectUnauthorized: false
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            const response = data ? JSON.parse(data) : {};
+            resolve(response);
+          } else {
+            reject(new Error(`F5 API 호출 실패: ${res.statusCode} - ${data}`));
+          }
+        } catch (error) {
+          reject(new Error(`F5 API 응답 파싱 실패: ${error.message}`));
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      reject(new Error(`F5 API 요청 실패: ${error.message}`));
+    });
+
+    req.end();
+  });
+}
+
+/**
+ * F5 Pool에서 멤버 제거
+ * @param {string} poolName - Pool 이름
+ * @param {string} memberIp - 멤버 IP 주소
+ * @param {string} memberPort - 멤버 포트 (기본값: 80)
+ * @param {string} partition - Partition (기본값: Common)
+ * @returns {Promise<object>} 제거 결과
+ */
+async function removeF5PoolMember(poolName, memberIp, memberPort = '80', partition = F5_PARTITION) {
+  try {
+    // 환경 변수 확인
+    if (!F5_SERVERS || F5_SERVERS.length === 0 || !F5_SERVERS[0]) {
+      throw new Error('F5_SERVERS 환경 변수가 설정되지 않았습니다.');
+    }
+    if (!F5_USER || !F5_PASSWORD) {
+      throw new Error('F5_USER 또는 F5_PASSWORD 환경 변수가 설정되지 않았습니다.');
+    }
+
+    const f5Server = F5_SERVERS[0];
+    const token = await authenticate(f5Server);
+
+    // 멤버 경로 구성
+    // 형식: /mgmt/tm/ltm/pool/~{partition}~{poolName}/members/~{partition}~{memberIp}:{memberPort}
+    const memberPath = `/mgmt/tm/ltm/pool/~${partition}~${poolName}/members/~${partition}~${memberIp}:${memberPort}`;
+
+    // 멤버 제거
+    await f5ApiCallDelete(f5Server, token, memberPath);
+
+    console.log(`[F5 Service] Pool '${poolName}'에서 멤버 '${memberIp}:${memberPort}' 제거 완료`);
+
+    return {
+      success: true,
+      poolName: poolName,
+      memberIp: memberIp,
+      memberPort: memberPort,
+      message: `Pool '${poolName}'에서 멤버 '${memberIp}:${memberPort}'가 제거되었습니다.`
+    };
+  } catch (error) {
+    console.error(`[F5 Service] Pool 멤버 제거 실패:`, error.message);
+    throw new Error(`Pool 멤버 제거 실패: ${error.message}`);
+  }
+}
+
 module.exports = {
   getF5Pools,
-  getF5VirtualServers
+  getF5VirtualServers,
+  removeF5PoolMember
 };
 

@@ -167,14 +167,61 @@ export const promtailApi = {
   }
 };
 
+// JMX Exporter API
+export const jmxExporterApi = {
+  // JMX Exporter 설치
+  install: async (serverIp, options = {}) => {
+    const response = await api.post('/api/jmx-exporter/install', {
+      serverIp,
+      ...options
+    });
+    return response.data;
+  },
+
+  // 여러 서버에 설치
+  installMultiple: async (serverIps, options = {}) => {
+    const response = await api.post('/api/jmx-exporter/install', {
+      serverIps,
+      ...options
+    });
+    return response.data;
+  },
+
+  // 상태 확인
+  checkStatus: async (serverIp, options = {}) => {
+    const params = new URLSearchParams({ serverIp, ...options });
+    const response = await api.get(`/api/jmx-exporter/status?${params}`);
+    return response.data;
+  },
+
+  // JMX Exporter 삭제
+  uninstall: async (serverIp, options = {}) => {
+    const response = await api.post('/api/jmx-exporter/uninstall', {
+      serverIp,
+      ...options
+    });
+    return response.data;
+  },
+
+  // 여러 서버에서 JMX Exporter 삭제
+  uninstallMultiple: async (serverIps, options = {}) => {
+    const response = await api.post('/api/jmx-exporter/uninstall', {
+      serverIps,
+      ...options
+    });
+    return response.data;
+  }
+};
+
 // Prometheus API
 export const prometheusApi = {
   // Job 추가
-  addJob: async (jobName, targets, labels = {}) => {
+  addJob: async (jobName, targets, labels = {}, dashboardOptions = {}) => {
     const response = await api.post('/api/prometheus/jobs', {
       jobName,
       targets,
-      labels
+      labels,
+      ...dashboardOptions
     });
     return response.data;
   },
@@ -194,6 +241,35 @@ export const prometheusApi = {
   deleteJob: async (jobName) => {
     const response = await api.delete(`/api/prometheus/jobs/${encodeURIComponent(jobName)}`);
     return response.data;
+  },
+
+  // VM별 등록 상태 조회
+  getVmStatus: async (vmName) => {
+    const response = await api.get(`/api/prometheus/vm-status?vmName=${encodeURIComponent(vmName)}`);
+    return response.data;
+  },
+
+  // 기능별 추가
+  addFeatures: async (vmName, ip, port, features, labels = {}, sshUser, sshKey) => {
+    const response = await api.post('/api/prometheus/add-features', {
+      vmName,
+      ip,
+      port,
+      features,
+      labels,
+      sshUser,
+      sshKey
+    });
+    return response.data;
+  },
+
+  // 기능별 삭제
+  removeFeatures: async (vmName, features) => {
+    const response = await api.post('/api/prometheus/remove-features', {
+      vmName,
+      features
+    });
+    return response.data;
   }
 };
 
@@ -210,6 +286,15 @@ export const alertmanagerApi = {
 
   deleteRoute: async (serviceName) => {
     const response = await api.delete(`/api/alertmanager/routing-rules/${encodeURIComponent(serviceName)}`);
+    return response.data;
+  }
+};
+
+// SSH 설정 API
+export const sshConfigApi = {
+  // SSH 설정 조회 (SSH 키 목록 + 기본 설정)
+  getConfig: async () => {
+    const response = await api.get('/api/ssh-config');
     return response.data;
   }
 };

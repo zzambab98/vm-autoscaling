@@ -40,10 +40,13 @@ async function addRoutingRule(config) {
         group_by: ['alertname', 'cluster', 'service'],
         group_wait: '10s',
         group_interval: '10s',
-        repeat_interval: '12h',
+        repeat_interval: '5m', // 12h → 5m로 단축 (스케일아웃 반응성 향상)
         receiver: 'default-webhook',
         routes: []
       };
+    } else if (!alertmanagerConfig.route.repeat_interval || alertmanagerConfig.route.repeat_interval === '12h') {
+      // 기존 설정이 12h이면 5m로 업데이트
+      alertmanagerConfig.route.repeat_interval = '5m';
     }
 
     if (!alertmanagerConfig.route.routes) {
@@ -206,26 +209,40 @@ async function deleteRoutingRule(serviceName) {
     // 2. YAML 파싱
     const alertmanagerConfig = yaml.load(currentConfig);
 
-    // 3. 라우팅 규칙 제거 (스케일아웃 + 스케일인)
+    // 3. 라우팅 규칙 제거 (서비스 이름으로 매칭)
+    // 서비스 이름과 일치하는 모든 라우팅 규칙 제거 (alertname 조건 없이)
     if (alertmanagerConfig.route && alertmanagerConfig.route.routes) {
+      const beforeCount = alertmanagerConfig.route.routes.length;
       alertmanagerConfig.route.routes = alertmanagerConfig.route.routes.filter(
-        route => !(
-          route.match && 
-          route.match.service === serviceName && 
-          (route.match.alertname === `${serviceName}_HighResourceUsage` || 
-           route.match.alertname === `${serviceName}_LowResourceUsage`)
-        )
+        route => {
+          // service 매칭이 없거나 다른 경우 유지
+          if (!route.match || route.match.service !== serviceName) {
+            return true;
+          }
+          // service가 일치하면 제거 (alertname 조건 무시)
+          console.log(`[Alertmanager] 라우팅 규칙 제거: service=${serviceName}, alertname=${route.match.alertname || 'N/A'}`);
+          return false;
+        }
       );
+      const afterCount = alertmanagerConfig.route.routes.length;
+      console.log(`[Alertmanager] 라우팅 규칙 제거: ${beforeCount}개 → ${afterCount}개`);
     }
 
-    // 4. 수신자 제거 (스케일아웃 + 스케일인)
+    // 4. 수신자 제거 (서비스 이름이 포함된 모든 수신자 제거)
     if (alertmanagerConfig.receivers) {
+      const beforeCount = alertmanagerConfig.receivers.length;
       alertmanagerConfig.receivers = alertmanagerConfig.receivers.filter(
-        receiver => !(
-          receiver.name === `jenkins-webhook-${serviceName}-out` ||
-          receiver.name === `jenkins-webhook-${serviceName}-in`
-        )
+        receiver => {
+          // 수신자 이름에 서비스 이름이 포함되어 있으면 제거
+          if (receiver.name && receiver.name.includes(serviceName)) {
+            console.log(`[Alertmanager] 수신자 제거: ${receiver.name}`);
+            return false;
+          }
+          return true;
+        }
       );
+      const afterCount = alertmanagerConfig.receivers.length;
+      console.log(`[Alertmanager] 수신자 제거: ${beforeCount}개 → ${afterCount}개`);
     }
 
     // 5. YAML로 변환 및 파일 업데이트
