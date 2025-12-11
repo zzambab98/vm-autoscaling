@@ -340,30 +340,46 @@ except Exception as e:
                         // 정렬 순서:
                         // 1. 타임스탬프가 있는 VM (스케일아웃 생성) - 타임스탬프 내림차순 (최신이 먼저)
                         // 2. 타임스탬프가 없는 VM (최초 생성) - 보호 (맨 뒤)
-                        def sortedVmInfo = vmInfo.sort { a, b ->
-                            def aTimestamp = getTimestamp(a.name)
-                            def bTimestamp = getTimestamp(b.name)
-                            
-                            // 둘 다 타임스탬프가 있으면 내림차순 정렬 (큰 숫자가 먼저 = 최신이 먼저)
-                            if (aTimestamp && bTimestamp) {
-                                return bTimestamp <=> aTimestamp
+                        
+                        // 타임스탬프가 있는 VM과 없는 VM 분리
+                        def vmsWithTimestamp = []
+                        def vmsWithoutTimestamp = []
+                        
+                        vmInfo.each { vm ->
+                            def timestamp = getTimestamp(vm.name)
+                            if (timestamp) {
+                                vmsWithTimestamp.push([vm: vm, timestamp: timestamp])
+                            } else {
+                                vmsWithoutTimestamp.push(vm)
                             }
-                            
-                            // a만 타임스탬프가 있으면 a가 먼저 (스케일아웃 생성 VM 우선)
-                            if (aTimestamp && !bTimestamp) {
-                                return -1
+                        }
+                        
+                        // 타임스탬프가 있는 VM을 타임스탬프 내림차순으로 정렬 (버블 정렬 사용)
+                        def n = vmsWithTimestamp.size()
+                        for (int i = 0; i < n - 1; i++) {
+                            for (int j = 0; j < n - i - 1; j++) {
+                                if (vmsWithTimestamp[j].timestamp < vmsWithTimestamp[j + 1].timestamp) {
+                                    def temp = vmsWithTimestamp[j]
+                                    vmsWithTimestamp[j] = vmsWithTimestamp[j + 1]
+                                    vmsWithTimestamp[j + 1] = temp
+                                }
                             }
-                            
-                            // b만 타임스탬프가 있으면 b가 먼저
-                            if (!aTimestamp && bTimestamp) {
-                                return 1
-                            }
-                            
-                            // 둘 다 타임스탬프가 없으면 순서 유지 (최초 생성 VM은 보호)
-                            return 0
+                        }
+                        
+                        // 정렬된 VM 목록 구성 (타임스탬프 있는 VM 먼저, 없는 VM 나중)
+                        def sortedVmInfo = []
+                        vmsWithTimestamp.each { item ->
+                            sortedVmInfo.push(item.vm)
+                        }
+                        vmsWithoutTimestamp.each { vm ->
+                            sortedVmInfo.push(vm)
                         }
 
-                        def vmsToRemove = sortedVmInfo.take(removeCount)
+                        // 제거할 VM 선택
+                        def vmsToRemove = []
+                        for (int i = 0; i < removeCount && i < sortedVmInfo.size(); i++) {
+                            vmsToRemove.push(sortedVmInfo[i])
+                        }
 
                         echo ""
                         echo "=========================================="
