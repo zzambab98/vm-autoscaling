@@ -231,42 +231,42 @@ async function generateScaleInJobXml(config) {
                 </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
                 <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
                   <key>SERVICE_NAME</key>
-                  <value>$.alerts[0].labels.service</value>
+                  <value>$.config.serviceName</value>
                   <regexpFilter></regexpFilter>
                 </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
                 <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
                   <key>PROMETHEUS_JOB_NAME</key>
-                  <value>$.alerts[0].labels.job</value>
+                  <value>$.config.monitoring.prometheusJobName</value>
                   <regexpFilter></regexpFilter>
                 </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
                 <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
                   <key>F5_POOL_NAME</key>
-                  <value>${poolName}</value>
+                  <value>$.config.f5.poolName</value>
                   <regexpFilter></regexpFilter>
                 </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
                 <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
                   <key>VIP</key>
-                  <value>${vip}</value>
+                  <value>$.config.f5.vip</value>
                   <regexpFilter></regexpFilter>
                 </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
                 <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
                   <key>VIP_PORT</key>
-                  <value>${vipPort || '80'}</value>
+                  <value>$.config.f5.vipPort</value>
                   <regexpFilter></regexpFilter>
                 </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
                 <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
                   <key>MIN_VMS</key>
-                  <value>${minVms}</value>
+                  <value>$.config.scaling.minVms</value>
                   <regexpFilter></regexpFilter>
                 </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
                 <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
                   <key>SCALE_IN_STEP</key>
-                  <value>${scaleInStep || 1}</value>
+                  <value>$.config.scaling.scaleInStep</value>
                   <regexpFilter></regexpFilter>
                 </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
                 <org.jenkinsci.plugins.gwt.GenericTriggerVariable>
                   <key>VM_PREFIX</key>
-                  <value>${vmPrefix}</value>
+                  <value>$.config.vmPrefix</value>
                   <regexpFilter></regexpFilter>
                 </org.jenkinsci.plugins.gwt.GenericTriggerVariable>
               </values>
@@ -365,38 +365,77 @@ async function createScaleInJenkinsJob(config) {
     // Job XML 생성
     const jobXml = await generateScaleInJobXml(config);
 
-    // Jenkins API를 통해 Job 생성
-    const createJobUrl = `${JENKINS_URL}/createItem?name=${encodeURIComponent(jobName)}`;
+    // 먼저 Job이 존재하는지 확인
+    const checkJobUrl = `${JENKINS_URL}/job/${encodeURIComponent(jobName)}/config.xml`;
+    let jobExists = false;
+    try {
+      const checkResponse = await axios.get(checkJobUrl, {
+        headers: {
+          'Authorization': getAuthHeader()
+        },
+        validateStatus: (status) => status < 500
+      });
+      if (checkResponse.status === 200) {
+        jobExists = true;
+      }
+    } catch (checkError) {
+      // Job이 존재하지 않음
+      jobExists = false;
+    }
 
-    const response = await axios.post(createJobUrl, jobXml, {
-      headers: {
-        'Content-Type': 'application/xml',
-        'Authorization': getAuthHeader()
-      },
-      validateStatus: (status) => status < 500 // 400번대는 에러로 처리
-    });
+    if (jobExists) {
+      // Job이 존재하면 업데이트
+      const updateJobUrl = `${JENKINS_URL}/job/${encodeURIComponent(jobName)}/config.xml`;
+      const updateResponse = await axios.post(updateJobUrl, jobXml, {
+        headers: {
+          'Content-Type': 'application/xml',
+          'Authorization': getAuthHeader()
+        },
+        validateStatus: (status) => status < 500
+      });
 
-    if (response.status === 200 || response.status === 201) {
-      return {
-        success: true,
-        jobName: jobName,
-        webhookToken: webhookToken,
-        webhookUrl: `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookToken}`,
-        message: `Jenkins Job '${jobName}'이 생성되었습니다.`
-      };
-    } else if (response.status === 400) {
-      // Job이 이미 존재할 수 있음
-      throw new Error(`Job '${jobName}'이 이미 존재하거나 생성에 실패했습니다.`);
+      if (updateResponse.status === 200) {
+        console.log(`[Jenkins Service] Job '${jobName}' 업데이트 완료`);
+        return {
+          success: true,
+          jobName: jobName,
+          webhookToken: webhookToken,
+          webhookUrl: `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookToken}`,
+          message: `Jenkins Job '${jobName}'이 업데이트되었습니다.`
+        };
+      } else {
+        throw new Error(`Jenkins Job 업데이트 실패: HTTP ${updateResponse.status}`);
+      }
     } else {
-      throw new Error(`Jenkins Job 생성 실패: HTTP ${response.status}`);
+      // Job이 없으면 생성
+      const createJobUrl = `${JENKINS_URL}/createItem?name=${encodeURIComponent(jobName)}`;
+      const createResponse = await axios.post(createJobUrl, jobXml, {
+        headers: {
+          'Content-Type': 'application/xml',
+          'Authorization': getAuthHeader()
+        },
+        validateStatus: (status) => status < 500
+      });
+
+      if (createResponse.status === 200 || createResponse.status === 201) {
+        return {
+          success: true,
+          jobName: jobName,
+          webhookToken: webhookToken,
+          webhookUrl: `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookToken}`,
+          message: `Jenkins Job '${jobName}'이 생성되었습니다.`
+        };
+      } else {
+        throw new Error(`Jenkins Job 생성 실패: HTTP ${createResponse.status}`);
+      }
     }
   } catch (error) {
     if (error.response) {
-      console.error(`[Jenkins Service] Job 생성 실패 (${error.response.status}):`, error.response.data);
-      throw new Error(`Jenkins Job 생성 실패: ${error.response.status} - ${error.response.statusText}`);
+      console.error(`[Jenkins Service] Job 생성/업데이트 실패 (${error.response.status}):`, error.response.data);
+      throw new Error(`Jenkins Job 생성/업데이트 실패: ${error.response.status} - ${error.response.statusText}`);
     } else {
-      console.error(`[Jenkins Service] Job 생성 실패:`, error.message);
-      throw new Error(`Jenkins Job 생성 실패: ${error.message}`);
+      console.error(`[Jenkins Service] Job 생성/업데이트 실패:`, error.message);
+      throw new Error(`Jenkins Job 생성/업데이트 실패: ${error.message}`);
     }
   }
 }
