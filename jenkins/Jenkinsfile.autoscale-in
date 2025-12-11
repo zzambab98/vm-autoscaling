@@ -223,37 +223,65 @@ except Exception as e:
                         string(credentialsId: 'vcenter-user', variable: 'VCENTER_USER_CRED'),
                         string(credentialsId: 'vcenter-password', variable: 'VCENTER_PASSWORD_CRED')
                     ]) {
-                        // 각 IP에 대해 VM 이름 조회
-                        def vmInfo = []
+                        // VM Prefix로 필터링하여 한 번만 조회 (효율성 향상)
+                        def vmPrefix = env.VM_PREFIX ?: params.VM_PREFIX ?: ''
                         
-                        for (def vmIp in vmIps) {
-                            def vmNameCommand = """
-                                export GOVC_URL="${VCENTER_SERVER_CRED}"
-                                export GOVC_USERNAME="${VCENTER_USER_CRED}"
-                                export GOVC_PASSWORD="${VCENTER_PASSWORD_CRED}"
-                                export GOVC_INSECURE=1
-                                
-                                # 모든 VM을 조회하고 IP로 매칭
-                                govc find / -type m 2>/dev/null | while read vm_path; do
+                        echo "VM Prefix로 필터링: ${vmPrefix}"
+                        
+                        // 한 번에 모든 VM 정보 조회 (VM Prefix로 필터링)
+                        def vmListCommand = """
+                            export GOVC_URL="${VCENTER_SERVER_CRED}"
+                            export GOVC_USERNAME="${VCENTER_USER_CRED}"
+                            export GOVC_PASSWORD="${VCENTER_PASSWORD_CRED}"
+                            export GOVC_INSECURE=1
+                            
+                            # VM Prefix로 필터링하여 조회 (vCLS 제외)
+                            if [ -n "${vmPrefix}" ]; then
+                                govc find / -type m -name "${vmPrefix}-*" 2>/dev/null | grep -v vCLS | while read vm_path; do
                                     vm_name=\$(basename "\$vm_path")
                                     vm_ip=\$(govc vm.ip "\$vm_path" 2>/dev/null || echo "")
-                                    if [ "\$vm_ip" = "${vmIp}" ]; then
+                                    if [ -n "\$vm_ip" ]; then
                                         echo "\${vm_name}|\${vm_ip}"
-                                        break
                                     fi
                                 done
-                            """
-                            
-                            def vmResult = sh(
-                                script: vmNameCommand,
-                                returnStdout: true
-                            ).trim()
-                            
-                            if (vmResult) {
-                                def parts = vmResult.split('\\|')
+                            else
+                                # Prefix가 없으면 모든 VM 조회 (vCLS 제외)
+                                govc find / -type m 2>/dev/null | grep -v vCLS | while read vm_path; do
+                                    vm_name=\$(basename "\$vm_path")
+                                    vm_ip=\$(govc vm.ip "\$vm_path" 2>/dev/null || echo "")
+                                    if [ -n "\$vm_ip" ]; then
+                                        echo "\${vm_name}|\${vm_ip}"
+                                    fi
+                                done
+                            fi
+                        """
+                        
+                        def vmList = sh(
+                            script: vmListCommand,
+                            returnStdout: true
+                        ).trim()
+                        
+                        // VM 이름과 IP 파싱
+                        def allVmInfo = []
+                        if (vmList) {
+                            allVmInfo = vmList.split('\n').collect { line ->
+                                def parts = line.split('\\|')
                                 if (parts.size() == 2) {
-                                    vmInfo.push([name: parts[0], ip: parts[1]])
+                                    return [name: parts[0], ip: parts[1]]
                                 }
+                                return null
+                            }.findAll { it != null }
+                        }
+                        
+                        echo "vCenter에서 찾은 VM 개수: ${allVmInfo.size()}"
+                        
+                        // Prometheus에서 가져온 IP 목록과 매칭
+                        def vmInfo = []
+                        for (def vmIp in vmIps) {
+                            def matchedVm = allVmInfo.find { it.ip == vmIp }
+                            if (matchedVm) {
+                                vmInfo.push(matchedVm)
+                                echo "✅ 매칭됨: ${matchedVm.name} (${matchedVm.ip})"
                             } else {
                                 echo "⚠️ IP ${vmIp}에 해당하는 VM을 찾을 수 없습니다. IP를 이름으로 사용합니다."
                                 vmInfo.push([name: vmIp, ip: vmIp]) // IP를 이름으로 사용
