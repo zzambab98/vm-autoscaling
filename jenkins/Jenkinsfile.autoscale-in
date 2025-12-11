@@ -144,27 +144,42 @@ except Exception as e:
                     
                     // Prometheus Job에서 target 목록 조회
                     def prometheusUrl = "http://${PLG_STACK_SERVER}:9090"
-                    def jobName = params.PROMETHEUS_JOB_NAME
+                    def jobName = env.PROMETHEUS_JOB_NAME ?: params.PROMETHEUS_JOB_NAME
+                    
+                    if (!jobName) {
+                        error("PROMETHEUS_JOB_NAME이 설정되지 않았습니다.")
+                    }
+                    
+                    echo "Prometheus Job Name: ${jobName}"
                     
                     def targetsJson = sh(
                         script: """
                             curl -s "${prometheusUrl}/api/v1/targets" | \
                             python3 -c "
 import sys, json
-data = json.load(sys.stdin)
-targets = []
-for target in data.get('data', {}).get('activeTargets', []):
-    if target.get('labels', {}).get('job') == '${jobName}':
-        instance = target.get('labels', {}).get('instance', '')
-        if instance:
-            # instance는 'IP:PORT' 형식이므로 IP만 추출
-            ip = instance.split(':')[0]
-            targets.append(ip)
-print('\\n'.join(targets))
+try:
+    data = json.load(sys.stdin)
+    targets = []
+    job_name = '${jobName}'
+    for target in data.get('data', {}).get('activeTargets', []):
+        if target.get('labels', {}).get('job') == job_name:
+            instance = target.get('labels', {}).get('instance', '')
+            if instance:
+                # instance는 'IP:PORT' 형식이므로 IP만 추출
+                ip = instance.split(':')[0]
+                targets.append(ip)
+    print('\\n'.join(targets))
+except Exception as e:
+    print('ERROR:' + str(e))
+    sys.exit(1)
 "
                         """,
                         returnStdout: true
                     ).trim()
+                    
+                    if (targetsJson.startsWith('ERROR:')) {
+                        error("Prometheus API 호출 실패: ${targetsJson}")
+                    }
                     
                     // targets를 리스트로 변환
                     def targets = targetsJson ? targetsJson.split('\n').findAll { it.trim() } : []
@@ -174,7 +189,7 @@ print('\\n'.join(targets))
                     }
                     
                     echo "현재 VM 개수: ${targets.size()}"
-                    echo "VM 목록: ${targets.join(', ')}"
+                    echo "VM IP 목록: ${targets.join(', ')}"
                     
                     env.CURRENT_VM_COUNT = targets.size().toString()
                     env.VM_IPS = targets.join(',')
