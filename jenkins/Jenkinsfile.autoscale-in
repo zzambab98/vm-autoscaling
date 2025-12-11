@@ -634,10 +634,10 @@ except:
                                 export GOVC_INSECURE=1
                                 
                                 # VM 경로 찾기
-                                VM_PATH=\$(govc find / -type m -name "${vmName}" | head -1)
+                                VM_PATH=\$(govc find / -type m -name "${vmName}" 2>/dev/null | head -1)
                                 
                                 if [ -z "\$VM_PATH" ]; then
-                                    echo "⚠️ VM을 찾을 수 없습니다: ${vmName}"
+                                    echo "⚠️ VM을 찾을 수 없습니다: ${vmName} (이미 삭제되었을 수 있음)"
                                     exit 0
                                 fi
                                 
@@ -645,33 +645,42 @@ except:
                                 
                                 # VM 전원 끄기
                                 echo "VM 전원 끄는 중: ${vmName}"
-                                govc vm.power -off "\$VM_PATH" || echo "전원 끄기 실패 (계속 진행): ${vmName}"
+                                govc vm.power -off "\$VM_PATH" || echo "⚠️ 전원 끄기 실패 (계속 진행): ${vmName}"
                                 
                                 # 전원이 완전히 꺼질 때까지 대기 (최대 30초)
                                 echo "VM 전원 종료 대기 중..."
+                                POWER_OFF=false
                                 for i in {1..30}; do
-                                    POWER_STATE=\$(govc vm.info "\$VM_PATH" | grep "Power state:" | awk '{print \$3}')
+                                    POWER_STATE=\$(govc vm.info "\$VM_PATH" 2>/dev/null | grep "Power state:" | awk '{print \$3}' || echo "")
                                     if [ "\$POWER_STATE" = "poweredOff" ]; then
                                         echo "✅ VM 전원이 꺼졌습니다: ${vmName}"
+                                        POWER_OFF=true
                                         break
                                     fi
                                     sleep 1
                                 done
                                 
+                                if [ "\$POWER_OFF" = "false" ]; then
+                                    echo "⚠️ VM 전원이 완전히 꺼지지 않았지만 계속 진행합니다: ${vmName}"
+                                fi
+                                
                                 # VM 삭제
                                 echo "VM 삭제 중: ${vmName}"
-                                govc object.destroy "\$VM_PATH" && echo "✅ VM 삭제 성공: ${vmName}" || {
+                                if govc object.destroy "\$VM_PATH" 2>/dev/null; then
+                                    echo "✅ VM 삭제 성공: ${vmName}"
+                                    
+                                    # 삭제 확인 (최대 10초 대기)
+                                    for j in {1..10}; do
+                                        CHECK_PATH=\$(govc find / -type m -name "${vmName}" 2>/dev/null | head -1)
+                                        if [ -z "\$CHECK_PATH" ]; then
+                                            echo "✅ VM 삭제 확인됨: ${vmName}"
+                                            break
+                                        fi
+                                        sleep 1
+                                    done
+                                else
                                     echo "❌ VM 삭제 실패: ${vmName}"
                                     exit 1
-                                }
-                                
-                                # 삭제 확인
-                                sleep 2
-                                CHECK_PATH=\$(govc find / -type m -name "${vmName}" 2>/dev/null | head -1)
-                                if [ -z "\$CHECK_PATH" ]; then
-                                    echo "✅ VM 삭제 확인됨: ${vmName}"
-                                else
-                                    echo "⚠️ VM이 아직 존재함: ${vmName}"
                                 fi
                             """
                             
