@@ -317,21 +317,43 @@ except Exception as e:
 
                         echo "제거할 VM 수: ${removeCount}"
 
+                        // VM 목록 출력 (정렬 전)
+                        echo ""
+                        echo "정렬 전 VM 목록:"
+                        vmInfo.each { vm ->
+                            def timestamp = vm.name.replaceAll(/.*-(\d+)$/, '$1')
+                            echo "  - ${vm.name} (${vm.ip}) - 타임스탬프: ${timestamp == vm.name ? '없음' : timestamp}"
+                        }
+
                         // 가장 최신 VM부터 제거 (VM 이름의 타임스탬프 기준 내림차순 정렬)
                         // VM 이름이 prefix-timestamp 형식이라고 가정
                         def sortedVmInfo = vmInfo.sort { a, b ->
                             // 타임스탬프 부분 추출하여 비교 (내림차순)
                             def aTimestamp = a.name.replaceAll(/.*-(\d+)$/, '$1')
                             def bTimestamp = b.name.replaceAll(/.*-(\d+)$/, '$1')
-                            return bTimestamp <=> aTimestamp  // 내림차순 정렬
+                            
+                            // 타임스탬프가 없으면 맨 뒤로
+                            if (!aTimestamp || aTimestamp == a.name) {
+                                return 1
+                            }
+                            if (!bTimestamp || bTimestamp == b.name) {
+                                return -1
+                            }
+                            
+                            return bTimestamp <=> aTimestamp  // 내림차순 정렬 (큰 숫자가 먼저)
                         }
 
                         def vmsToRemove = sortedVmInfo.take(removeCount)
 
-                        echo "제거 대상 VM:"
-                        vmsToRemove.each { vm ->
-                            echo "  - ${vm.name} (${vm.ip})"
+                        echo ""
+                        echo "=========================================="
+                        echo "제거 대상 VM (가장 최신부터):"
+                        echo "=========================================="
+                        vmsToRemove.eachWithIndex { vm, idx ->
+                            def timestamp = vm.name.replaceAll(/.*-(\d+)$/, '$1')
+                            echo "  ${idx + 1}. ${vm.name} (${vm.ip}) - 타임스탬프: ${timestamp == vm.name ? '없음' : timestamp}"
                         }
+                        echo "=========================================="
 
                         env.VMS_TO_REMOVE = vmsToRemove.collect { it.ip }.join(',')
                         env.VM_NAMES_TO_REMOVE = vmsToRemove.collect { it.name }.join(',')
