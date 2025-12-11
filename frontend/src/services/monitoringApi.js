@@ -1,19 +1,18 @@
 import api from './api';
 
-const PROMETHEUS_URL = 'http://10.255.1.254:9090';
-
 /**
- * Prometheus Query API 호출
+ * Prometheus Query API 호출 (백엔드를 통해 호출 - CORS 문제 해결)
  * @param {string} query - PromQL 쿼리
  * @returns {Promise<object>} 쿼리 결과
  */
 export async function queryPrometheus(query) {
   try {
-    const response = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=${encodeURIComponent(query)}`);
-    const data = await response.json();
+    const response = await api.get('/api/prometheus/query', {
+      params: { query }
+    });
     
-    if (data.status === 'success' && data.data && data.data.result) {
-      return data.data.result;
+    if (response.data.status === 'success' && response.data.data && response.data.data.result) {
+      return response.data.data.result;
     }
     return [];
   } catch (error) {
@@ -23,7 +22,7 @@ export async function queryPrometheus(query) {
 }
 
 /**
- * Prometheus Query Range API 호출
+ * Prometheus Query Range API 호출 (백엔드를 통해 호출 - CORS 문제 해결)
  * @param {string} query - PromQL 쿼리
  * @param {number} start - 시작 시간 (Unix timestamp)
  * @param {number} end - 종료 시간 (Unix timestamp)
@@ -32,12 +31,12 @@ export async function queryPrometheus(query) {
  */
 export async function queryRangePrometheus(query, start, end, step = 15) {
   try {
-    const url = `${PROMETHEUS_URL}/api/v1/query_range?query=${encodeURIComponent(query)}&start=${start}&end=${end}&step=${step}`;
-    const response = await fetch(url);
-    const data = await response.json();
+    const response = await api.get('/api/prometheus/query_range', {
+      params: { query, start, end, step }
+    });
     
-    if (data.status === 'success' && data.data && data.data.result) {
-      return data.data.result;
+    if (response.data.status === 'success' && response.data.data && response.data.data.result) {
+      return response.data.data.result;
     }
     return [];
   } catch (error) {

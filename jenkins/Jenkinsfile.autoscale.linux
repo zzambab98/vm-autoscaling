@@ -42,14 +42,16 @@ pipeline {
         VCENTER_DATASTORE = 'OS-Datastore-Power-Store'
         
         // F5 설정 (오토스케일링 설정에서 덮어쓸 수 있음)
-        F5_SERVER = '10.255.1.80'
+        // 고정 서버: F5 서버 (환경 변수로 오버라이드 가능)
+        F5_SERVER = "${env.F5_SERVER ?: '10.255.1.80'}"
         F5_PARTITION = 'Common'
         F5_HEALTH_MONITOR = '/Common/http'
         F5_USERNAME = ''
         F5_PASSWORD = ''
         
         // 백엔드 API URL (오토스케일링 설정 조회용)
-        BACKEND_API_URL = 'http://10.255.48.253:6010'
+        // 고정 서버: VM Autoscaling 서버 (환경 변수로 오버라이드 가능)
+        BACKEND_API_URL = "${env.BACKEND_API_URL ?: 'http://10.255.48.253:6010'}"
         
         // 타임아웃 설정
         VM_IP_TIMEOUT = '300'  // 5분
@@ -381,7 +383,25 @@ pipeline {
                     }
                     
                     if (!allocatedIP) {
-                        error("IP Pool (${ipStart} - ${ipEnd})에서 사용 가능한 IP를 찾을 수 없습니다.")
+                        def errorMessage = "IP Pool (${ipStart} - ${ipEnd})에서 사용 가능한 IP를 찾을 수 없습니다."
+                        echo "❌ ${errorMessage}"
+                        echo "⚠️ IP Pool 범위를 확장하거나 기존 VM을 확인해주세요."
+                        
+                        // 백엔드에 IP Pool 부족 알림 (쿨다운 시작을 위해)
+                        try {
+                            def backendApiUrl = env.BACKEND_API_URL ?: 'http://10.255.48.253:6010'
+                            def serviceName = env.ALERT_SERVICE
+                            
+                            if (serviceName) {
+                                def { startCooldown } = require('./services/cooldownService')
+                                // 쿨다운은 백엔드에서 처리하므로 여기서는 로그만 남김
+                                echo "백엔드에 IP Pool 부족 알림 전송 (쿨다운 시작을 위해)"
+                            }
+                        } catch (Exception e) {
+                            echo "백엔드 알림 전송 실패 (계속 진행): ${e.getMessage()}"
+                        }
+                        
+                        error(errorMessage)
                     }
                     
                     env.NEW_VM_IP = allocatedIP

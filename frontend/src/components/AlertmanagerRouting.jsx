@@ -2,17 +2,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { alertmanagerApi } from '../services/api';
 
 const DEFAULT_WEBHOOK_TOKEN = '11c729d250790bec23d77c6144053e7b03';
-const DEFAULT_WEBHOOK_URL = `http://10.255.0.103:8080/generic-webhook-trigger/invoke?token=${DEFAULT_WEBHOOK_TOKEN}`;
+// Jenkins 서버는 고정 서버 (환경 변수로 오버라이드 가능)
+const getDefaultWebhookUrl = () => {
+  const jenkinsUrl = import.meta.env.VITE_JENKINS_URL || 'http://10.255.0.103:8080';  // Jenkins 서버
+  return `${jenkinsUrl}/generic-webhook-trigger/invoke?token=${DEFAULT_WEBHOOK_TOKEN}`;
+};
 
 function AlertmanagerRouting() {
   const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [formData, setFormData] = useState({
-    serviceName: 'auto-vm-test-service',
+    serviceName: '', // 기본값 제거 - 사용자가 입력하도록
     receiverName: '',
     webhookToken: DEFAULT_WEBHOOK_TOKEN,
-    webhookUrl: DEFAULT_WEBHOOK_URL,
+    webhookUrl: getDefaultWebhookUrl(),
     useBackendWebhookProxy: false
   });
 

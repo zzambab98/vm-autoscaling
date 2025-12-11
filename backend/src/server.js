@@ -1,5 +1,7 @@
 const http = require('http');
 const url = require('url');
+const fs = require('fs');
+const path = require('path');
 const { 
   installNodeExporter, 
   checkNodeExporterStatus, 
@@ -1144,79 +1146,185 @@ const server = http.createServer((req, res) => {
           }
         }
 
-        // 스케일인인 경우 삭제할 VM 선택
+        // 스케일아웃인 경우 최대 VM 개수 체크 (Prometheus Job에 등록된 개수 기준)
+        if (isScaleOut) {
+          try {
+            const maxVms = config.scaling?.maxVms || 10;
+            const prometheusJobName = config.monitoring?.prometheusJobName;
+            
+            if (!prometheusJobName) {
+              console.warn(`[Webhook] Prometheus Job 이름이 설정되지 않았습니다: ${serviceName}`);
+              sendJSONResponse(res, 400, {
+                success: false,
+                message: 'Prometheus Job 이름이 설정되지 않았습니다.'
+              });
+              return;
+            }
+            
+            // Prometheus Job에 등록된 현재 VM 개수 확인
+            const { getPrometheusTargets } = require('./services/prometheusMonitoringService');
+            const targetsResult = await getPrometheusTargets(prometheusJobName);
+            
+            if (!targetsResult.success) {
+              console.error(`[Webhook] Prometheus Job 조회 실패: ${serviceName} - ${prometheusJobName}`);
+              sendJSONResponse(res, 500, {
+                success: false,
+                message: `Prometheus Job 조회 실패: ${prometheusJobName}`
+              });
+              return;
+            }
+            
+            const currentVmCount = targetsResult.targets?.length || 0;
+            
+            // 최대 VM 개수 체크 (Prometheus Job에 등록된 개수 기준)
+            if (currentVmCount >= maxVms) {
+              console.log(`[Webhook] 최대 VM 개수 도달: ${serviceName} - 현재 Prometheus Job 등록 개수: ${currentVmCount}, 최대: ${maxVms}`);
+              
+              // 쿨다운 시작하여 반복 시도 방지
+              try {
+                const { startCooldown } = require('./services/cooldownService');
+                const cooldownPeriod = config.scaling?.cooldownPeriod || 300;
+                await startCooldown(serviceName, 'scale-out', cooldownPeriod);
+                console.log(`[Webhook] 최대 VM 개수 도달로 인한 쿨다운 시작: ${serviceName} (${cooldownPeriod}초)`);
+              } catch (error) {
+                console.error(`[Webhook] 쿨다운 시작 실패 (경고):`, error.message);
+              }
+              
+              sendJSONResponse(res, 200, {
+                success: false,
+                message: `최대 VM 개수(${maxVms})에 도달하여 스케일아웃할 수 없습니다. (현재 Prometheus Job 등록 개수: ${currentVmCount}개)`,
+                currentVmCount: currentVmCount,
+                maxVms: maxVms,
+                prometheusJobName: prometheusJobName
+              });
+              return;
+            }
+            
+            console.log(`[Webhook] VM 개수 확인 통과: ${serviceName} - 현재 Prometheus Job 등록 개수: ${currentVmCount}, 최대: ${maxVms} (스케일아웃 가능)`);
+          } catch (error) {
+            console.error(`[Webhook] 최대 VM 개수 확인 실패:`, error.message);
+            sendJSONResponse(res, 500, {
+              success: false,
+              message: `최대 VM 개수 확인 중 오류 발생: ${error.message}`
+            });
+            return;
+          }
+        }
+
+        // 스케일인인 경우 최소 VM 개수 체크 및 삭제할 VM 선택 (Prometheus Job에 등록된 개수 기준)
         let vmToDelete = null;
         if (isScaleIn) {
           try {
-            // 최소 VM 개수 확인
             const minVms = config.scaling?.minVms || 1;
-            
-            // Prometheus Job에서 현재 등록된 VM 목록 가져오기
             const prometheusJobName = config.monitoring?.prometheusJobName;
-            if (prometheusJobName) {
-              const { getPrometheusTargets } = require('./services/prometheusMonitoringService');
-              const targetsResult = await getPrometheusTargets(prometheusJobName);
+            
+            if (!prometheusJobName) {
+              console.warn(`[Webhook] Prometheus Job 이름이 설정되지 않았습니다: ${serviceName}`);
+              sendJSONResponse(res, 400, {
+                success: false,
+                message: 'Prometheus Job 이름이 설정되지 않았습니다.'
+              });
+              return;
+            }
+            
+            // Prometheus Job에 등록된 현재 VM 개수 확인
+            const { getPrometheusTargets } = require('./services/prometheusMonitoringService');
+            const targetsResult = await getPrometheusTargets(prometheusJobName);
+            
+            if (!targetsResult.success) {
+              console.error(`[Webhook] Prometheus Job 조회 실패: ${serviceName} - ${prometheusJobName}`);
+              sendJSONResponse(res, 500, {
+                success: false,
+                message: `Prometheus Job 조회 실패: ${prometheusJobName}`
+              });
+              return;
+            }
+            
+            const currentVmCount = targetsResult.targets?.length || 0;
+            
+            // 최소 VM 개수 체크 (Prometheus Job에 등록된 개수 기준)
+            if (currentVmCount <= minVms) {
+              console.log(`[Webhook] 최소 VM 개수 도달: ${serviceName} - 현재 Prometheus Job 등록 개수: ${currentVmCount}, 최소: ${minVms}`);
               
-              if (targetsResult.success && targetsResult.targets && targetsResult.targets.length > minVms) {
-                // VM 목록에서 vmPrefix로 시작하는 VM만 필터링
-                const { getVmList } = require('./services/templateService');
-                const vmListResult = await getVmList();
-                
-                if (vmListResult.success && vmListResult.vms) {
-                  const vmPrefix = config.vmPrefix || '';
-                  const serviceVms = vmListResult.vms.filter(vm => {
-                    // vmPrefix로 시작하는 VM만 선택
-                    if (vmPrefix && !vm.name.startsWith(vmPrefix)) {
-                      return false;
+              // 쿨다운 시작하여 반복 시도 방지
+              try {
+                const { startCooldown } = require('./services/cooldownService');
+                const cooldownPeriod = config.scaling?.cooldownPeriod || 300;
+                await startCooldown(serviceName, 'scale-in', cooldownPeriod);
+                console.log(`[Webhook] 최소 VM 개수 도달로 인한 쿨다운 시작: ${serviceName} (${cooldownPeriod}초)`);
+              } catch (error) {
+                console.error(`[Webhook] 쿨다운 시작 실패 (경고):`, error.message);
+              }
+              
+              sendJSONResponse(res, 200, {
+                success: false,
+                message: `최소 VM 개수(${minVms})에 도달하여 스케일인할 수 없습니다. (현재 Prometheus Job 등록 개수: ${currentVmCount}개)`,
+                currentVmCount: currentVmCount,
+                minVms: minVms,
+                prometheusJobName: prometheusJobName
+              });
+              return;
+            }
+            
+            console.log(`[Webhook] VM 개수 확인 통과: ${serviceName} - 현재 Prometheus Job 등록 개수: ${currentVmCount}, 최소: ${minVms} (스케일인 가능)`);
+            
+            // 삭제할 VM 선택 (Jenkins에서도 선택하지만, 백엔드에서도 선택하여 전달)
+            try {
+              const { getVmList } = require('./services/templateService');
+              const vmListResult = await getVmList();
+              
+              if (vmListResult.success && vmListResult.vms) {
+                const vmPrefix = config.vmPrefix || '';
+                const serviceVms = vmListResult.vms.filter(vm => {
+                  // vmPrefix로 시작하는 VM만 선택
+                  if (vmPrefix && !vm.name.startsWith(vmPrefix)) {
+                    return false;
+                  }
+                  // Prometheus Job에 등록된 VM만 선택 (IP로 매칭)
+                  const vmIp = vm.ips && vm.ips.length > 0 ? vm.ips[0] : null;
+                  return vmIp && targetsResult.targets.some(target => {
+                    const targetIp = target.instance?.split(':')[0]; // IP:PORT 형식에서 IP만 추출
+                    return targetIp === vmIp;
+                  });
+                });
+
+                if (serviceVms.length > 0) {
+                  // 가장 오래된 VM 선택 (FIFO - First In First Out)
+                  // VM 이름에서 숫자 부분을 추출하여 정렬 (예: auto-vm-test-01, auto-vm-test-02)
+                  const sortedVms = serviceVms.sort((a, b) => {
+                    // 숫자 부분 추출 및 비교
+                    const aMatch = a.name.match(/(\d+)$/);
+                    const bMatch = b.name.match(/(\d+)$/);
+                    if (aMatch && bMatch) {
+                      return parseInt(aMatch[1]) - parseInt(bMatch[1]);
                     }
-                    // Prometheus Job에 등록된 VM만 선택 (IP로 매칭)
-                    const vmIp = vm.ips && vm.ips.length > 0 ? vm.ips[0] : null;
-                    return vmIp && targetsResult.targets.some(target => target.instance === vmIp);
+                    // 숫자가 없으면 이름으로 정렬
+                    return a.name.localeCompare(b.name);
                   });
 
-                  if (serviceVms.length > minVms) {
-                    // 가장 오래된 VM 선택 (FIFO - First In First Out)
-                    // VM 이름에서 숫자 부분을 추출하여 정렬 (예: auto-vm-test-01, auto-vm-test-02)
-                    const sortedVms = serviceVms.sort((a, b) => {
-                      // 숫자 부분 추출 및 비교
-                      const aMatch = a.name.match(/(\d+)$/);
-                      const bMatch = b.name.match(/(\d+)$/);
-                      if (aMatch && bMatch) {
-                        return parseInt(aMatch[1]) - parseInt(bMatch[1]);
-                      }
-                      // 숫자가 없으면 이름으로 정렬
-                      return a.name.localeCompare(b.name);
-                    });
+                  // 가장 오래된 VM 선택 (첫 번째)
+                  const selectedVm = sortedVms[0];
+                  vmToDelete = {
+                    name: selectedVm.name,
+                    ip: selectedVm.ips && selectedVm.ips.length > 0 ? selectedVm.ips[0] : null
+                  };
 
-                    // 가장 오래된 VM 선택 (첫 번째)
-                    const selectedVm = sortedVms[0];
-                    vmToDelete = {
-                      name: selectedVm.name,
-                      ip: selectedVm.ips && selectedVm.ips.length > 0 ? selectedVm.ips[0] : null
-                    };
-
-                    console.log(`[Webhook] 삭제할 VM 선택: ${vmToDelete.name} (${vmToDelete.ip})`);
-                  } else {
-                    console.warn(`[Webhook] 최소 VM 개수(${minVms})에 도달하여 스케일인 불가`);
-                    sendJSONResponse(res, 200, {
-                      success: false,
-                      message: `최소 VM 개수(${minVms})에 도달하여 스케일인할 수 없습니다.`
-                    });
-                    return;
-                  }
+                  console.log(`[Webhook] 삭제할 VM 선택: ${vmToDelete.name} (${vmToDelete.ip})`);
+                } else {
+                  console.warn(`[Webhook] Prometheus Job에 등록된 VM을 vCenter에서 찾을 수 없습니다. Jenkins에서 VM 선택하도록 진행합니다.`);
                 }
-              } else {
-                console.warn(`[Webhook] 현재 VM 개수(${targetsResult.targets?.length || 0})가 최소 개수(${minVms}) 이하여서 스케일인 불가`);
-                sendJSONResponse(res, 200, {
-                  success: false,
-                  message: `현재 VM 개수가 최소 개수(${minVms}) 이하여서 스케일인할 수 없습니다.`
-                });
-                return;
               }
+            } catch (error) {
+              console.error(`[Webhook] 삭제할 VM 선택 실패:`, error.message);
+              // VM 선택 실패해도 계속 진행 (Jenkins에서 선택하도록)
             }
           } catch (error) {
-            console.error(`[Webhook] 삭제할 VM 선택 실패:`, error.message);
-            // VM 선택 실패해도 계속 진행 (Jenkins에서 선택하도록)
+            console.error(`[Webhook] 스케일인 처리 실패:`, error.message);
+            sendJSONResponse(res, 500, {
+              success: false,
+              message: `스케일인 처리 중 오류 발생: ${error.message}`
+            });
+            return;
           }
         }
         
@@ -1511,6 +1619,61 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Prometheus 메트릭 조회 API (프록시 - CORS 문제 해결)
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/prometheus/query') {
+    const queryParams = parsedUrl.query;
+    const query = queryParams.query;
+    
+    if (!query) {
+      sendJSONResponse(res, 400, { error: 'query 파라미터가 필요합니다.' });
+      return;
+    }
+
+    (async () => {
+      try {
+        const axios = require('axios');
+        const PROMETHEUS_URL = process.env.PROMETHEUS_URL || 'http://10.255.1.254:9090';
+        const response = await axios.get(`${PROMETHEUS_URL}/api/v1/query`, {
+          params: { query }
+        });
+        sendJSONResponse(res, 200, response.data);
+      } catch (error) {
+        console.error('[API] Prometheus 쿼리 실패:', error.message);
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
+  // Prometheus Query Range API (프록시 - CORS 문제 해결)
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/prometheus/query_range') {
+    const queryParams = parsedUrl.query;
+    const query = queryParams.query;
+    const start = queryParams.start;
+    const end = queryParams.end;
+    const step = queryParams.step || '15';
+    
+    if (!query || !start || !end) {
+      sendJSONResponse(res, 400, { error: 'query, start, end 파라미터가 필요합니다.' });
+      return;
+    }
+
+    (async () => {
+      try {
+        const axios = require('axios');
+        const PROMETHEUS_URL = process.env.PROMETHEUS_URL || 'http://10.255.1.254:9090';
+        const response = await axios.get(`${PROMETHEUS_URL}/api/v1/query_range`, {
+          params: { query, start, end, step }
+        });
+        sendJSONResponse(res, 200, response.data);
+      } catch (error) {
+        console.error('[API] Prometheus Query Range 실패:', error.message);
+        sendJSONResponse(res, 500, { error: error.message });
+      }
+    })();
+    return;
+  }
+
   // 디버깅: Alertmanager 상태 확인 API
   if (req.method === 'GET' && parsedUrl.pathname === '/api/debug/alertmanager/status') {
     (async () => {
@@ -1561,6 +1724,44 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 로고 이미지 서빙
+  if (req.method === 'GET' && parsedUrl.pathname === '/logo.svg') {
+    try {
+      const logoPath = path.join(__dirname, '../../frontend/public/logo.svg');
+      const logoContent = fs.readFileSync(logoPath);
+      res.writeHead(200, {
+        'Content-Type': 'image/svg+xml',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=3600'
+      });
+      res.end(logoContent);
+    } catch (error) {
+      console.error('[API] 로고 파일 읽기 실패:', error.message);
+      sendJSONResponse(res, 404, { error: '로고 파일을 찾을 수 없습니다.' });
+    }
+    return;
+  }
+
+  // 설계 문서 서빙 (HTML 파일)
+  if (req.method === 'GET' && parsedUrl.pathname === '/docs/design') {
+    try {
+      const docPath = path.join(__dirname, '../../docs/DanaIX IXNode Autoscaling Service 설계 문서.md');
+      const content = fs.readFileSync(docPath, 'utf8');
+      
+      // Markdown을 HTML로 변환하지 않고 그대로 반환 (브라우저에서 렌더링)
+      // 또는 HTML 파일이면 그대로 반환
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Access-Control-Allow-Origin': '*'
+      });
+      res.end(content);
+    } catch (error) {
+      console.error('[API] 설계 문서 읽기 실패:', error.message);
+      sendJSONResponse(res, 404, { error: '설계 문서를 찾을 수 없습니다.' });
+    }
+    return;
+  }
+
   // 404 Not Found
   sendJSONResponse(res, 404, { error: 'Not Found' });
 });
@@ -1569,8 +1770,12 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`[VM Autoscaling Backend] Server running on port ${PORT}`);
   console.log(`[VM Autoscaling Backend] Listening on all interfaces (0.0.0.0:${PORT})`);
   console.log(`[VM Autoscaling Backend] Health check: http://localhost:${PORT}/health`);
-  console.log(`[VM Autoscaling Backend] Internal access: http://10.255.48.253:${PORT}/health`);
-  console.log(`[VM Autoscaling Backend] External access: http://121.156.103.69:${PORT}/health`);
+  
+  // 고정 서버: VM Autoscaling 서버
+  const INTERNAL_IP = process.env.INTERNAL_IP || '10.255.48.253';
+  const EXTERNAL_IP = process.env.EXTERNAL_IP || '121.156.103.69';
+  console.log(`[VM Autoscaling Backend] Internal access: http://${INTERNAL_IP}:${PORT}/health`);
+  console.log(`[VM Autoscaling Backend] External access: http://${EXTERNAL_IP}:${PORT}/health`);
   
   // vCenter 연결 모니터링 시작
   startVCenterConnectionMonitor();

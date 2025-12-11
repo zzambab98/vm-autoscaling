@@ -11,6 +11,8 @@ import AlertmanagerRouting from './components/AlertmanagerRouting';
 import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:6010';
+
 const TAB_FLOW = [
   { id: 'templates', label: '템플릿 관리', summary: 'Golden Image 생성 & 버전 관리' },
   { id: 'node-exporter', label: 'Node Exporter 설치', summary: 'VM 메트릭 수집 준비' },
@@ -61,31 +63,61 @@ function App() {
         }}
       >
         <div style={{ position: 'relative', zIndex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' }}>
-            <img
-              src="/logo.svg"
-              alt="DanaIX"
-              style={{ height: 64, width: 'auto' }}
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
-            />
-            <div>
-              <p style={{ textTransform: 'uppercase', fontSize: 12, letterSpacing: '0.35em', color: 'var(--text-muted)' }}>
-                Dana Cloud · Jenkins · PLG Stack
-              </p>
-              <h1
-                style={{
-                  marginTop: 6,
-                  fontSize: 36,
-                  fontWeight: 700,
-                  letterSpacing: '-0.02em',
-                  fontFamily: "'Space Grotesk', 'Inter', sans-serif"
+          <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' }}>
+              <img
+                src="/logo.svg"
+                alt="DanaIX"
+                style={{ height: 64, width: 'auto' }}
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
                 }}
-              >
-                DanaIX VM 오토스케일링 관리 시스템
-              </h1>
+              />
+              <div>
+                <p style={{ textTransform: 'uppercase', fontSize: 12, letterSpacing: '0.35em', color: 'var(--text-muted)' }}>
+                  Dana Cloud
+                </p>
+                <h1
+                  style={{
+                    marginTop: 6,
+                    fontSize: 36,
+                    fontWeight: 700,
+                    letterSpacing: '-0.02em',
+                    fontFamily: "'Space Grotesk', 'Inter', sans-serif"
+                  }}
+                >
+                  DanaIX VM 오토스케일링 관리 시스템
+                </h1>
+              </div>
             </div>
+            <a
+              href={`${API_BASE_URL}/docs/design`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 16px',
+                backgroundColor: '#0e7777',
+                color: '#ffffff',
+                textDecoration: 'none',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: '500',
+                transition: 'background-color 0.2s',
+                whiteSpace: 'nowrap'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#0a5a5a';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#0e7777';
+              }}
+            >
+              <span>📘</span>
+              <span>설계 문서</span>
+            </a>
           </div>
           <p style={{ marginTop: 18, color: 'var(--text-muted)', fontSize: 16, lineHeight: 1.6 }}>
             템플릿 → Node Exporter → Prometheus → Autoscaling → Alertmanager → Grafana까지 이어지는 DanaIX 확장 파이프라인을

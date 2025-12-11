@@ -14,10 +14,11 @@ pipeline {
     }
     
     environment {
-        BACKEND_API_URL = 'http://10.255.48.253:6010'
-        PLG_STACK_SERVER = '10.255.1.254'
-        PLG_STACK_USER = 'ubuntu'
-        PLG_STACK_SSH_KEY = '/home/ubuntu/workspace/vm-autoscaling/pemkey/danainfra'
+        // 고정 서버 설정 (환경 변수로 오버라이드 가능)
+        BACKEND_API_URL = "${env.BACKEND_API_URL ?: 'http://10.255.48.253:6010'}"  // VM Autoscaling 서버
+        PLG_STACK_SERVER = "${env.PLG_STACK_SERVER ?: '10.255.1.254'}"  // PLG Stack 서버
+        PLG_STACK_USER = "${env.PLG_STACK_USER ?: 'ubuntu'}"
+        PLG_STACK_SSH_KEY = "${env.PLG_STACK_SSH_KEY ?: '/home/ubuntu/workspace/vm-autoscaling/pemkey/danainfra'}"
     }
     
     stages {
@@ -40,7 +41,7 @@ pipeline {
                         echo "⚠️ 파라미터가 비어있습니다. 백엔드에서 설정을 조회합니다..."
                         
                         // 백엔드에서 설정 조회
-                        def backendUrl = env.BACKEND_API_URL ?: 'http://10.255.48.253:6010'
+                        def backendUrl = env.BACKEND_API_URL
                         def configResponse = sh(
                             script: """
                                 curl -sf -H "Content-Type: application/json" "${backendUrl}/api/autoscaling/configs" | \
@@ -413,7 +414,8 @@ except Exception as e:
                     withCredentials([
                         usernamePassword(credentialsId: 'f5-credentials', usernameVariable: 'F5_USERNAME', passwordVariable: 'F5_PASSWORD')
                     ]) {
-                        def f5Server = '10.255.1.80' // F5 서버 주소
+                        // F5 서버 주소 (고정 서버, 환경 변수로 오버라이드 가능)
+                        def f5Server = env.F5_SERVER ?: params.F5_SERVER ?: '10.255.1.80'
                         
                         for (def vmIp in vmsToRemove) {
                             echo "F5 Pool에서 제거 중: ${vmIp}:${memberPort}"

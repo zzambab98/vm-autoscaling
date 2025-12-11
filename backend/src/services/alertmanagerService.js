@@ -99,14 +99,12 @@ async function addRoutingRule(config) {
       )
     );
 
-    // Jenkins Webhook URL 생성 (공통 파이프라인 사용)
-    const JENKINS_DEFAULT_WEBHOOK_TOKEN_OUT = process.env.JENKINS_DEFAULT_WEBHOOK_TOKEN || 'plg-autoscale-token';
-    const JENKINS_DEFAULT_WEBHOOK_TOKEN_IN = 'plg-autoscale-in-token';
-    
-    const webhookUrlOut = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${JENKINS_DEFAULT_WEBHOOK_TOKEN_OUT}`;
-    const webhookUrlIn = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${JENKINS_DEFAULT_WEBHOOK_TOKEN_IN}`;
+    // 백엔드 웹훅 URL 생성 (백엔드에서 최소/최대 VM 개수 체크 및 쿨다운 체크 후 Jenkins 호출)
+    const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://10.255.48.253:6010';
+    const webhookUrlOut = `${BACKEND_API_URL}/api/webhook/autoscale/${encodeURIComponent(serviceName)}`;
+    const webhookUrlIn = `${BACKEND_API_URL}/api/webhook/autoscale/${encodeURIComponent(serviceName)}`;
 
-    // 스케일아웃 수신자 추가
+    // 스케일아웃 수신자 추가 (백엔드 웹훅 호출)
     const scaleOutReceiver = {
       name: `jenkins-webhook-${serviceName}-out`,
       webhook_configs: [
@@ -114,16 +112,13 @@ async function addRoutingRule(config) {
           url: webhookUrlOut,
           send_resolved: false, // Alert 해결 시 webhook 전송 안 함
           http_config: {
-            basic_auth: {
-              username: JENKINS_WEBHOOK_USER,
-              password: JENKINS_WEBHOOK_PASSWORD
-            }
+            // 백엔드 웹훅은 인증 불필요 (내부 서비스)
           }
         }
       ]
     };
 
-    // 스케일인 수신자 추가
+    // 스케일인 수신자 추가 (백엔드 웹훅 호출)
     const scaleInReceiver = {
       name: `jenkins-webhook-${serviceName}-in`,
       webhook_configs: [
@@ -131,10 +126,7 @@ async function addRoutingRule(config) {
           url: webhookUrlIn,
           send_resolved: false, // Alert 해결 시 webhook 전송 안 함
           http_config: {
-            basic_auth: {
-              username: JENKINS_WEBHOOK_USER,
-              password: JENKINS_WEBHOOK_PASSWORD
-            }
+            // 백엔드 웹훅은 인증 불필요 (내부 서비스)
           }
         }
       ]

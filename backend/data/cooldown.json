@@ -1,0 +1,14 @@
+{
+  "auto-vm-test-AutoScaling": {
+    "lastScaleOutTime": 1765435662,
+    "scaleOutCooldownPeriod": 300,
+    "lastScaleInTime": 1765436658,
+    "scaleInCooldownPeriod": 300
+  },
+  "auto-vm-test-service": {
+    "lastScaleOutTime": 1765442792,
+    "scaleOutCooldownPeriod": 300,
+    "lastScaleInTime": 1765443983,
+    "scaleInCooldownPeriod": 300
+  }
+}

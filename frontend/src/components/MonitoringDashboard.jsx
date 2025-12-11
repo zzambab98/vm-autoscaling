@@ -179,7 +179,35 @@ function MonitoringDashboard() {
         </div>
       </div>
 
-      {selectedConfig && (
+      {configs.length === 0 ? (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '60px 20px', 
+          background: '#f8f9fa', 
+          border: '1px solid #dee2e6', 
+          borderRadius: '8px',
+          color: '#6c757d'
+        }}>
+          <h3 style={{ color: '#495057', marginBottom: '10px' }}>설정이 없습니다</h3>
+          <p>모니터링 대시보드를 보려면 먼저 오토스케일링 설정을 생성하고 활성화해주세요.</p>
+          <p style={{ marginTop: '10px', fontSize: '14px' }}>
+            <strong>설정 방법:</strong><br />
+            1. "PLG Stack 모니터링 등록" 탭에서 Prometheus Job을 등록하세요.<br />
+            2. "오토스케일링 설정" 탭에서 설정을 생성하고 활성화하세요.
+          </p>
+        </div>
+      ) : !selectedConfig ? (
+        <div style={{ 
+          textAlign: 'center', 
+          padding: '40px 20px', 
+          background: '#fff3cd', 
+          border: '1px solid #ffc107', 
+          borderRadius: '8px',
+          color: '#856404'
+        }}>
+          <p>위의 드롭다운에서 서비스를 선택해주세요.</p>
+        </div>
+      ) : (
         <>
           <div className="metrics-summary">
             <div className="metric-card">

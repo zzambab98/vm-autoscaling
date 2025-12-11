@@ -176,17 +176,17 @@ async function createScaleInAlertRule(config) {
     group.rules = group.rules.filter(rule => rule.alert !== `${serviceName}_LowResourceUsage`);
 
     // 5. 새 스케일인 Alert Rule 생성
-    // CPU 사용률: 각 instance별로 계산하고, 그 중 최소값이 임계값 이하이고
-    // Memory 사용률: 각 instance별로 계산하고, 그 중 최소값이 임계값 이하일 때 Alert 발생
+    // CPU 사용률: 각 instance별로 계산하고, 그 중 최대값이 임계값 미만이고
+    // Memory 사용률: 각 instance별로 계산하고, 그 중 최대값이 임계값 미만일 때 Alert 발생
     // - 모든 서버가 CPU와 Memory 모두 낮아야 스케일인
-    // - min() 함수 사용 (모든 서버가 낮아야 함)
+    // - max() 함수 사용 (모든 서버가 낮아야 함 - 최대값이 임계값 미만이면 모든 서버가 낮음)
     // - AND 조건 사용 (CPU와 Memory 모두 낮아야 함)
     const alertRule = {
       alert: `${serviceName}_LowResourceUsage`,
       expr: `(
-        min(100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle",job="${prometheusJobName}"}[5m])) * 100)) < ${scaleInCpuThreshold}
+        max(100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle",job="${prometheusJobName}"}[5m])) * 100)) < ${scaleInCpuThreshold}
         AND
-        min((1 - (avg by (instance) (node_memory_MemAvailable_bytes{job="${prometheusJobName}"}) / avg by (instance) (node_memory_MemTotal_bytes{job="${prometheusJobName}"}))) * 100) < ${scaleInMemoryThreshold}
+        max((1 - (avg by (instance) (node_memory_MemAvailable_bytes{job="${prometheusJobName}"}) / avg by (instance) (node_memory_MemTotal_bytes{job="${prometheusJobName}"}))) * 100) < ${scaleInMemoryThreshold}
       )`,
       for: `${scaleInDuration}m`,
       labels: {
@@ -194,7 +194,7 @@ async function createScaleInAlertRule(config) {
         service: serviceName,
         autoscaleConfigId: configId,
         scaleAction: 'scale-in', // 스케일인 액션 표시
-        instance: 'all' // min() 집계를 사용하므로 모든 instance를 의미
+        instance: 'all' // max() 집계를 사용하므로 모든 instance를 의미
       },
       annotations: {
         summary: `${serviceName} 자동 스케일인 필요 (리소스 사용률 낮음)`,

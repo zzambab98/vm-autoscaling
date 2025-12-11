@@ -57,10 +57,10 @@ function ScaleOutEventList() {
               let serviceName = job.name;
               if (job.name.startsWith('autoscale-')) {
                 serviceName = job.name.replace(/^autoscale-/, '').replace(/-out$/, '').replace(/-in$/, '');
-              } else if (job.name === 'plg-autoscale-out') {
-                serviceName = 'auto-vm-test-service';
-              } else if (job.name === 'plg-autoscale-in') {
-                serviceName = 'auto-vm-test-service';
+              } else if (job.name === 'plg-autoscale-out' || job.name === 'plg-autoscale-in') {
+                // 공통 Jenkins Job인 경우 설정에서 서비스 이름 찾기
+                // 설정이 없으면 Job 이름 그대로 사용
+                serviceName = job.name;
               }
 
               const config = configs.find(c =>

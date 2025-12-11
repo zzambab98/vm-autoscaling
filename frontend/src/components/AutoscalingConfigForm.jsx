@@ -27,7 +27,9 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
       prometheusJobName: '',
       scaleInCpuThreshold: 30,
       scaleInMemoryThreshold: 30,
-      scaleInDuration: 10
+      scaleInDuration: 10,
+      jmxExporterPort: 9999,
+      enableJmx: false
     },
     scaling: {
       minVms: 2,
@@ -181,6 +183,15 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
             resourcePool: '/Datacenter/host/Cluster-01/Resources',
             datastore: 'OS-Datastore-Power-Store'
           };
+        }
+        // monitoring 설정에 JMX 필드가 없으면 기본값 설정
+        if (config.monitoring) {
+          if (config.monitoring.enableJmx === undefined) {
+            config.monitoring.enableJmx = false;
+          }
+          if (config.monitoring.jmxExporterPort === undefined) {
+            config.monitoring.jmxExporterPort = 9999;
+          }
         }
         setFormData(config);
       } else {
@@ -387,6 +398,41 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
         <div style={{ fontSize: '12px', color: '#666', marginTop: '4px', marginBottom: '12px' }}>
           ⚠️ 중요: PLG Stack 모니터링 등록 메뉴에서 등록한 Job 이름과 정확히 일치해야 합니다.
         </div>
+
+        {/* JMX 설정 */}
+        <h4 style={{ marginTop: '24px', marginBottom: '12px', color: '#495057', fontSize: '14px', fontWeight: '600' }}>JMX 설정</h4>
+        <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <input
+            type="checkbox"
+            checked={formData.monitoring.enableJmx || false}
+            onChange={(e) => updateNestedField('monitoring', 'enableJmx', e.target.checked)}
+            style={{ width: 'auto' }}
+          />
+          JMX 모니터링 사용
+        </label>
+        <div style={{ fontSize: '12px', color: '#666', marginTop: '4px', marginBottom: '12px' }}>
+          JVM 애플리케이션의 경우 JMX Exporter를 사용하여 JVM 메트릭을 수집할 수 있습니다.
+          <br />
+          <strong>참고:</strong> JMX 모니터링은 대시보드 표시용이며, 오토스케일링 스케일아웃/인 조건에는 사용되지 않습니다.
+        </div>
+
+        {formData.monitoring.enableJmx && (
+          <>
+            <label className="label">JMX Exporter 포트</label>
+            <input
+              type="number"
+              className="input"
+              value={formData.monitoring.jmxExporterPort || 9999}
+              onChange={(e) => updateNestedField('monitoring', 'jmxExporterPort', parseInt(e.target.value))}
+              min="1"
+              max="65535"
+              placeholder="9999"
+            />
+            <div style={{ fontSize: '12px', color: '#666', marginTop: '4px', marginBottom: '12px' }}>
+              JMX Exporter가 수신 대기하는 포트 번호입니다. (기본값: 9999)
+            </div>
+          </>
+        )}
 
         {/* 스케일인 조건 */}
         <h4 style={{ marginTop: '24px', marginBottom: '12px', color: '#495057', fontSize: '14px', fontWeight: '600' }}>스케일인 조건</h4>
