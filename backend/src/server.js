@@ -1132,6 +1132,46 @@ const server = http.createServer((req, res) => {
         const isScaleIn = alertName.includes('LowResourceUsage');
         const scaleAction = isScaleOut ? 'scale-out' : (isScaleIn ? 'scale-in' : null);
 
+        // 스케일인인 경우 Silence 상태 확인 (최소 VM 수 도달 시 차단)
+        if (isScaleIn) {
+          try {
+            const axios = require('axios');
+            const ALERTMANAGER_URL = process.env.ALERTMANAGER_URL || 'http://10.255.1.254:9093';
+            
+            // 활성화된 Silence 확인
+            const silencesResponse = await axios.get(
+              `${ALERTMANAGER_URL}/api/v2/silences`,
+              { params: { active: true }, timeout: 5000 }
+            ).catch(() => ({ data: [] }));
+            
+            const activeSilence = silencesResponse.data.find(silence => {
+              const matchers = silence.matchers || [];
+              const hasService = matchers.some(m => m.name === 'service' && m.value === serviceName);
+              const hasAlertname = matchers.some(m => m.name === 'alertname' && m.value === `${serviceName}_LowResourceUsage`);
+              return hasService && hasAlertname && silence.status?.state === 'active';
+            });
+            
+            if (activeSilence) {
+              const endsAt = new Date(activeSilence.endsAt);
+              const now = new Date();
+              const remainingMinutes = Math.ceil((endsAt - now) / (60 * 1000));
+              
+              console.log(`[Webhook] Alertmanager Silence 활성화됨: ${serviceName} - 스케일인 웹훅 차단 (${remainingMinutes}분 남음)`);
+              sendJSONResponse(res, 200, {
+                success: false,
+                message: `Alertmanager Silence가 활성화되어 스케일인 alert가 차단됩니다. (${remainingMinutes}분 남음)`,
+                silenceID: activeSilence.id,
+                endsAt: activeSilence.endsAt,
+                note: '최소 VM 수 도달로 인한 Silence입니다. 웹훅이 무시됩니다.'
+              });
+              return;
+            }
+          } catch (error) {
+            console.log(`[Webhook] Silence 확인 실패 (계속 진행):`, error.message);
+            // Silence 확인 실패해도 계속 진행
+          }
+        }
+
         // 쿨다운 체크
         if (scaleAction) {
           const cooldownStatus = await checkCooldown(serviceName, scaleAction);
@@ -1549,7 +1589,39 @@ const server = http.createServer((req, res) => {
           // Prometheus 추가 실패해도 계속 진행 (경고만)
         }
 
-        // 2. 쿨다운 시작
+        // 2. 현재 VM 개수 확인 후 Silence 삭제 (최소 VM 수를 넘으면 스케일인 가능 상태로 복구)
+        try {
+          const { getConfigs } = require('./services/autoscalingService');
+          const { getPrometheusTargets } = require('./services/prometheusMonitoringService');
+          const configs = await getConfigs();
+          const config = configs.find(c => c.serviceName === serviceName);
+          
+          if (config) {
+            const minVms = config.scaling?.minVms || 1;
+            const targetsResult = await getPrometheusTargets(prometheusJobName);
+            
+            if (targetsResult.success) {
+              const currentVmCount = targetsResult.targets?.length || 0;
+              
+              // 최소 VM 수를 넘으면 Silence 삭제 (스케일인 가능 상태로 복구)
+              if (currentVmCount > minVms) {
+                try {
+                  const { deleteScaleInSilence } = require('./services/alertmanagerService');
+                  const deleteResult = await deleteScaleInSilence(serviceName);
+                  if (deleteResult.success && deleteResult.silenceID) {
+                    console.log(`[Webhook] VM 생성 후 Silence 삭제 성공: ${serviceName} - 스케일인 가능 상태로 복구 (현재 VM: ${currentVmCount}개, 최소: ${minVms}개)`);
+                  }
+                } catch (error) {
+                  console.log(`[Webhook] Silence 삭제 확인: ${serviceName} - ${error.message}`);
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`[Webhook] Silence 삭제 확인 실패 (경고):`, error.message);
+        }
+
+        // 3. 쿨다운 시작
         try {
           const { startCooldown } = require('./services/cooldownService');
           // 설정에서 쿨다운 기간 가져오기 (기본값: 5분)
