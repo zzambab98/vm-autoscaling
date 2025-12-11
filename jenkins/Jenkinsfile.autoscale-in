@@ -198,7 +198,11 @@ except Exception as e:
                     // 최소 VM 수 확인
                     def minVms = (env.MIN_VMS ?: params.MIN_VMS ?: '2').toInteger()
                     if (targets.size() <= minVms) {
-                        error("현재 VM 수(${targets.size()})가 최소 VM 수(${minVms}) 이하입니다. 스케일인을 수행할 수 없습니다.")
+                        echo "ℹ️ 현재 VM 수(${targets.size()})가 최소 VM 수(${minVms}) 이하입니다. 스케일인을 수행할 수 없습니다."
+                        echo "✅ 최소 VM 개수를 유지하기 위해 스케일인을 건너뜁니다. (정상 종료)"
+                        // 정상 종료로 처리 (에러가 아님)
+                        currentBuild.result = 'SUCCESS'
+                        return
                     }
                 }
             }
