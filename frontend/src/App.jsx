@@ -18,7 +18,7 @@ const TAB_FLOW = [
   { id: 'autoscaling', label: '오토스케일링 설정', summary: '임계값 · VM 범위 · Jenkins 연동' },
   { id: 'alertmanager', label: 'Alertmanager 라우팅', summary: '서비스별 Jenkins webhook 연결' },
   { id: 'monitoring', label: '모니터링 대시보드', summary: 'Grafana에서 상태 확인' },
-  { id: 'events', label: '스케일아웃 이벤트', summary: '최근 자동화 작업 내역' }
+  { id: 'events', label: '스케일아웃/인 이벤트', summary: '최근 자동화 작업 내역' }
 ];
 
 function App() {

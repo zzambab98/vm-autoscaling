@@ -126,7 +126,7 @@ function ScaleOutEventList() {
   return (
     <div className="scale-out-event-list">
       <div className="event-list-header">
-        <h2>스케일아웃 이벤트 목록</h2>
+        <h2>스케일아웃/인 이벤트 목록</h2>
         <button 
           className="button button-primary"
           onClick={loadEvents}
