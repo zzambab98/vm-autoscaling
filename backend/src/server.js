@@ -1246,14 +1246,26 @@ const server = http.createServer((req, res) => {
             if (currentVmCount <= minVms) {
               console.log(`[Webhook] 최소 VM 개수 도달: ${serviceName} - 현재 Prometheus Job 등록 개수: ${currentVmCount}, 최소: ${minVms}`);
               
-              // 쿨다운 시작하여 반복 시도 방지
+              // Alertmanager Silence 생성하여 스케일인 alert 차단 (웹훅 발생 방지)
               try {
-                const { startCooldown } = require('./services/cooldownService');
-                const cooldownPeriod = config.scaling?.cooldownPeriod || 300;
-                await startCooldown(serviceName, 'scale-in', cooldownPeriod);
-                console.log(`[Webhook] 최소 VM 개수 도달로 인한 쿨다운 시작: ${serviceName} (${cooldownPeriod}초)`);
+                const { createScaleInSilence } = require('./services/alertmanagerService');
+                // 30분간 silence 생성 (Alertmanager의 repeat_interval보다 훨씬 길게)
+                const silenceResult = await createScaleInSilence(serviceName, 30);
+                console.log(`[Webhook] Alertmanager Silence 생성 성공: ${serviceName} - ${silenceResult.silenceID} (30분간 스케일인 alert 차단)`);
               } catch (error) {
-                console.error(`[Webhook] 쿨다운 시작 실패 (경고):`, error.message);
+                console.error(`[Webhook] Alertmanager Silence 생성 실패 (경고):`, error.message);
+                // Silence 생성 실패 시 쿨다운으로 대체
+                try {
+                  const { startCooldown, checkCooldown } = require('./services/cooldownService');
+                  const cooldownStatus = await checkCooldown(serviceName, 'scale-in');
+                  if (!cooldownStatus.inCooldown) {
+                    const extendedCooldownPeriod = 600; // 10분
+                    await startCooldown(serviceName, 'scale-in', extendedCooldownPeriod);
+                    console.log(`[Webhook] 쿨다운 시작 (Silence 실패 대체): ${serviceName} (${extendedCooldownPeriod}초)`);
+                  }
+                } catch (cooldownError) {
+                  console.error(`[Webhook] 쿨다운 시작 실패 (경고):`, cooldownError.message);
+                }
               }
               
               sendJSONResponse(res, 200, {
@@ -1261,9 +1273,22 @@ const server = http.createServer((req, res) => {
                 message: `최소 VM 개수(${minVms})에 도달하여 스케일인할 수 없습니다. (현재 Prometheus Job 등록 개수: ${currentVmCount}개)`,
                 currentVmCount: currentVmCount,
                 minVms: minVms,
-                prometheusJobName: prometheusJobName
+                prometheusJobName: prometheusJobName,
+                note: 'Alertmanager Silence가 생성되어 30분간 스케일인 alert가 차단됩니다. 웹훅이 발생하지 않습니다.'
               });
               return;
+            }
+            
+            // 최소 VM 수를 넘어서면 기존 Silence 삭제 (스케일인 가능 상태로 복구)
+            try {
+              const { deleteScaleInSilence } = require('./services/alertmanagerService');
+              const deleteResult = await deleteScaleInSilence(serviceName);
+              if (deleteResult.success && deleteResult.silenceID) {
+                console.log(`[Webhook] Alertmanager Silence 삭제 성공: ${serviceName} - 스케일인 가능 상태로 복구`);
+              }
+            } catch (error) {
+              // Silence 삭제 실패는 무시 (이미 만료되었을 수 있음)
+              console.log(`[Webhook] Silence 삭제 확인: ${serviceName} - ${error.message}`);
             }
             
             console.log(`[Webhook] VM 개수 확인 통과: ${serviceName} - 현재 Prometheus Job 등록 개수: ${currentVmCount}, 최소: ${minVms} (스케일인 가능)`);

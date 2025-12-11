@@ -305,10 +305,124 @@ async function getRoutingRules() {
   }
 }
 
+/**
+ * Alertmanager Silence 생성 (최소 VM 수 도달 시 스케일인 alert 차단)
+ * @param {string} serviceName - 서비스 이름
+ * @param {number} durationMinutes - Silence 지속 시간 (분), 기본 30분
+ * @returns {Promise<object>} Silence 생성 결과
+ */
+async function createScaleInSilence(serviceName, durationMinutes = 30) {
+  try {
+    const axios = require('axios');
+    const ALERTMANAGER_URL = process.env.ALERTMANAGER_URL || 'http://10.255.1.254:9093';
+    
+    // Silence 시작 시간 (현재)
+    const startsAt = new Date().toISOString();
+    // Silence 종료 시간
+    const endsAt = new Date(Date.now() + durationMinutes * 60 * 1000).toISOString();
+    
+    // Silence 생성 요청
+    const silencePayload = {
+      matchers: [
+        {
+          name: 'service',
+          value: serviceName,
+          isRegex: false
+        },
+        {
+          name: 'alertname',
+          value: `${serviceName}_LowResourceUsage`,
+          isRegex: false
+        }
+      ],
+      startsAt: startsAt,
+      endsAt: endsAt,
+      createdBy: 'vm-autoscaling-backend',
+      comment: `최소 VM 수 도달로 인한 스케일인 alert 차단 (${durationMinutes}분)`
+    };
+    
+    const response = await axios.post(
+      `${ALERTMANAGER_URL}/api/v2/silences`,
+      silencePayload,
+      { timeout: 10000 }
+    );
+    
+    console.log(`[Alertmanager] Silence 생성 성공: ${serviceName} - ${response.data.silenceID}`);
+    
+    return {
+      success: true,
+      silenceID: response.data.silenceID,
+      serviceName: serviceName,
+      durationMinutes: durationMinutes,
+      endsAt: endsAt
+    };
+  } catch (error) {
+    console.error(`[Alertmanager] Silence 생성 실패:`, error.message);
+    throw new Error(`Silence 생성 실패: ${error.message}`);
+  }
+}
+
+/**
+ * Alertmanager Silence 삭제 (스케일인 가능 상태로 복구)
+ * @param {string} serviceName - 서비스 이름
+ * @returns {Promise<object>} Silence 삭제 결과
+ */
+async function deleteScaleInSilence(serviceName) {
+  try {
+    const axios = require('axios');
+    const ALERTMANAGER_URL = process.env.ALERTMANAGER_URL || 'http://10.255.1.254:9093';
+    
+    // 현재 활성화된 silence 목록 조회
+    const silencesResponse = await axios.get(
+      `${ALERTMANAGER_URL}/api/v2/silences`,
+      { params: { active: true }, timeout: 10000 }
+    );
+    
+    // 해당 서비스의 스케일인 silence 찾기
+    const targetSilence = silencesResponse.data.find(silence => {
+      const matchers = silence.matchers || [];
+      const hasService = matchers.some(m => m.name === 'service' && m.value === serviceName);
+      const hasAlertname = matchers.some(m => m.name === 'alertname' && m.value === `${serviceName}_LowResourceUsage`);
+      return hasService && hasAlertname && silence.status?.state === 'active';
+    });
+    
+    if (!targetSilence) {
+      return {
+        success: true,
+        message: '활성화된 silence가 없습니다.',
+        silenceID: null
+      };
+    }
+    
+    // Silence 삭제
+    await axios.delete(
+      `${ALERTMANAGER_URL}/api/v2/silence/${targetSilence.id}`,
+      { timeout: 10000 }
+    );
+    
+    console.log(`[Alertmanager] Silence 삭제 성공: ${serviceName} - ${targetSilence.id}`);
+    
+    return {
+      success: true,
+      silenceID: targetSilence.id,
+      serviceName: serviceName
+    };
+  } catch (error) {
+    console.error(`[Alertmanager] Silence 삭제 실패:`, error.message);
+    // 삭제 실패해도 에러를 던지지 않음 (이미 만료되었을 수 있음)
+    return {
+      success: false,
+      message: `Silence 삭제 실패: ${error.message}`
+    };
+  }
+}
+
 module.exports = {
   addRoutingRule,
   deleteRoutingRule,
-  getRoutingRules
+  getRoutingRules,
+  createScaleInSilence,
+  deleteScaleInSilence
 };
 
 
