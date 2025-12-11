@@ -25,13 +25,77 @@ pipeline {
             steps {
                 script {
                     echo "=== Webhook 파라미터 파싱 ==="
-                    echo "AUTOSCALE_CONFIG_ID: ${params.AUTOSCALE_CONFIG_ID}"
-                    echo "SERVICE_NAME: ${params.SERVICE_NAME}"
-                    echo "PROMETHEUS_JOB_NAME: ${params.PROMETHEUS_JOB_NAME}"
                     
-                    // Webhook에서 전달된 파라미터 확인
-                    if (!params.AUTOSCALE_CONFIG_ID || !params.SERVICE_NAME || !params.PROMETHEUS_JOB_NAME) {
-                        error("필수 파라미터가 누락되었습니다: AUTOSCALE_CONFIG_ID, SERVICE_NAME, PROMETHEUS_JOB_NAME")
+                    // GenericTrigger에서 전달된 변수 확인
+                    def configId = params.AUTOSCALE_CONFIG_ID ?: ''
+                    def serviceName = params.SERVICE_NAME ?: ''
+                    def prometheusJobName = params.PROMETHEUS_JOB_NAME ?: ''
+                    
+                    echo "AUTOSCALE_CONFIG_ID: ${configId}"
+                    echo "SERVICE_NAME: ${serviceName}"
+                    echo "PROMETHEUS_JOB_NAME: ${prometheusJobName}"
+                    
+                    // 파라미터가 없으면 백엔드에서 설정 조회
+                    if (!configId || !serviceName || !prometheusJobName) {
+                        echo "⚠️ 파라미터가 비어있습니다. 백엔드에서 설정을 조회합니다..."
+                        
+                        // 백엔드에서 설정 조회
+                        def backendUrl = env.BACKEND_API_URL ?: 'http://10.255.48.253:6010'
+                        def configResponse = sh(
+                            script: """
+                                curl -sf -H "Content-Type: application/json" "${backendUrl}/api/autoscaling/configs" | \
+                                python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+configs = data.get('configs', [])
+if configs:
+    # 첫 번째 활성화된 설정 사용 또는 serviceName으로 찾기
+    config = None
+    if '${serviceName}' and '${serviceName}' != '':
+        config = next((c for c in configs if c.get('serviceName') == '${serviceName}' and c.get('enabled')), None)
+    if not config:
+        config = next((c for c in configs if c.get('enabled')), None)
+    if config:
+        print(json.dumps(config))
+"
+                            """,
+                            returnStdout: true
+                        ).trim()
+                        
+                        if (configResponse) {
+                            def configData = readJSON text: configResponse
+                            env.AUTOSCALE_CONFIG_ID = configData.id ?: configId
+                            env.SERVICE_NAME = configData.serviceName ?: serviceName
+                            env.PROMETHEUS_JOB_NAME = configData.monitoring?.prometheusJobName ?: prometheusJobName
+                            env.VM_PREFIX = configData.vmPrefix ?: params.VM_PREFIX ?: ''
+                            env.F5_POOL_NAME = configData.f5?.poolName ?: params.F5_POOL_NAME ?: ''
+                            env.VIP = configData.f5?.vip ?: params.VIP ?: ''
+                            env.VIP_PORT = configData.f5?.vipPort ?: params.VIP_PORT ?: '80'
+                            env.MIN_VMS = configData.scaling?.minVms?.toString() ?: params.MIN_VMS ?: '2'
+                            env.SCALE_IN_STEP = configData.scaling?.scaleInStep?.toString() ?: params.SCALE_IN_STEP ?: '1'
+                            
+                            echo "✅ 백엔드에서 설정 조회 완료"
+                            echo "SERVICE_NAME: ${env.SERVICE_NAME}"
+                            echo "PROMETHEUS_JOB_NAME: ${env.PROMETHEUS_JOB_NAME}"
+                        } else {
+                            error("백엔드에서 설정을 조회할 수 없습니다.")
+                        }
+                    } else {
+                        // 파라미터가 있으면 사용
+                        env.AUTOSCALE_CONFIG_ID = configId
+                        env.SERVICE_NAME = serviceName
+                        env.PROMETHEUS_JOB_NAME = prometheusJobName
+                        env.VM_PREFIX = params.VM_PREFIX ?: ''
+                        env.F5_POOL_NAME = params.F5_POOL_NAME ?: ''
+                        env.VIP = params.VIP ?: ''
+                        env.VIP_PORT = params.VIP_PORT ?: '80'
+                        env.MIN_VMS = params.MIN_VMS ?: '2'
+                        env.SCALE_IN_STEP = params.SCALE_IN_STEP ?: '1'
+                    }
+                    
+                    // 최종 검증
+                    if (!env.SERVICE_NAME || !env.PROMETHEUS_JOB_NAME) {
+                        error("필수 파라미터가 누락되었습니다: SERVICE_NAME, PROMETHEUS_JOB_NAME")
                     }
                 }
             }
@@ -79,7 +143,7 @@ print(json.dumps(targets))
                     env.VM_IPS = targets.join(',')
                     
                     // 최소 VM 수 확인
-                    def minVms = params.MIN_VMS.toInteger()
+                    def minVms = (env.MIN_VMS ?: params.MIN_VMS ?: '2').toInteger()
                     if (targets.size() <= minVms) {
                         error("현재 VM 수(${targets.size()})가 최소 VM 수(${minVms}) 이하입니다. 스케일인을 수행할 수 없습니다.")
                     }
@@ -92,7 +156,7 @@ print(json.dumps(targets))
                 script {
                     echo "=== 제거할 VM 선택 (vmPrefix 기준) ==="
 
-                    def vmPrefix = params.VM_PREFIX
+                    def vmPrefix = env.VM_PREFIX ?: params.VM_PREFIX
                     if (!vmPrefix) {
                         error("VM_PREFIX가 지정되지 않았습니다.")
                     }
@@ -143,8 +207,8 @@ print(json.dumps(targets))
                         }
 
                         // 제거할 VM 수 결정
-                        def minVms = params.MIN_VMS.toInteger()
-                        def scaleInStep = params.SCALE_IN_STEP.toInteger()
+                        def minVms = (env.MIN_VMS ?: params.MIN_VMS ?: '2').toInteger()
+                        def scaleInStep = (env.SCALE_IN_STEP ?: params.SCALE_IN_STEP ?: '1').toInteger()
                         def maxRemoveCount = vmInfo.size() - minVms
                         def removeCount = Math.min(scaleInStep, maxRemoveCount)
 
@@ -176,7 +240,9 @@ print(json.dumps(targets))
                     echo "=== F5 Pool에서 Member 제거 ==="
                     
                     def vmsToRemove = env.VMS_TO_REMOVE.split(',')
-                    def memberPort = params.VIP_PORT ?: '80'
+                    def memberPort = env.VIP_PORT ?: params.VIP_PORT ?: '80'
+                    def f5PoolName = env.F5_POOL_NAME ?: params.F5_POOL_NAME
+                    def vip = env.VIP ?: params.VIP
                     
                     withCredentials([
                         usernamePassword(credentialsId: 'f5-credentials', usernameVariable: 'F5_USERNAME', passwordVariable: 'F5_PASSWORD')
@@ -188,9 +254,9 @@ print(json.dumps(targets))
                             
                             sh """
                                 python3 scripts/remove-f5-pool-member.py \
-                                    --pool ${params.F5_POOL_NAME} \
+                                    --pool ${f5PoolName} \
                                     --member ${vmIp}:${memberPort} \
-                                    --vip ${params.VIP} \
+                                    --vip ${vip} \
                                     --server ${f5Server} \
                                     --username ${F5_USERNAME} \
                                     --password ${F5_PASSWORD} || echo "F5 제거 실패 (계속 진행): ${vmIp}"
@@ -262,7 +328,7 @@ print(json.dumps(targets))
                     echo "=== Prometheus Job에서 Target 제거 ==="
                     
                     def vmsToRemove = env.VMS_TO_REMOVE.split(',')
-                    def jobName = params.PROMETHEUS_JOB_NAME
+                    def jobName = env.PROMETHEUS_JOB_NAME ?: params.PROMETHEUS_JOB_NAME
                     
                     // Prometheus 설정 파일에서 target 제거
                     for (def vmIp in vmsToRemove) {
@@ -336,7 +402,10 @@ print(json.dumps(targets))
                 echo "남은 VM 수: ${env.CURRENT_VM_COUNT.toInteger() - env.REMOVE_COUNT.toInteger()}"
                 
                 // 백엔드로 VM 삭제 완료 웹훅 전송 (각 VM마다)
-                if (env.VMS_TO_REMOVE && env.VM_NAMES_TO_REMOVE && params.SERVICE_NAME && params.PROMETHEUS_JOB_NAME) {
+                def serviceName = env.SERVICE_NAME ?: params.SERVICE_NAME
+                def prometheusJobName = env.PROMETHEUS_JOB_NAME ?: params.PROMETHEUS_JOB_NAME
+                
+                if (env.VMS_TO_REMOVE && env.VM_NAMES_TO_REMOVE && serviceName && prometheusJobName) {
                     def vmIps = env.VMS_TO_REMOVE.split(',')
                     def vmNames = env.VM_NAMES_TO_REMOVE.split(',')
                     
@@ -346,12 +415,12 @@ print(json.dumps(targets))
                         
                         try {
                             def webhookPayload = [
-                                serviceName: params.SERVICE_NAME,
+                                serviceName: serviceName,
                                 vmName: vmName,
                                 vmIp: vmIp,
-                                prometheusJobName: params.PROMETHEUS_JOB_NAME,
-                                f5PoolName: params.F5_POOL_NAME ?: '',
-                                f5VipPort: params.VIP_PORT ?: '80'
+                                prometheusJobName: prometheusJobName,
+                                f5PoolName: env.F5_POOL_NAME ?: params.F5_POOL_NAME ?: '',
+                                f5VipPort: env.VIP_PORT ?: params.VIP_PORT ?: '80'
                             ]
                             
                             def webhookResponse = sh(
