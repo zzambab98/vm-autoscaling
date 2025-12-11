@@ -260,6 +260,18 @@ async function getTemplates() {
     };
   });
 
+  // 로컬 저장소에만 있는 템플릿 추가 (vCenter에 매칭되지 않은 템플릿)
+  const vcenterTemplateNames = new Set(vcenterTemplates.map(t => t.name));
+  const localOnlyTemplates = localTemplates.filter(lt => !vcenterTemplateNames.has(lt.name));
+  
+  // 로컬에만 있는 템플릿도 결과에 포함
+  localOnlyTemplates.forEach(localTemplate => {
+    mergedTemplates.push({
+      ...localTemplate,
+      source: localTemplate.source || 'local'
+    });
+  });
+
   return mergedTemplates;
 }
 
@@ -876,9 +888,9 @@ async function convertVmToTemplate(vmName, templateName, metadata = {}) {
     
     // 방법 2: VM을 클론하여 템플릿으로 변환 (새 이름 사용)
     // 더 안전한 방법: VM을 클론한 후 템플릿으로 변환
-    // templateName에서 공백 제거 및 정리
-    const cleanTemplateName = templateName.trim().replace(/\s+/g, '-');
-    const cloneName = `${cleanTemplateName}-temp-${Date.now()}`;
+    // templateName에서 공백 제거 및 정리 (클론 이름 생성용)
+    const cleanTemplateNameForClone = templateName.trim().replace(/\s+/g, '-');
+    const cloneName = `${cleanTemplateNameForClone}-temp-${Date.now()}`;
     
     console.log(`[Template Service] VM 클론 시작: ${vmName} -> ${cloneName}`);
     
@@ -1242,8 +1254,10 @@ TEMPLATE_INIT_EOF`;
     });
 
     // 3. 템플릿 이름 변경 (필요한 경우)
-    if (cloneName !== templateName) {
-      console.log(`[Template Service] 템플릿 이름 변경: ${cloneName} -> ${templateName}`);
+    // 템플릿 이름 앞뒤 공백 제거 (일관성 유지)
+    const cleanTemplateName = templateName.trim();
+    if (cloneName !== cleanTemplateName) {
+      console.log(`[Template Service] 템플릿 이름 변경: ${cloneName} -> ${cleanTemplateName}`);
       
       // VM의 전체 경로 찾기
       try {
@@ -1260,8 +1274,8 @@ TEMPLATE_INIT_EOF`;
         const vmFullPath = vmPath.trim().split('\n')[0];
         
         if (vmFullPath) {
-          // 전체 경로를 사용하여 이름 변경
-          const renameCommand = `govc object.rename "${vmFullPath}" "${templateName}"`;
+          // 전체 경로를 사용하여 이름 변경 (템플릿 이름도 공백 제거된 버전 사용)
+          const renameCommand = `govc object.rename "${vmFullPath}" "${cleanTemplateName}"`;
           await execPromise(renameCommand, {
             env: {
               ...process.env,
@@ -1271,7 +1285,7 @@ TEMPLATE_INIT_EOF`;
               GOVC_INSECURE: vcenterConfig.insecure
             }
           });
-          console.log(`[Template Service] 템플릿 이름 변경 완료: ${templateName}`);
+          console.log(`[Template Service] 템플릿 이름 변경 완료: ${cleanTemplateName}`);
         } else {
           console.warn(`[Template Service] VM 경로를 찾을 수 없어 이름 변경을 건너뜁니다: ${cloneName}`);
         }
@@ -1282,9 +1296,10 @@ TEMPLATE_INIT_EOF`;
     }
 
     // 4. 템플릿 메타데이터 저장
+    // cleanTemplateName은 위에서 이미 선언됨 (재사용)
     const templateData = {
       id: `template-${Date.now()}`,
-      name: templateName,
+      name: cleanTemplateName,
       originalVmName: vmName,
       description: metadata.description || '',
       createdAt: new Date().toISOString(),
@@ -1297,7 +1312,7 @@ TEMPLATE_INIT_EOF`;
     return {
       success: true,
       template: templateData,
-      message: `VM '${vmName}'을 템플릿 '${templateName}'으로 변환했습니다.`
+      message: `VM '${vmName}'을 템플릿 '${cleanTemplateName}'으로 변환했습니다.`
     };
   } catch (error) {
     console.error(`[Template Service] 템플릿 변환 실패:`, error);
@@ -1626,6 +1641,58 @@ function startVCenterConnectionMonitor() {
   console.log(`[Template Service] vCenter 연결 모니터링이 ${CONNECTION_CHECK_INTERVAL / 1000}초마다 실행됩니다.`);
 }
 
+/**
+ * vCenter에서 네트워크/VLAN 목록 조회
+ */
+async function getNetworks() {
+  const vcenterConfig = getVCenterConfig();
+  
+  if (!vcenterConfig.url || !vcenterConfig.username || !vcenterConfig.password) {
+    throw new Error('vCenter 설정이 완료되지 않았습니다.');
+  }
+
+  try {
+    // govc find 명령어로 네트워크 목록 조회
+    const findCommand = `govc find / -type n`;
+    const { stdout, stderr } = await execPromise(findCommand, {
+      env: {
+        ...process.env,
+        GOVC_URL: vcenterConfig.url,
+        GOVC_USERNAME: vcenterConfig.username,
+        GOVC_PASSWORD: vcenterConfig.password,
+        GOVC_INSECURE: vcenterConfig.insecure
+      },
+      timeout: 30000
+    });
+
+    if (stderr && stderr.trim()) {
+      console.warn('[Template Service] govc stderr:', stderr);
+    }
+
+    // 네트워크 경로 파싱 (예: /Datacenter/network/Vlan-1048)
+    const networkPaths = stdout.trim().split('\n').filter(line => line.trim());
+    
+    const networks = networkPaths.map(path => {
+      const parts = path.split('/');
+      const name = parts[parts.length - 1]; // 마지막 부분이 네트워크 이름
+      return {
+        name: name, // 네트워크 이름 (예: Vlan-1048)
+        path: path,  // 전체 경로 (예: /Datacenter/network/Vlan-1048)
+        displayName: name // 표시용 이름
+      };
+    }).filter(net => net.name && net.name.trim() !== ''); // 빈 이름 제외
+
+    // 이름순으로 정렬
+    networks.sort((a, b) => a.name.localeCompare(b.name));
+
+    console.log(`[Template Service] 네트워크 목록 조회 완료: ${networks.length}개`);
+    return networks;
+  } catch (error) {
+    console.error('[Template Service] 네트워크 목록 조회 실패:', error);
+    throw new Error(`네트워크 목록 조회 실패: ${error.message}`);
+  }
+}
+
 module.exports = {
   getTemplates,
   getTemplateById,
@@ -1633,6 +1700,7 @@ module.exports = {
   saveTemplateMetadata,
   deleteTemplate,
   getVmList,
+  getNetworks,
   getVCenterConnectionState,
   checkVCenterConnection,
   startVCenterConnectionMonitor

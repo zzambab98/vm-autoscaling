@@ -3,7 +3,7 @@
     "serviceName": "auto-vm-test-AutoScaling",
     "vmPrefix": "auto-vm-test",
     "templateId": "template-1765426433439",
-    "enabled": true,
+    "enabled": false,
     "monitoring": {
       "cpuThreshold": 80,
       "memoryThreshold": 80,
@@ -40,6 +40,6 @@
     "sshKeyPath": "/home/ubuntu/workspace/vm-autoscaling/pemkey/danainfra",
     "id": "config-1765353828931",
     "createdAt": "2025-12-10T08:03:48.931Z",
-    "updatedAt": "2025-12-11T04:32:49.974Z"
+    "updatedAt": "2025-12-11T04:32:43.335Z"
   }
 ]

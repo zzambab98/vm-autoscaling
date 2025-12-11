@@ -583,6 +583,21 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 네트워크/VLAN 목록 조회 API
+  if (req.method === 'GET' && parsedUrl.pathname === '/api/networks') {
+    (async () => {
+      try {
+        const { getNetworks } = require('./services/templateService');
+        const networks = await getNetworks();
+        sendJSONResponse(res, 200, { success: true, networks });
+      } catch (error) {
+        console.error('[Server] 네트워크 목록 조회 API 에러:', error);
+        sendJSONResponse(res, 500, { success: false, error: error.message, networks: [] });
+      }
+    })();
+    return;
+  }
+
   // 템플릿 상세 조회 API
   if (req.method === 'GET' && parsedUrl.pathname.startsWith('/api/templates/')) {
     const templateId = parsedUrl.pathname.split('/').pop();
@@ -1523,9 +1538,12 @@ const server = http.createServer((req, res) => {
   sendJSONResponse(res, 404, { error: 'Not Found' });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`[VM Autoscaling Backend] Server running on port ${PORT}`);
+  console.log(`[VM Autoscaling Backend] Listening on all interfaces (0.0.0.0:${PORT})`);
   console.log(`[VM Autoscaling Backend] Health check: http://localhost:${PORT}/health`);
+  console.log(`[VM Autoscaling Backend] Internal access: http://10.255.48.253:${PORT}/health`);
+  console.log(`[VM Autoscaling Backend] External access: http://121.156.103.69:${PORT}/health`);
   
   // vCenter 연결 모니터링 시작
   startVCenterConnectionMonitor();

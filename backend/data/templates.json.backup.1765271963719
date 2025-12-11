@@ -1,0 +1,50 @@
+[
+  {
+    "id": "vcenter-18a70a1e-auto-vm-test-02-template",
+    "name": "auto-vm-test-02-template",
+    "originalVmName": "auto-vm-test-02-template",
+    "description": "",
+    "createdAt": "2025-12-09T09:18:57.162Z",
+    "updatedAt": "2025-12-09T09:18:57.162Z",
+    "path": "/Datacenter/vm/auto-vm-test-02-template",
+    "source": "vcenter"
+  },
+  {
+    "id": "template-1764130044779",
+    "name": "kube-worker-node-template",
+    "originalVmName": "kube-golden-image",
+    "description": "",
+    "createdAt": "2025-11-26T04:07:24.780Z",
+    "updatedAt": "2025-11-26T04:07:24.780Z",
+    "path": "/Datacenter/vm/kube-worker-node-template",
+    "source": "vcenter"
+  },
+  {
+    "id": "vcenter-1764921538924-ubuntu-22.04-golden-image-template",
+    "name": "ubuntu-22.04-golden-image-template",
+    "originalVmName": "ubuntu-22.04-golden-image-template",
+    "description": "",
+    "createdAt": "2025-12-05T07:58:58.924Z",
+    "updatedAt": "2025-12-05T07:58:58.924Z",
+    "path": "/Datacenter/vm/ubuntu-22.04-golden-image-template",
+    "source": "vcenter"
+  },
+  {
+    "id": "vcenter-e4e7d35d-auto-vm-test-01-template",
+    "name": "auto-vm-test-01-template",
+    "originalVmName": "auto-vm-test-01-template",
+    "description": "",
+    "createdAt": "2025-12-09T09:17:34.432Z",
+    "updatedAt": "2025-12-09T09:17:34.433Z",
+    "path": "/Datacenter/vm/auto-vm-test-01-template",
+    "source": "vcenter"
+  },
+  {
+    "id": "template-1765271937139",
+    "name": " auto-vm-test-02-template",
+    "originalVmName": "auto-vm-test-02",
+    "description": "",
+    "createdAt": "2025-12-09T09:18:57.139Z",
+    "updatedAt": "2025-12-09T09:18:57.139Z"
+  }
+]

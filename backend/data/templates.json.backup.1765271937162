@@ -20,22 +20,21 @@
     "source": "vcenter"
   },
   {
-    "id": "template-1765426433439",
-    "name": "auto-vm-test-template",
-    "originalVmName": "auto-vm-test-02",
+    "id": "vcenter-e4e7d35d-auto-vm-test-01-template",
+    "name": "auto-vm-test-01-template",
+    "originalVmName": "auto-vm-test-01-template",
     "description": "",
-    "createdAt": "2025-12-11T04:13:53.439Z",
-    "updatedAt": "2025-12-11T04:13:53.460Z",
-    "path": "/Datacenter/vm/auto-vm-test-template",
+    "createdAt": "2025-12-09T09:17:34.432Z",
+    "updatedAt": "2025-12-09T09:17:34.433Z",
+    "path": "/Datacenter/vm/auto-vm-test-01-template",
     "source": "vcenter"
   },
   {
-    "id": "template-1765334969025",
-    "name": " auto-vm-test",
+    "id": "template-1765271854410",
+    "name": " auto-vm-test-01-template",
     "originalVmName": "auto-vm-test-01",
     "description": "",
-    "createdAt": "2025-12-10T02:49:29.025Z",
-    "updatedAt": "2025-12-10T02:49:29.025Z",
-    "source": "local"
+    "createdAt": "2025-12-09T09:17:34.410Z",
+    "updatedAt": "2025-12-09T09:17:34.410Z"
   }
 ]

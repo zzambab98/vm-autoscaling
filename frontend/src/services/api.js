@@ -299,6 +299,15 @@ export const sshConfigApi = {
   }
 };
 
+// 네트워크/VLAN API
+export const networkApi = {
+  // 네트워크/VLAN 목록 조회
+  getNetworks: async () => {
+    const response = await api.get('/api/networks');
+    return response.data;
+  }
+};
+
 // Health Check
 export const healthCheck = async () => {
   const response = await api.get('/health');

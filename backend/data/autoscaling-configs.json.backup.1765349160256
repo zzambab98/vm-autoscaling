@@ -1,17 +1,16 @@
 [
   {
-    "serviceName": "auto-vm-test-AutoScaling",
-    "vmPrefix": "auto-vm-test",
-    "templateId": "template-1765426433439",
+    "serviceName": "auto-vm-test-service",
+    "templateId": "template-1764043685242",
     "enabled": true,
     "monitoring": {
       "cpuThreshold": 80,
       "memoryThreshold": 80,
       "duration": 1,
-      "prometheusJobName": "auto-vm-test",
+      "prometheusJobName": "auto-vm-test-service-job",
       "scaleInCpuThreshold": 30,
       "scaleInMemoryThreshold": 30,
-      "scaleInDuration": 5
+      "scaleInDuration": 10
     },
     "scaling": {
       "minVms": 2,
@@ -22,13 +21,13 @@
     },
     "f5": {
       "poolName": "auto-vm-test-pool",
-      "vip": "10.255.48.250",
+      "vip": "10.255.48.229",
       "vipPort": 80,
       "healthCheckPath": "/"
     },
     "network": {
-      "ipPoolStart": "10.255.48.200",
-      "ipPoolEnd": "10.255.48.202",
+      "ipPoolStart": "10.255.48.100",
+      "ipPoolEnd": "10.255.48.102",
       "subnet": "255.255.255.0",
       "gateway": "10.255.48.1",
       "vlan": "Vlan-1048"
@@ -37,9 +36,10 @@
       "resourcePool": "/Datacenter/host/Cluster-01/Resources",
       "datastore": "OS-Datastore-Power-Store"
     },
-    "sshKeyPath": "/home/ubuntu/workspace/vm-autoscaling/pemkey/danainfra",
-    "id": "config-1765353828931",
-    "createdAt": "2025-12-10T08:03:48.931Z",
-    "updatedAt": "2025-12-11T04:32:49.974Z"
+    "id": "config-1764568169505",
+    "createdAt": "2025-12-01T05:49:29.505Z",
+    "updatedAt": "2025-12-03T06:57:56.686Z",
+    "sshKeyPath": "/home/ubuntu/workspace/vm-autoscaling/pemkey/dana-cocktail",
+    "vmPrefix": "auto-vm-test"
   }
 ]

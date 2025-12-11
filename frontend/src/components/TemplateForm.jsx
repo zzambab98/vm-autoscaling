@@ -38,10 +38,29 @@ function TemplateForm({ onSuccess }) {
       return;
     }
 
+    // 템플릿 이름 공백 검증
+    const trimmedTemplateName = formData.templateName.trim();
+    if (formData.templateName !== trimmedTemplateName) {
+      const hasLeadingSpace = formData.templateName.startsWith(' ');
+      const hasTrailingSpace = formData.templateName.endsWith(' ');
+      let spaceMessage = '템플릿 이름에 공백이 포함되어 있습니다. ';
+      if (hasLeadingSpace && hasTrailingSpace) {
+        spaceMessage += '앞뒤 공백을 제거해주세요.';
+      } else if (hasLeadingSpace) {
+        spaceMessage += '앞 공백을 제거해주세요.';
+      } else if (hasTrailingSpace) {
+        spaceMessage += '뒤 공백을 제거해주세요.';
+      }
+      spaceMessage += ` (현재: "${formData.templateName}", 수정 후: "${trimmedTemplateName}")`;
+      setMessage({ type: 'error', text: spaceMessage });
+      setLoading(false);
+      return;
+    }
+
     try {
       const result = await templateApi.createTemplate(
         formData.vmName,
-        formData.templateName,
+        trimmedTemplateName,
         formData.description
       );
 
@@ -105,7 +124,8 @@ function TemplateForm({ onSuccess }) {
           type="text"
           className="input"
           value={formData.templateName}
-          onChange={(e) => setFormData({ ...formData, templateName: e.target.value })}
+          onChange={(e) => setFormData({ ...formData, templateName: e.target.value.trimStart() })}
+          onBlur={(e) => setFormData({ ...formData, templateName: e.target.value.trim() })}
           placeholder="템플릿 이름 입력 (예: auto-vm-test-template)"
           required
         />

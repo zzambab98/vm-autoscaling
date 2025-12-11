@@ -2,8 +2,8 @@
   {
     "serviceName": "auto-vm-test-AutoScaling",
     "vmPrefix": "auto-vm-test",
-    "templateId": "template-1765426433439",
-    "enabled": true,
+    "templateId": "vcenter-1764921538924-ubuntu-22.04-golden-image-template",
+    "enabled": false,
     "monitoring": {
       "cpuThreshold": 80,
       "memoryThreshold": 80,
@@ -31,7 +31,7 @@
       "ipPoolEnd": "10.255.48.202",
       "subnet": "255.255.255.0",
       "gateway": "10.255.48.1",
-      "vlan": "Vlan-1048"
+      "vlan": "vlan_1048"
     },
     "vcenter": {
       "resourcePool": "/Datacenter/host/Cluster-01/Resources",
@@ -40,6 +40,6 @@
     "sshKeyPath": "/home/ubuntu/workspace/vm-autoscaling/pemkey/danainfra",
     "id": "config-1765353828931",
     "createdAt": "2025-12-10T08:03:48.931Z",
-    "updatedAt": "2025-12-11T04:32:49.974Z"
+    "updatedAt": "2025-12-10T08:03:48.931Z"
   }
 ]

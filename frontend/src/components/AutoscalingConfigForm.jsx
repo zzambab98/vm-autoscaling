@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { autoscalingApi } from '../services/autoscalingApi';
 import { templateApi } from '../services/templateApi';
 import f5Api from '../services/f5Api';
-import { prometheusApi } from '../services/api';
+import { prometheusApi, networkApi } from '../services/api';
 import { getSshKeys } from '../services/sshKeyApi';
 
 function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
@@ -12,6 +12,7 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
   const [f5Error, setF5Error] = useState(null);
   const [prometheusJobs, setPrometheusJobs] = useState([]);
   const [sshKeys, setSshKeys] = useState([]);
+  const [networks, setNetworks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [formData, setFormData] = useState({
@@ -60,6 +61,7 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
     loadF5Data();
     loadPrometheusJobs();
     loadSshKeys();
+    loadNetworks();
     // configId가 있고 'new'가 아닐 때만 설정 조회
     if (configId && configId !== 'new') {
       loadConfig();
@@ -101,6 +103,18 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
     } catch (error) {
       console.error('SSH 키 목록 조회 실패:', error);
       setSshKeys([]);
+    }
+  };
+
+  const loadNetworks = async () => {
+    try {
+      const result = await networkApi.getNetworks();
+      if (result.success) {
+        setNetworks(result.networks || []);
+      }
+    } catch (error) {
+      console.error('네트워크 목록 조회 실패:', error);
+      setNetworks([]);
     }
   };
 
@@ -184,12 +198,57 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
     setLoading(true);
     setMessage(null);
 
+    // 서비스 이름 공백 검증
+    const trimmedServiceName = formData.serviceName.trim();
+    if (formData.serviceName !== trimmedServiceName) {
+      const hasLeadingSpace = formData.serviceName.startsWith(' ');
+      const hasTrailingSpace = formData.serviceName.endsWith(' ');
+      let spaceMessage = '서비스 이름에 공백이 포함되어 있습니다. ';
+      if (hasLeadingSpace && hasTrailingSpace) {
+        spaceMessage += '앞뒤 공백을 제거해주세요.';
+      } else if (hasLeadingSpace) {
+        spaceMessage += '앞 공백을 제거해주세요.';
+      } else if (hasTrailingSpace) {
+        spaceMessage += '뒤 공백을 제거해주세요.';
+      }
+      spaceMessage += ` (현재: "${formData.serviceName}", 수정 후: "${trimmedServiceName}")`;
+      setMessage({ type: 'error', text: spaceMessage });
+      setLoading(false);
+      return;
+    }
+
+    // VM Prefix 공백 검증
+    const trimmedVmPrefix = formData.vmPrefix.trim();
+    if (formData.vmPrefix !== trimmedVmPrefix) {
+      const hasLeadingSpace = formData.vmPrefix.startsWith(' ');
+      const hasTrailingSpace = formData.vmPrefix.endsWith(' ');
+      let spaceMessage = 'VM 이름 Prefix에 공백이 포함되어 있습니다. ';
+      if (hasLeadingSpace && hasTrailingSpace) {
+        spaceMessage += '앞뒤 공백을 제거해주세요.';
+      } else if (hasLeadingSpace) {
+        spaceMessage += '앞 공백을 제거해주세요.';
+      } else if (hasTrailingSpace) {
+        spaceMessage += '뒤 공백을 제거해주세요.';
+      }
+      spaceMessage += ` (현재: "${formData.vmPrefix}", 수정 후: "${trimmedVmPrefix}")`;
+      setMessage({ type: 'error', text: spaceMessage });
+      setLoading(false);
+      return;
+    }
+
     try {
+      // 공백이 제거된 값으로 폼 데이터 업데이트
+      const cleanedFormData = {
+        ...formData,
+        serviceName: trimmedServiceName,
+        vmPrefix: trimmedVmPrefix
+      };
+
       let result;
       if (configId) {
-        result = await autoscalingApi.updateConfig(configId, formData);
+        result = await autoscalingApi.updateConfig(configId, cleanedFormData);
       } else {
-        result = await autoscalingApi.createConfig(formData);
+        result = await autoscalingApi.createConfig(cleanedFormData);
       }
 
       if (result.success) {
@@ -794,13 +853,23 @@ function AutoscalingConfigForm({ configId, onSuccess, onCancel }) {
           </div>
           <div>
             <label className="label">VLAN</label>
-            <input
-              type="text"
+            <select
               className="input"
               value={formData.network.vlan}
               onChange={(e) => updateNestedField('network', 'vlan', e.target.value)}
-              placeholder="예: vlan_1048"
-            />
+            >
+              <option value="">VLAN 선택</option>
+              {networks.map((network) => (
+                <option key={network.path} value={network.name}>
+                  {network.displayName} ({network.name})
+                </option>
+              ))}
+            </select>
+            {networks.length === 0 && (
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.9em', marginTop: '5px' }}>
+                네트워크 목록을 불러올 수 없습니다. vCenter 연결을 확인하세요.
+              </p>
+            )}
           </div>
         </div>
 

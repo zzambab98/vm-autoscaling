@@ -311,14 +311,61 @@ print(json.dumps(targets))
         }
     }
     
+    environment {
+        BACKEND_API_URL = 'http://10.255.48.253:6010'
+    }
+    
     post {
         success {
-            echo "=== 스케일인 성공 ==="
-            echo "제거된 VM 수: ${env.REMOVE_COUNT}"
-            echo "제거된 VM IP: ${env.VMS_TO_REMOVE}"
-            echo "제거된 VM 이름: ${env.VM_NAMES}"
-            echo "남은 VM 수: ${env.CURRENT_VM_COUNT.toInteger() - env.REMOVE_COUNT.toInteger()}"
-            // 성공 알림 (Slack, Email 등)
+            script {
+                echo "=== 스케일인 성공 ==="
+                echo "제거된 VM 수: ${env.REMOVE_COUNT}"
+                echo "제거된 VM IP: ${env.VMS_TO_REMOVE}"
+                echo "제거된 VM 이름: ${env.VM_NAMES_TO_REMOVE}"
+                echo "남은 VM 수: ${env.CURRENT_VM_COUNT.toInteger() - env.REMOVE_COUNT.toInteger()}"
+                
+                // 백엔드로 VM 삭제 완료 웹훅 전송 (각 VM마다)
+                if (env.VMS_TO_REMOVE && env.VM_NAMES_TO_REMOVE && params.SERVICE_NAME && params.PROMETHEUS_JOB_NAME) {
+                    def vmIps = env.VMS_TO_REMOVE.split(',')
+                    def vmNames = env.VM_NAMES_TO_REMOVE.split(',')
+                    
+                    for (int i = 0; i < vmIps.size(); i++) {
+                        def vmIp = vmIps[i]
+                        def vmName = vmNames[i]
+                        
+                        try {
+                            def webhookPayload = [
+                                serviceName: params.SERVICE_NAME,
+                                vmName: vmName,
+                                vmIp: vmIp,
+                                prometheusJobName: params.PROMETHEUS_JOB_NAME,
+                                f5PoolName: params.F5_POOL_NAME ?: '',
+                                f5VipPort: params.VIP_PORT ?: '80'
+                            ]
+                            
+                            def webhookResponse = sh(
+                                script: """
+                                    curl -sf -X POST \
+                                        -H "Content-Type: application/json" \
+                                        -d '${groovy.json.JsonOutput.toJson(webhookPayload)}' \
+                                        "${env.BACKEND_API_URL}/api/webhook/jenkins/vm-deleted"
+                                """,
+                                returnStdout: true
+                            )
+                            
+                            echo "✅ 백엔드 웹훅 전송 완료: ${vmName} (${vmIp})"
+                            echo "웹훅 응답: ${webhookResponse}"
+                        } catch (Exception e) {
+                            echo "⚠️ 백엔드 웹훅 전송 실패 (경고): ${vmName} - ${e.getMessage()}"
+                            // 웹훅 실패해도 파이프라인은 성공으로 처리
+                        }
+                    }
+                } else {
+                    echo "⚠️ VM 정보가 불완전하여 백엔드 웹훅을 전송하지 않습니다."
+                }
+                
+                // 성공 알림 (Slack, Email 등)
+            }
         }
         failure {
             echo "=== 스케일인 실패 ==="
