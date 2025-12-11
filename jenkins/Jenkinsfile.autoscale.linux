@@ -172,35 +172,51 @@ pipeline {
                             if (configData.templateId) {
                                 echo "📝 Template 정보 조회: ${configData.templateId}"
                                 try {
+                                    // HTTP 응답 코드와 본문을 분리하여 가져오기
                                     def templateResponseText = sh(
-                                        script: """curl -s -w "\\n%{http_code}" -H "Content-Type: application/json" "${env.BACKEND_API_URL}/api/templates/${configData.templateId}" """,
+                                        script: """curl -s -w "\\nHTTP_CODE:%{http_code}" -H "Content-Type: application/json" "${env.BACKEND_API_URL}/api/templates/${configData.templateId}" """,
                                         returnStdout: true
                                     ).trim()
 
-                                    def lines = templateResponseText.split('\n')
-                                    def httpCode = lines[-1]
-                                    def responseBody = lines[0..-2].join('\n')
+                                    // HTTP 코드 추출
+                                    def httpCodeMatch = templateResponseText =~ /HTTP_CODE:(\\d+)/
+                                    def httpCode = httpCodeMatch ? httpCodeMatch[0][1] : '000'
+                                    def responseBody = templateResponseText.replaceAll(/HTTP_CODE:\\d+$/, '').trim()
 
                                     echo "🔍 Template API HTTP 응답 코드: ${httpCode}"
+                                    echo "🔍 Template API 응답 본문 (처음 200자): ${responseBody.take(200)}"
 
-                                    if (httpCode == '200') {
-                                        def templateJson = new groovy.json.JsonSlurper().parseText(responseBody)
-                                        def templateName = templateJson.template?.name ?: templateJson.name
+                                    if (httpCode == '200' && responseBody) {
+                                        try {
+                                            // JSON 파싱 시 직렬화 문제 방지를 위해 안전하게 처리
+                                            def templateJson = readJSON text: responseBody
+                                            def templateName = templateJson?.template?.name ?: templateJson?.name
 
-                                        if (templateName && templateName != '' && templateName != 'null') {
-                                            env.VCENTER_TEMPLATE = templateName
-                                            echo "✅ Template 이름: ${env.VCENTER_TEMPLATE}"
-                                        } else {
-                                            echo "⚠️ Template 이름이 비어있습니다. 기본값 사용: auto-vm-test-template"
+                                            if (templateName && templateName != '' && templateName != 'null') {
+                                                // 템플릿 이름 앞뒤 공백 제거 (vCenter에서 정확한 이름으로 조회하기 위해)
+                                                env.VCENTER_TEMPLATE = templateName.toString().trim()
+                                                echo "✅ Template 이름: ${env.VCENTER_TEMPLATE}"
+                                            } else {
+                                                echo "⚠️ Template 이름이 비어있습니다. 기본값 사용: auto-vm-test-template"
+                                                env.VCENTER_TEMPLATE = 'auto-vm-test-template'
+                                            }
+                                        } catch (JSONException jsonErr) {
+                                            echo "⚠️ JSON 파싱 실패: ${jsonErr.message}"
+                                            echo "⚠️ 응답 본문: ${responseBody}"
+                                            echo "⚠️ 기본값 사용: auto-vm-test-template"
                                             env.VCENTER_TEMPLATE = 'auto-vm-test-template'
                                         }
                                     } else {
                                         echo "⚠️ Template API 호출 실패 (HTTP ${httpCode}). 기본값 사용: auto-vm-test-template"
+                                        if (responseBody) {
+                                            echo "⚠️ 응답 본문: ${responseBody.take(500)}"
+                                        }
                                         env.VCENTER_TEMPLATE = 'auto-vm-test-template'
                                     }
                                 } catch (Exception tmplErr) {
                                     echo "⚠️ Template 조회 중 예외 발생: ${tmplErr.class.name}"
-                                    echo "기본값 사용: auto-vm-test-template"
+                                    echo "⚠️ 예외 메시지: ${tmplErr.message}"
+                                    echo "⚠️ 기본값 사용: auto-vm-test-template"
                                     env.VCENTER_TEMPLATE = 'auto-vm-test-template'
                                 }
                             } else {
@@ -254,6 +270,10 @@ pipeline {
                             env.VM_PREFIX = configData.vmPrefix ?: ''
                             echo "SSH 키 경로: ${env.SSH_KEY_PATH ?: '미지정 (Fallback 사용)'}"
                             echo "VM Prefix: ${env.VM_PREFIX ?: '미지정 (기본값 사용)'}"
+                            
+                            // Prometheus Job 이름 설정
+                            env.PROMETHEUS_JOB_NAME = configData.monitoring?.prometheusJobName ?: configData.prometheusJobName ?: ''
+                            echo "Prometheus Job 이름: ${env.PROMETHEUS_JOB_NAME ?: '미지정'}"
                             
                             // vCenter 정보 설정 (LazyMap 직접 접근)
                             def vcenterInfo = configData.vcenter
@@ -415,8 +435,8 @@ pipeline {
                             // DNS 서버 (기본값)
                             def dnsServers = '10.255.0.10'
                             
-                            // Customization Spec 이름 (vCenter에서 미리 생성해야 함)
-                            def customizationSpecName = env.CUSTOMIZATION_SPEC_NAME ?: 'DanaLinuxSpec'
+                            // Customization Spec 이름 (환경 변수로 제공되면 사용, 없으면 직접 IP 설정)
+                            def customizationSpecName = env.CUSTOMIZATION_SPEC_NAME ?: null
                             
                             // ==========================================
                             // (1) VM 클론 (전원 OFF 상태)
@@ -465,6 +485,11 @@ pipeline {
                                 export GOVC_PASSWORD="${govcPass}"
                                 export GOVC_INSECURE="${env.GOVC_INSECURE}"
                                 
+                            """
+                            
+                            if (customizationSpecName && customizationSpecName.trim() != '') {
+                                // Customization Spec 사용
+                                customizeCommand += """
                                 govc vm.customize \\
                                     -vm "${vmName}" \\
                                     -type=Linux \\
@@ -473,7 +498,19 @@ pipeline {
                                     -gateway="${gateway}" \\
                                     -dns-server="${dnsServers}" \\
                                     "${customizationSpecName}"
-                            """
+                                """
+                            } else {
+                                // Customization Spec 없이 직접 IP 설정
+                                customizeCommand += """
+                                govc vm.customize \\
+                                    -vm "${vmName}" \\
+                                    -type=Linux \\
+                                    -ip="${vmIP}" \\
+                                    -netmask="${subnet}" \\
+                                    -gateway="${gateway}" \\
+                                    -dns-server="${dnsServers}"
+                                """
+                            }
                             
                             sh customizeCommand
                             echo "✅ vCenter Guest Customization 적용 완료 (IP: ${vmIP})"
@@ -643,7 +680,41 @@ pipeline {
             }
         }
         success {
-            echo "✅ 자동 스케일아웃 성공"
+            script {
+                echo "✅ 자동 스케일아웃 성공"
+                
+                // 백엔드로 VM 생성 완료 웹훅 전송
+                if (env.NEW_VM_NAME && env.NEW_VM_IP && env.ALERT_SERVICE) {
+                    try {
+                        def webhookPayload = [
+                            serviceName: env.ALERT_SERVICE,
+                            vmName: env.NEW_VM_NAME,
+                            vmIp: env.NEW_VM_IP,
+                            prometheusJobName: env.PROMETHEUS_JOB_NAME ?: '',
+                            f5PoolName: env.F5_POOL_NAME ?: '',
+                            f5VipPort: env.F5_POOL_PORT ?: '80'
+                        ]
+                        
+                        def webhookResponse = sh(
+                            script: """
+                                curl -sf -X POST \
+                                    -H "Content-Type: application/json" \
+                                    -d '${groovy.json.JsonOutput.toJson(webhookPayload)}' \
+                                    "${env.BACKEND_API_URL}/api/webhook/jenkins/vm-created"
+                            """,
+                            returnStdout: true
+                        )
+                        
+                        echo "✅ 백엔드 웹훅 전송 완료: ${env.NEW_VM_NAME}"
+                        echo "웹훅 응답: ${webhookResponse}"
+                    } catch (Exception e) {
+                        echo "⚠️ 백엔드 웹훅 전송 실패 (경고): ${e.getMessage()}"
+                        // 웹훅 실패해도 파이프라인은 성공으로 처리
+                    }
+                } else {
+                    echo "⚠️ VM 정보가 불완전하여 백엔드 웹훅을 전송하지 않습니다."
+                }
+            }
         }
         failure {
             echo "❌ 자동 스케일아웃 실패"
