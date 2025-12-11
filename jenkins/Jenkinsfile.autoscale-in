@@ -160,13 +160,14 @@ for target in data.get('data', {}).get('activeTargets', []):
             # instance는 'IP:PORT' 형식이므로 IP만 추출
             ip = instance.split(':')[0]
             targets.append(ip)
-print(json.dumps(targets))
+print('\\n'.join(targets))
 "
                         """,
                         returnStdout: true
                     ).trim()
                     
-                    def targets = readJSON text: targetsJson
+                    // targets를 리스트로 변환
+                    def targets = targetsJson ? targetsJson.split('\n').findAll { it.trim() } : []
                     
                     if (!targets || targets.size() == 0) {
                         error("Prometheus Job '${jobName}'에 등록된 VM이 없습니다.")
