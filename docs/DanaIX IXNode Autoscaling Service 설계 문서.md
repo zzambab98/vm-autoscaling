@@ -963,7 +963,12 @@
   PROM_REMOVE --> VM_POWER_OFF[vCenter: VM 전원 끄기]
   VM_POWER_OFF --> VM_DELETE[vCenter: VM 삭제]
   VM_DELETE --> WEBHOOK_CALLBACK[Backend: VM 삭제 완료 웹훅]
-  WEBHOOK_CALLBACK --> COOLDOWN_START[쿨다운 시작]
+  WEBHOOK_CALLBACK --> CHECK_VM_COUNT{현재 VM 개수 확인}
+  CHECK_VM_COUNT -->|currentVmCount <= minVms| SWITCH_OFF[스케일인 스위치 OFF]
+  SWITCH_OFF --> SILENCE_CREATE[Alertmanager Silence 생성<br/>30분간 웹훅 차단]
+  CHECK_VM_COUNT -->|currentVmCount > minVms| SWITCH_ON[스케일인 스위치 ON<br/>Silence 삭제]
+  SILENCE_CREATE --> COOLDOWN_START[쿨다운 시작]
+  SWITCH_ON --> COOLDOWN_START
   COOLDOWN_START --> END([완료])
   
   REJECT1 --> END
@@ -1164,6 +1169,7 @@ AND
     <li><b>스케일 아웃 차단 조건:</b> currentVmCount &gt;= maxVms → 스케일 아웃 차단</li>
     <li><b>스케일 인 차단 조건:</b> currentVmCount &lt;= minVms → 스케일 인 차단</li>
     <li><b>스케일인 스위치 방식:</b> 최소 VM 개수 도달 시 스케일인 스위치 OFF, Alertmanager Silence 생성하여 웹훅 자체 차단</li>
+    <li><b>VM 삭제 완료 시 Silence 생성:</b> VM 삭제 완료 웹훅 수신 시 현재 VM 개수를 확인하여 최소 개수 도달 시 스위치 OFF 및 Silence 생성 (웹훅 발생 원천 차단)</li>
     <li><b>스위치 자동 복구:</b> VM 개수가 최소 개수 이상이 되면 스위치 자동 ON, Silence 삭제</li>
     <li><b>쿨다운 시작:</b> 최소/최대 개수에 도달한 시점에 쿨다운을 시작하여 Alertmanager 반복 알림에 의한 파이프라인 폭주 방지</li>
     <li><b>로직 단순화:</b> 불필요한 중복 체크 제거, Prometheus Job 타겟만으로 최소/최대 개수 판단</li>
@@ -1255,6 +1261,7 @@ export function decideScaleAction(
     <li>스케일 아웃: currentVmCount &gt;= maxVms → 차단</li>
     <li>스케일 인: currentVmCount &lt;= minVms → 차단 + 스위치 OFF + Silence 생성</li>
     <li>스케일인 스위치: 최소 VM 개수 도달 시 OFF, Alertmanager Silence로 웹훅 자체 차단</li>
+    <li>VM 삭제 완료 시: VM 삭제 완료 웹훅 수신 시 VM 개수 확인하여 최소 개수 도달 시 스위치 OFF 및 Silence 생성 (이중 방어)</li>
     <li>스위치 자동 복구: VM 개수 증가 시 자동 ON, Silence 삭제</li>
     <li>최소/최대 도달 시 쿨다운을 시작해 Alert 반복 알림에 의한 불필요한 실행을 막는다.</li>
     <li>웹훅 흐름: Alertmanager → Backend (검증: 스위치, 쿨다운, VM 개수) → Jenkins</li>

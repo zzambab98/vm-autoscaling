@@ -151,7 +151,7 @@ function AlertmanagerRouting() {
               className="input"
               value={formData.webhookUrl}
               onChange={(e) => setFormData({ ...formData, webhookUrl: e.target.value })}
-              placeholder={DEFAULT_WEBHOOK_URL}
+              placeholder={getDefaultWebhookUrl()}
             />
           </div>
         </div>

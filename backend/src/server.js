@@ -1516,6 +1516,16 @@ const server = http.createServer((req, res) => {
           const switchUpdateResult = updateScaleInSwitch(serviceName, currentVmCount, minVms);
           if (!switchUpdateResult.enabled) {
             console.log(`[Webhook] VM 삭제 완료 후 스케일인 스위치 OFF: ${serviceName} - 스케일인 비활성화 (현재 VM: ${currentVmCount}개, 최소: ${minVms}개)`);
+            
+            // 스위치가 OFF되면 Silence 생성하여 웹훅 차단
+            try {
+              const { createScaleInSilence } = require('./services/alertmanagerService');
+              const silenceResult = await createScaleInSilence(serviceName, 30);
+              console.log(`[Webhook] VM 삭제 완료 후 Alertmanager Silence 생성 성공: ${serviceName} - ${silenceResult.silenceID} (30분간 웹훅 차단)`);
+            } catch (error) {
+              console.error(`[Webhook] VM 삭제 완료 후 Alertmanager Silence 생성 실패 (경고):`, error.message);
+              // Silence 생성 실패해도 스위치로 차단
+            }
           }
         } catch (error) {
           console.warn(`[Webhook] 스케일인 스위치 상태 업데이트 실패 (경고):`, error.message);

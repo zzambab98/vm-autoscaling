@@ -87,12 +87,12 @@ function App() {
                     fontFamily: "'Space Grotesk', 'Inter', sans-serif"
                   }}
                 >
-                  DanaIX VM 오토스케일링 관리 시스템
+                  DanaIX VM Autoscaling Management System
                 </h1>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <button
                   onClick={() => {
                     setLanguage('ko');
@@ -101,70 +101,74 @@ function App() {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
+                    gap: '10px',
                     padding: '12px 20px',
-                    background: language === 'ko' 
-                      ? 'linear-gradient(120deg, #546bff, #7c3aed)' 
-                      : 'linear-gradient(120deg, #546bff, #7c3aed)',
+                    background: 'linear-gradient(90deg, #546bff, #7c3aed)',
                     color: '#ffffff',
                     border: 'none',
-                    borderRadius: '10px',
-                    fontSize: '14px',
-                    fontWeight: 600,
+                    borderRadius: '12px',
+                    fontSize: '13px',
+                    fontWeight: 500,
                     cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(84, 107, 255, 0.3)',
                     transition: 'all 0.2s',
-                    opacity: language === 'ko' ? 1 : 0.7,
-                    fontFamily: "'Poppins', 'Noto Sans KR', sans-serif"
+                    fontFamily: "'Poppins', 'Noto Sans KR', sans-serif",
+                    minWidth: '200px'
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = 'translateY(-2px)';
                     e.currentTarget.style.boxShadow = '0 6px 16px rgba(84, 107, 255, 0.4)';
-                    if (language !== 'ko') e.currentTarget.style.opacity = '1';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(84, 107, 255, 0.3)';
-                    if (language !== 'ko') e.currentTarget.style.opacity = '0.7';
+                    e.currentTarget.style.boxShadow = 'none';
                   }}
                 >
-                  <span>📄</span>
-                  <span>설계 문서 (한글)</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                  <span>Design Document (Korean)</span>
                 </button>
-              <button
-                onClick={() => {
-                  setLanguage('en');
-                  window.open(`${API_BASE_URL}/docs/design-en`, '_blank');
-                }}
+                <button
+                  onClick={() => {
+                    setLanguage('en');
+                    window.open(`${API_BASE_URL}/docs/design-en`, '_blank');
+                  }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
+                    gap: '10px',
                     padding: '12px 20px',
-                    background: 'linear-gradient(120deg, #7c3aed, #a855f7)',
+                    background: 'linear-gradient(90deg, #546bff, #7c3aed)',
                     color: '#ffffff',
                     border: 'none',
-                    borderRadius: '10px',
-                    fontSize: '14px',
-                    fontWeight: 600,
+                    borderRadius: '12px',
+                    fontSize: '13px',
+                    fontWeight: 500,
                     cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)',
                     transition: 'all 0.2s',
-                    opacity: language === 'en' ? 1 : 0.7,
-                    fontFamily: "'Poppins', 'Noto Sans KR', sans-serif"
+                    fontFamily: "'Poppins', 'Noto Sans KR', sans-serif",
+                    minWidth: '200px'
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(124, 58, 237, 0.4)';
-                    if (language !== 'en') e.currentTarget.style.opacity = '1';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(84, 107, 255, 0.4)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(124, 58, 237, 0.3)';
-                    if (language !== 'en') e.currentTarget.style.opacity = '0.7';
+                    e.currentTarget.style.boxShadow = 'none';
                   }}
                 >
-                  <span>📄</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
                   <span>Design Doc (EN)</span>
                 </button>
               </div>

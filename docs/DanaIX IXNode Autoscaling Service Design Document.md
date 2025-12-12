@@ -964,7 +964,12 @@
   PROM_REMOVE --> VM_POWER_OFF[vCenter: VM Power Off]
   VM_POWER_OFF --> VM_DELETE[vCenter: VM Deletion]
   VM_DELETE --> WEBHOOK_CALLBACK[Backend: VM Deletion Complete Webhook]
-  WEBHOOK_CALLBACK --> COOLDOWN_START[Start Cooldown]
+  WEBHOOK_CALLBACK --> CHECK_VM_COUNT{Check Current VM Count}
+  CHECK_VM_COUNT -->|currentVmCount <= minVms| SWITCH_OFF[Scale-In Switch OFF]
+  SWITCH_OFF --> SILENCE_CREATE[Create Alertmanager Silence<br/>Block webhooks for 30 minutes]
+  CHECK_VM_COUNT -->|currentVmCount > minVms| SWITCH_ON[Scale-In Switch ON<br/>Delete Silence]
+  SILENCE_CREATE --> COOLDOWN_START[Start Cooldown]
+  SWITCH_ON --> COOLDOWN_START
   COOLDOWN_START --> END([Complete])
   
   REJECT1 --> END
@@ -1165,6 +1170,7 @@ AND
     <li><b>Scale-Out Block Condition:</b> currentVmCount &gt;= maxVms → Scale-Out Block</li>
     <li><b>Scale-In Block Condition:</b> currentVmCount &lt;= minVms → Scale-In Block</li>
     <li><b>Scale-In Switch Method:</b> When minimum VM count is reached, turn scale-in switch OFF and create Alertmanager Silence to block webhooks</li>
+    <li><b>Silence Creation on VM Deletion:</b> When VM deletion complete webhook is received, check current VM count and create Silence if minimum count is reached (double protection)</li>
     <li><b>Automatic Switch Recovery:</b> When VM count reaches above minimum, automatically turn switch ON and delete Silence</li>
     <li><b>Start Cooldown:</b> Start cooldown when min/max count is reached to prevent pipeline overload from Alertmanager repeated alerts</li>
     <li><b>Logic Simplification:</b> Remove unnecessary duplicate checks, determine min/max count only from Prometheus Job targets</li>
@@ -1256,6 +1262,7 @@ export function decideScaleAction(
     <li>Scale-Out: currentVmCount &gt;= maxVms → Block</li>
     <li>Scale-In: currentVmCount &lt;= minVms → Block + Switch OFF + Create Silence</li>
     <li>Scale-In Switch: OFF when minimum VM count is reached, block webhooks via Alertmanager Silence</li>
+    <li>On VM Deletion Complete: When VM deletion webhook is received, check VM count and create Silence if minimum count is reached (double protection)</li>
     <li>Automatic Switch Recovery: Automatically ON when VM count increases, delete Silence</li>
     <li>Start cooldown when min/max is reached to prevent unnecessary execution from repeated alert notifications.</li>
     <li>Webhook Flow: Alertmanager → Backend (validation: switch, cooldown, VM count) → Jenkins</li>
