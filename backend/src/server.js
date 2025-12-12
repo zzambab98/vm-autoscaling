@@ -1116,7 +1116,6 @@ const server = http.createServer((req, res) => {
         // 설정 정보 조회
         const { getConfigs } = require('./services/autoscalingService');
         const { getTemplateById } = require('./services/templateService');
-        const { checkCooldown } = require('./services/cooldownService');
         const configs = await getConfigs();
         const config = configs.find(c => c.serviceName === serviceName && c.enabled);
         
