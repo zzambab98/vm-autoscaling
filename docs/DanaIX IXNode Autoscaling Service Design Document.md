@@ -1086,7 +1086,7 @@ AND
   ) &lt; SCALE_IN_MEMORY_THRESHOLD
 )</code></pre>
   <div class="info">
-    <p><strong>설명:</strong> Scale-in occurs only when the maximum CPU/Memory usage of all instances is below the threshold using the <code>max()</code> function. That is, scale-in is triggered only when all VMs have low usage.</p>
+    <p><strong>Description:</strong> Scale-in occurs only when the maximum CPU/Memory usage of all instances is below the threshold using the <code>max()</code> function. That is, scale-in is triggered only when all VMs have low usage.</p>
   </div>
 
   <!-- 6. Scale-In/Out Decision Logic (Changes) -->
@@ -1336,7 +1336,7 @@ export function decideScaleAction(
   <!-- 10. Events -->
   <h2>10. Autoscaling Event Management (Concept)</h2>
   <ul>
-    <li>Scale-Out/Scale-In Execution 시 Backend로 이벤트 기록 요청</li>
+    <li>Scale-Out/Scale-In Execution 시 Backend로 Event 기록 요청</li>
     <li>Expected Fields
       <ul>
         <li>serviceName, action(scale-out | scale-in)</li>
@@ -1397,440 +1397,440 @@ export function decideScaleAction(
     <li><b>Monitoring Dashboard 확인</b>
       <ul>
         <li>CPU/Memory Usage 그래프 모니터링</li>
-        <li>Current VM Count 및 스케일 이벤트 확인</li>
-        <li>Alert 상태 확인</li>
+        <li>Current VM Count 및 Check Scale Events</li>
+        <li>Check alert status</li>
       </ul>
     </li>
-    <li><b>스케일 이벤트 확인</b>
+    <li><b>Check Scale Events</b>
       <ul>
-        <li>스케일아웃/인 이벤트 목록에서 최근 작업 확인</li>
-        <li>Jenkins 빌드 로그 확인</li>
-        <li>에러 발생 시 롤백 여부 확인</li>
+        <li>Check recent operations from scale-out/in event list</li>
+        <li>Check Jenkins build logs</li>
+        <li>Check if rollback is needed when errors occur</li>
       </ul>
     </li>
-    <li><b>설정 변경</b>
+    <li><b>Configuration Changes</b>
       <ul>
-        <li>임계값 조정 시 설정 수정 후 저장</li>
-        <li>Prometheus Alert Rule 자동 업데이트 확인</li>
-        <li>변경사항 적용 확인</li>
+        <li>Modify and save configuration when adjusting thresholds</li>
+        <li>Verify automatic Prometheus Alert Rule update</li>
+        <li>Verify changes are applied</li>
       </ul>
     </li>
   </ul>
 
-  <h3>11.3 트러블슈팅</h3>
+  <h3>11.3 Troubleshooting</h3>
   <div class="box">
-    <h4>문제: 스케일아웃이 발생하지 않음</h4>
+    <h4>Issue: Scale-Out Not Occurring</h4>
     <ul>
-      <li>Prometheus Alert Rule이 정상적으로 생성되었는지 확인</li>
-      <li>Alertmanager Route가 올바르게 설정되었는지 확인</li>
-      <li>쿨다운 기간이 지났는지 확인</li>
-      <li>최대 VM 개수에 Reached하지 않았는지 확인</li>
-      <li>Jenkins Job이 정상적으로 생성되었는지 확인</li>
+      <li>Verify Prometheus Alert Rule is created correctly</li>
+      <li>Verify Alertmanager Route is configured correctly</li>
+      <li>Verify cooldown period has passed</li>
+      <li>Verify max VM count is not reached</li>
+      <li>Verify Jenkins Job is created correctly</li>
     </ul>
 
-    <h4>문제: 스케일인으로 VM이 계속 삭제됨</h4>
+    <h4>Issue: VMs Continuously Deleted by Scale-In</h4>
     <ul>
-      <li>최소 VM 개수 설정 확인 (기본값: 2)</li>
-      <li>스케일인 CPU/Memory 임계값이 너무 높은지 확인</li>
-      <li>쿨다운 기간 확인</li>
-      <li>Alertmanager가 반복 알림을 보내는지 확인</li>
+      <li>Check minimum VM count setting (default: 2)</li>
+      <li>Check if scale-in CPU/Memory threshold is too high</li>
+      <li>Check cooldown period</li>
+      <li>Check if Alertmanager is sending repeated alerts</li>
     </ul>
 
-    <h4>문제: VM Creation 후 F5에 등록되지 않음</h4>
+    <h4>Issue: VM Not Registered to F5 After Creation</h4>
     <ul>
       <li>Jenkins 빌드 로그에서 F5 Registration 단계 확인</li>
-      <li>F5 Pool 이름 및 VIP Configuration 확인</li>
-      <li>F5 인증 정보 확인</li>
+      <li>Check F5 Pool name and VIP configuration</li>
+      <li>Check F5 credentials</li>
       <li>Network 연결 확인</li>
     </ul>
 
-    <h4>문제: Prometheus에 Target이 추가되지 않음</h4>
+    <h4>Issue: Target Not Added to Prometheus</h4>
     <ul>
-      <li>Prometheus Job 이름이 올바른지 확인</li>
-      <li>VM IP와 포트(9100)가 올바른지 확인</li>
-      <li>Prometheus 설정 파일이 올바르게 업데이트되었는지 확인</li>
-      <li>Prometheus 컨테이너 재시작 여부 확인</li>
+      <li>Verify Prometheus Job name is correct</li>
+      <li>Verify VM IP and port (9100) are correct</li>
+      <li>Verify Prometheus configuration file is updated correctly</li>
+      <li>Check if Prometheus container needs restart</li>
     </ul>
   </div>
 
-  <!-- 12. 보안 -->
-  <h2>12. 보안 및 권한 구조</h2>
+  <!-- 12. Security -->
+  <h2>12. Security and Permission Structure</h2>
 
-  <h3>12.1 인증 및 권한 관리</h3>
+  <h3>12.1 Authentication and Permission Management</h3>
   <ul>
-    <li><b>vCenter 계정</b>
+    <li><b>vCenter Account</b>
       <ul>
-        <li>전용 서비스 계정 사용 (예: svc-auto)</li>
-        <li>VM Creation/삭제, 템플릿 조회 권한만 부여</li>
-        <li>관리자 권한 불필요</li>
+        <li>Use dedicated service account (e.g., svc-auto)</li>
+        <li>Grant only VM creation/deletion and template query permissions</li>
+        <li>Administrator privileges not required</li>
       </ul>
     </li>
-    <li><b>Jenkins 계정</b>
+    <li><b>Jenkins Account</b>
       <ul>
-        <li>Webhook 트리거용 계정 (예: danacloud)</li>
-        <li>Job 실행 권한만 부여</li>
-        <li>Jenkins Credentials로 인증 정보 관리</li>
+        <li>Account for webhook triggers (e.g., danacloud)</li>
+        <li>Grant only job execution permissions</li>
+        <li>Manage credentials using Jenkins Credentials</li>
       </ul>
     </li>
-    <li><b>F5 계정</b>
+    <li><b>F5 Account</b>
       <ul>
         <li>Add Pool Member/제거 권한만 부여</li>
-        <li>관리자 권한 불필요</li>
-        <li>Jenkins Credentials로 관리</li>
+        <li>Administrator privileges not required</li>
+        <li>Manage using Jenkins Credentials</li>
       </ul>
     </li>
-    <li><b>PLG Stack 계정</b>
+    <li><b>PLG Stack Account</b>
       <ul>
-        <li>SSH 접근용 계정 (예: ubuntu)</li>
-        <li>설정 파일 수정 권한만 부여</li>
-        <li>SSH 키 기반 인증 사용</li>
+        <li>Account for SSH access (e.g., ubuntu)</li>
+        <li>Grant only configuration file modification permissions</li>
+        <li>Use SSH key-based authentication</li>
       </ul>
     </li>
   </ul>
 
-  <h3>12.2 데이터 보안</h3>
+  <h3>12.2 Data Security</h3>
   <ul>
-    <li><b>환경 변수 관리</b>
+    <li><b>Environment Variable Management</b>
       <ul>
-        <li>모든 민감 정보는 환경 변수로 관리</li>
-        <li>코드에 하드코딩 금지</li>
-        <li>.env 파일은 .gitignore에 추가</li>
+        <li>Manage all sensitive information as environment variables</li>
+        <li>No hardcoding in code</li>
+        <li>Add .env file to .gitignore</li>
       </ul>
     </li>
     <li><b>Network 보안</b>
       <ul>
         <li>Backend/Frontend는 사내망에서만 접근 Available</li>
-        <li>VPN 또는 방화벽 규칙으로 외부 접근 Block</li>
+        <li>Block external access via VPN or firewall rules</li>
         <li>서비스 간 통신은 내부 Network 사용</li>
       </ul>
     </li>
-    <li><b>SSH 키 관리</b>
+    <li><b>SSH Key Management</b>
       <ul>
-        <li>SSH 키는 pemkey 디렉토리에 저장</li>
-        <li>파일 권한 600으로 설정</li>
-        <li>Git에 커밋하지 않음</li>
+        <li>Store SSH keys in pemkey directory</li>
+        <li>Set file permissions to 600</li>
+        <li>Do not commit to Git</li>
       </ul>
     </li>
   </ul>
 
-  <h3>12.3 보안 모범 사례</h3>
+  <h3>12.3 Security Best Practices</h3>
   <ul>
-    <li>정기적인 보안 업데이트 및 패치 적용</li>
-    <li>로그 모니터링 및 이상 징후 탐지</li>
-    <li>정기적인 권한 검토 및 최소 권한 원칙 준수</li>
-    <li>민감 정보 암호화 저장 (향후 개선)</li>
+    <li>Regular security updates and patch application</li>
+    <li>Log monitoring and anomaly detection</li>
+    <li>Regular permission review and adherence to principle of least privilege</li>
+    <li>Encrypted storage of sensitive information (future improvement)</li>
   </ul>
 
-  <!-- 13. 성능 및 확장성 -->
-  <h2>13. 성능 및 확장성</h2>
+  <!-- 13. Performance and Scalability -->
+  <h2>13. Performance and Scalability</h2>
 
-  <h3>13.1 성능 고려사항</h3>
+  <h3>13.1 Performance Considerations</h3>
   <ul>
-    <li><b>쿨다운 메커니즘</b>
+    <li><b>Cooldown Mechanism</b>
       <ul>
-        <li>기본 쿨다운 기간: 5분 (300초)</li>
-        <li>스케일아웃/인 각각 독립적인 Cooldown Management</li>
+        <li>Default cooldown period: 5 minutes (300 seconds)</li>
+        <li>Independent cooldown management for scale-out/in</li>
         <li>최소/Max Count Reached 시 자동 Start Cooldown</li>
-        <li>Alertmanager 반복 알림 방지</li>
+        <li>Prevent Alertmanager repeated alerts</li>
       </ul>
     </li>
-    <li><b>VM Creation 시간</b>
+    <li><b>VM Creation Time</b>
       <ul>
-        <li>템플릿 Clone: 약 1-2분</li>
-        <li>VM 부팅 및 IP Configuration: 약 1-2분</li>
+        <li>Template clone: approximately 1-2 minutes</li>
+        <li>VM boot and IP configuration: approximately 1-2 minutes</li>
         <li>Health Check Wait: 약 30초</li>
         <li>F5 Registration 및 Prometheus 추가: 약 30초</li>
-        <li>총 소요 시간: 약 3-5분</li>
+        <li>Total time: approximately 3-5 minutes</li>
       </ul>
     </li>
-    <li><b>VM Deletion 시간</b>
+    <li><b>VM Deletion Time</b>
       <ul>
         <li>F5 Removal: 약 10초</li>
         <li>Prometheus Removal: 약 10초</li>
         <li>VM Power Off: 약 30초</li>
-        <li>VM Deletion: 약 1분</li>
-        <li>총 소요 시간: 약 2분</li>
+        <li>VM deletion: approximately 1 minute</li>
+        <li>Total time: approximately 2 minutes</li>
       </ul>
     </li>
   </ul>
 
-  <h3>13.2 실제 스케일링 시나리오 예제</h3>
+  <h3>13.2 Real Scaling Scenario Example</h3>
   <div class="box">
-    <h4>시나리오 설정</h4>
+    <h4>Scenario Setup</h4>
     <ul>
-      <li>초기 상태: VM 1번, VM 2번 운영 중 (최소 VM 개수: 2, 최대 VM 개수: 4)</li>
-      <li>스케일아웃 CPU 임계값: 80%, 지속 시간: 1분</li>
-      <li>스케일인 CPU 임계값: 30%, 지속 시간: 5분</li>
-      <li>쿨다운 기간: 5분</li>
-      <li>Alertmanager repeat_interval: 5분</li>
+      <li>Initial state: VM 1 and VM 2 running (min VM count: 2, max VM count: 4)</li>
+      <li>Scale-out CPU threshold: 80%, duration: 1 minute</li>
+      <li>Scale-in CPU threshold: 30%, duration: 5 minutes</li>
+      <li>Cooldown period: 5 minutes</li>
+      <li>Alertmanager repeat_interval: 5 minutes</li>
     </ul>
 
-    <h4>스케일아웃 시나리오</h4>
+    <h4>Scale-Out Scenario</h4>
     <div class="mermaid">gantt
-    title 스케일아웃 타임라인
+    title Scale-Out Timeline
     dateFormat HH:mm
     axisFormat %H:%M
     
-    section 초기 상태
-    VM 1번 운영 :active, vm1, 00:00, 30m
-    VM 2번 운영 :active, vm2, 00:00, 30m
+    section Initial State
+    VM 1 Running :active, vm1, 00:00, 30m
+    VM 2 Running :active, vm2, 00:00, 30m
     
-    section 부하 증가
-    CPU 80% 초과 :crit, load, 00:05, 1m
+    section Load Increase
+    CPU Exceeds 80% :crit, load, 00:05, 1m
     Alert Triggered :milestone, alert1, 00:06, 0m
     Cooldown Check :done, cd1, 00:06, 1m
     
-    section VM 3번 생성
-    VM 3번 생성 시작 :active, vm3_create, 00:07, 5m
-    VM 3번 서비스 투입 :done, vm3_ready, 00:12, 0m
-    Start Cooldown (5분) :active, cooldown1, 00:12, 5m
+    section VM 3 Creation
+    VM 3 Creation 시작 :active, vm3_create, 00:07, 5m
+    VM 3 Service Deployment :done, vm3_ready, 00:12, 0m
+    Start Cooldown (5 minutes) :active, cooldown1, 00:12, 5m
     
-    section VM 4번 생성
-    CPU 여전히 80% 초과 :crit, load2, 00:12, 1m
-    Alert 재발생 (5분 후) :milestone, alert2, 00:17, 0m
-    쿨다운 End 확인 :done, cd2, 00:17, 1m
-    VM 4번 생성 시작 :active, vm4_create, 00:18, 5m
-    VM 4번 서비스 투입 :done, vm4_ready, 00:23, 0m
-    Start Cooldown (5분) :active, cooldown2, 00:23, 5m</div>
+    section VM 4 Creation
+    CPU Still Exceeds 80% :crit, load2, 00:12, 1m
+    Alert Re-triggered (after 5 minutes) :milestone, alert2, 00:17, 0m
+    Cooldown End Verified :done, cd2, 00:17, 1m
+    VM 4 Creation 시작 :active, vm4_create, 00:18, 5m
+    VM 4 Service Deployment :done, vm4_ready, 00:23, 0m
+    Start Cooldown (5 minutes) :active, cooldown2, 00:23, 5m</div>
 
-    <p><strong>스케일아웃 프로세스:</strong></p>
+    <p><strong>Scale-Out Process:</strong></p>
     <ol>
-      <li><strong>초기 상태:</strong> VM 1번, VM 2번 운영 중</li>
-      <li><strong>부하 증가:</strong> CPU 사용률이 80% 초과하여 1분 이상 지속</li>
+      <li><strong>Initial State:</strong> VM 1번, VM 2 Running 중</li>
+      <li><strong>Load Increase:</strong> CPU 사용률이 80% 초과하여 1분 이상 지속</li>
       <li><strong>Alert Triggered:</strong> Prometheus에서 Alert Firing → Alertmanager로 전달</li>
-      <li><strong>VM 3번 생성:</strong> 
+      <li><strong>VM 3 Creation:</strong> 
         <ul>
-          <li>Cooldown Check Pass (초기 상태이므로 쿨다운 없음)</li>
+          <li>Cooldown Check Pass (Initial State이므로 쿨다운 없음)</li>
           <li>Max VM Count Check Pass (현재 2개 < 최대 4개)</li>
           <li>Jenkins 파이프라인 실행: VM Creation, F5 Registration, Prometheus Registration (약 5분 소요)</li>
-          <li>VM 3번 서비스 투입 Complete</li>
-          <li>Start Cooldown (5분)</li>
+          <li>VM 3 Service Deployment Complete</li>
+          <li>Start Cooldown (5 minutes)</li>
         </ul>
       </li>
-      <li><strong>VM 4번 생성:</strong>
+      <li><strong>VM 4 Creation:</strong>
         <ul>
-          <li>부하가 여전히 높아 CPU 80% 초과 지속</li>
-          <li>쿨다운 End 대기 (5분)</li>
-          <li>Alertmanager가 5분 후 재전송 (repeat_interval)</li>
-          <li>쿨다운 End 확인 후 VM 4번 생성 (약 5분 소요)</li>
-          <li>VM 4번 서비스 투입 Complete</li>
-          <li>최대 VM 개수(4개) Reached로 이후 스케일아웃 Block</li>
+          <li>부하가 여전히 높아 CPU Exceeds 80% 지속</li>
+          <li>Wait for cooldown end (5 minutes)</li>
+          <li>Alertmanager re-sends after 5 minutes (repeat_interval)</li>
+          <li>Cooldown End Verified 후 VM 4 Creation (약 5분 소요)</li>
+          <li>VM 4 Service Deployment Complete</li>
+          <li>Scale-out blocked thereafter as max VM count (4) reached</li>
         </ul>
       </li>
     </ol>
 
-    <h4>스케일인 시나리오</h4>
+    <h4>Scale-In Scenario</h4>
     <div class="mermaid">gantt
-    title 스케일인 타임라인
+    title Scale-In Timeline
     dateFormat HH:mm
     axisFormat %H:%M
     
     section Max Count Reached
-    VM 1번 운영 :active, vm1_in, 00:00, 30m
-    VM 2번 운영 :active, vm2_in, 00:00, 30m
-    VM 3번 운영 :active, vm3_in, 00:00, 30m
-    VM 4번 운영 :active, vm4_in, 00:00, 30m
+    VM 1 Running :active, vm1_in, 00:00, 30m
+    VM 2 Running :active, vm2_in, 00:00, 30m
+    VM 3 Running :active, vm3_in, 00:00, 30m
+    VM 4 Running :active, vm4_in, 00:00, 30m
     
-    section 부하 감소
-    전체 CPU 30% 이하 :done, low_load, 00:05, 5m
+    section Load Decrease
+    Overall CPU Below 30% :done, low_load, 00:05, 5m
     Alert Triggered :milestone, alert_in1, 00:10, 0m
     Cooldown Check :done, cd_in1, 00:10, 1m
     
-    section VM 4번 삭제
-    VM 4번 삭제 시작 :active, vm4_del, 00:11, 2m
-    VM 4번 삭제 Complete :milestone, vm4_done, 00:13, 0m
-    Start Cooldown (5분) :active, cooldown_in1, 00:13, 5m
+    section VM 4 Deletion
+    VM 4 Deletion 시작 :active, vm4_del, 00:11, 2m
+    VM 4 Deletion Complete :milestone, vm4_done, 00:13, 0m
+    Start Cooldown (5 minutes) :active, cooldown_in1, 00:13, 5m
     
-    section VM 3번 삭제
-    CPU 여전히 30% 이하 :done, low_load2, 00:13, 5m
-    Alert 재발생 (5분 후) :milestone, alert_in2, 00:18, 0m
-    쿨다운 End 확인 :done, cd_in2, 00:18, 1m
-    VM 3번 삭제 시작 :active, vm3_del, 00:19, 2m
-    VM 3번 삭제 Complete :milestone, vm3_done, 00:21, 0m
-    Start Cooldown (5분) :active, cooldown_in2, 00:21, 5m
+    section VM 3 Deletion
+    CPU Still Below 30% :done, low_load2, 00:13, 5m
+    Alert Re-triggered (after 5 minutes) :milestone, alert_in2, 00:18, 0m
+    Cooldown End Verified :done, cd_in2, 00:18, 1m
+    VM 3 Deletion 시작 :active, vm3_del, 00:19, 2m
+    VM 3 Deletion Complete :milestone, vm3_done, 00:21, 0m
+    Start Cooldown (5 minutes) :active, cooldown_in2, 00:21, 5m
     
-    section 최소 개수 유지
-    VM 1번 유지 :active, vm1_keep, 00:21, 10m
-    VM 2번 유지 :active, vm2_keep, 00:21, 10m
+    section Maintain Min Count
+    VM 1 Maintained :active, vm1_keep, 00:21, 10m
+    VM 2 Maintained :active, vm2_keep, 00:21, 10m
     Min Count Reached로 스케일인 Block :crit, block, 00:21, 10m</div>
 
-    <p><strong>스케일인 프로세스:</strong></p>
+    <p><strong>Scale-In Process:</strong></p>
     <ol>
-      <li><strong>Max Count Reached:</strong> VM 1번, 2번, 3번, 4번 모두 운영 중</li>
-      <li><strong>부하 감소:</strong> 전체 CPU 사용률이 30% 이하로 5분 이상 지속</li>
+      <li><strong>Max Count Reached:</strong> VM 1, 2, 3, 4 all running</li>
+      <li><strong>Load Decrease:</strong> Overall CPU usage below 30% for more than 5 minutes</li>
       <li><strong>Alert Triggered:</strong> Prometheus에서 Alert Firing → Alertmanager로 전달</li>
-      <li><strong>VM 4번 삭제 (가장 최신 VM):</strong>
+      <li><strong>VM 4 Deletion (가장 최신 VM):</strong>
         <ul>
           <li>Cooldown Check Pass</li>
           <li>Min VM Count Check Pass (현재 4개 > 최소 2개)</li>
-          <li>Jenkins 파이프라인 실행: 가장 최신 VM(4번) 선택, F5 Removal, Prometheus Removal, VM Deletion (약 2분 소요)</li>
-          <li>VM 4번 삭제 Complete</li>
-          <li>Start Cooldown (5분)</li>
+          <li>Jenkins 파이프라인 실행: 가장 최신 VM(4번) 선택, F5 Removal, Prometheus Removal, VM Deletion (Approximately 2 minutes 소요)</li>
+          <li>VM 4 Deletion Complete</li>
+          <li>Start Cooldown (5 minutes)</li>
         </ul>
       </li>
-      <li><strong>VM 3번 삭제:</strong>
+      <li><strong>VM 3 Deletion:</strong>
         <ul>
-          <li>부하가 여전히 낮아 CPU 30% 이하 지속</li>
-          <li>쿨다운 End 대기 (5분)</li>
-          <li>Alertmanager가 5분 후 재전송 (repeat_interval)</li>
-          <li>쿨다운 End 확인 후 VM 3번 삭제 (약 2분 소요)</li>
-          <li>VM 3번 삭제 Complete</li>
+          <li>Load still low, CPU below 30% continuously</li>
+          <li>Wait for cooldown end (5 minutes)</li>
+          <li>Alertmanager re-sends after 5 minutes (repeat_interval)</li>
+          <li>Cooldown End Verified 후 VM 3 Deletion (Approximately 2 minutes 소요)</li>
+          <li>VM 3 Deletion Complete</li>
         </ul>
       </li>
-      <li><strong>최소 개수 유지:</strong>
+      <li><strong>Maintain Min Count:</strong>
         <ul>
           <li>Current VM Count: 2개 (VM 1번, VM 2번)</li>
-          <li>최소 VM 개수(2개)에 Reached하여 이후 스케일인 Block</li>
-          <li>VM 1번과 VM 2번은 최소 개수로 유지됨</li>
+          <li>Scale-in blocked thereafter as min VM count (2) reached</li>
+          <li>VM 1 and VM 2 maintained at minimum count</li>
         </ul>
       </li>
     </ol>
 
-    <h4>타이밍 요약</h4>
+    <h4>Timing Summary</h4>
     <table>
       <tr>
-        <th>이벤트</th>
-        <th>소요 시간</th>
-        <th>설명</th>
+        <th>Event</th>
+        <th>Duration</th>
+        <th>Description</th>
       </tr>
       <tr>
-        <td>VM Creation (스케일아웃)</td>
+        <td>VM Creation (Scale-Out)</td>
         <td>약 5분</td>
         <td>템플릿 Clone, IP Configuration, F5 Registration, Prometheus Registration</td>
       </tr>
       <tr>
-        <td>VM Deletion (스케일인)</td>
-        <td>약 2분</td>
+        <td>VM Deletion (Scale-In)</td>
+        <td>Approximately 2 minutes</td>
         <td>F5 Removal, Prometheus Removal, VM Deletion</td>
       </tr>
       <tr>
-        <td>쿨다운 기간</td>
+        <td>Cooldown Period</td>
         <td>5분</td>
-        <td>스케일아웃/인 후 다음 액션까지 대기 시간</td>
+        <td>Wait time until next action after scale-out/in</td>
       </tr>
       <tr>
-        <td>Alertmanager 재전송</td>
+        <td>Alertmanager Re-transmission</td>
         <td>5분</td>
-        <td>Alert가 해결되지 않으면 5분마다 재전송</td>
+        <td>Re-transmit every 5 minutes if alert is not resolved</td>
       </tr>
       <tr>
-        <td>스케일아웃: 3번 → 4번</td>
-        <td>약 10분 후</td>
-        <td>쿨다운(5분) + Alert 재전송(5분) = 최소 10분 후</td>
+        <td>Scale-Out: 3 → 4</td>
+        <td>Approximately 10 minutes later</td>
+        <td>Cooldown (5 min) + Alert re-transmission (5 min) = minimum 10 minutes later</td>
       </tr>
       <tr>
-        <td>스케일인: 4번 삭제</td>
-        <td>약 10분 후</td>
-        <td>스케일인 조건 지속(5분) + Alert Triggered + 처리(2분) = 약 10분 후</td>
+        <td>Scale-In: Delete 4</td>
+        <td>Approximately 10 minutes later</td>
+        <td>스케일인 조건 지속(5분) + Alert Triggered + 처리(2분) = Approximately 10 minutes later</td>
       </tr>
       <tr>
-        <td>스케일인: 3번 삭제</td>
-        <td>약 10분 후</td>
-        <td>쿨다운(5분) + Alert 재전송(5분) + 처리(2분) = 약 10분 후</td>
+        <td>Scale-In: Delete 3</td>
+        <td>Approximately 10 minutes later</td>
+        <td>쿨다운(5분) + Alert 재전송(5분) + 처리(2분) = Approximately 10 minutes later</td>
       </tr>
     </table>
   </div>
 
-  <h3>13.3 확장성</h3>
+  <h3>13.3 Scalability</h3>
   <ul>
-    <li><b>서비스별 독립 운영</b>
+    <li><b>Independent Operation per Service</b>
       <ul>
-        <li>각 서비스는 독립적인 설정 및 Job 사용</li>
-        <li>서비스 간 영향 없음</li>
+        <li>Each service uses independent configuration and jobs</li>
+        <li>No impact between services</li>
         <li>동시에 여러 서비스 오토스케일링 Available</li>
       </ul>
     </li>
     <li><b>IP Pool Management</b>
       <ul>
-        <li>서비스별 IP Pool 범위 지정</li>
-        <li>IP 충돌 방지</li>
-        <li>IP Pool 부족 시 스케일아웃 Block</li>
+        <li>Specify IP pool range per service</li>
+        <li>Prevent IP conflicts</li>
+        <li>Block scale-out when IP pool is insufficient</li>
       </ul>
     </li>
-    <li><b>리소스 제한</b>
+    <li><b>Resource Limits</b>
       <ul>
-        <li>최대 VM 개수로 리소스 사용량 제한</li>
-        <li>vCenter 리소스 풀 활용</li>
-        <li>Datastore 용량 모니터링</li>
+        <li>Limit resource usage with max VM count</li>
+        <li>Utilize vCenter resource pool</li>
+        <li>Monitor datastore capacity</li>
       </ul>
     </li>
   </ul>
 
-  <h3>13.4 모니터링 및 알림</h3>
+  <h3>13.4 Monitoring and Alerts</h3>
   <div class="box">
-    <h4>모니터링 항목</h4>
+    <h4>Monitoring Items</h4>
     <ul>
       <li><b>시스템 Metric</b>
         <ul>
-          <li>CPU 사용률 (전체 및 인스턴스별)</li>
-          <li>Memory 사용률 (전체 및 인스턴스별)</li>
+          <li>CPU usage (overall and per instance)</li>
+          <li>Memory usage (overall and per instance)</li>
           <li>Current VM Count</li>
-          <li>스케일 이벤트 발생 횟수</li>
+          <li>스케일 Event 발생 횟수</li>
         </ul>
       </li>
       <li><b>인프라 Metric</b>
         <ul>
-          <li>vCenter 연결 상태</li>
-          <li>Prometheus Target 상태</li>
-          <li>F5 Pool Member 상태</li>
-          <li>Jenkins Job 실행 상태</li>
+          <li>vCenter connection status</li>
+          <li>Prometheus target status</li>
+          <li>F5 pool member status</li>
+          <li>Jenkins job execution status</li>
         </ul>
       </li>
-      <li><b>알림</b>
+      <li><b>Alerts</b>
         <ul>
-          <li>스케일아웃/인 이벤트 알림</li>
-          <li>에러 발생 알림</li>
+          <li>스케일아웃/인 Event 알림</li>
+          <li>Error occurrence alerts</li>
           <li>최대/Min Count Reached 알림</li>
-          <li>IP Pool 부족 알림</li>
+          <li>IP pool shortage alerts</li>
         </ul>
       </li>
     </ul>
   </div>
 
-  <!-- 14. 향후 고도화 -->
-  <h2>14. 향후 고도화 방향</h2>
+  <!-- 14. Future Enhancements -->
+  <h2>14. Future Enhancement Directions</h2>
 
-  <h3>14.1 고객사별 권한 분리</h3>
+  <h3>14.1 Tenant-Based Permission Separation</h3>
   <ul>
     <li>현재는 관리자만 모든 서비스에 대해 설정 Available</li>
     <li>향후에는 고객사(테넌트) 별로 접근 Available한 서비스와 오토스케일링 설정을 분리</li>
-    <li>역할 기반 접근 제어(RBAC) 예:
+    <li>Role-based access control (RBAC) examples:
       <ul>
-        <li>GLOBAL_ADMIN, TENANT_ADMIN, TENANT_VIEWER 등</li>
+        <li>GLOBAL_ADMIN, TENANT_ADMIN, TENANT_VIEWER, etc.</li>
       </ul>
     </li>
   </ul>
 
-  <h3>14.2 고객사 전용 서버/인프라 제공</h3>
+  <h3>14.2 Tenant-Dedicated Server/Infrastructure</h3>
   <ul>
-    <li>대형 고객사의 요구 시, Autoscaling Backend/Jenkins/PLG/F5 파티션을 전용 인스턴스로 제공</li>
-    <li>각 고객사별로 min/maxVms, IP Pool, VLAN, 템플릿 및 모니터링을 완전히 분리 운영</li>
+    <li>For large tenants, provide dedicated instances of Autoscaling Backend/Jenkins/PLG/F5 partitions</li>
+    <li>Completely separate operation of min/maxVms, IP pool, VLAN, templates, and monitoring per tenant</li>
   </ul>
 
-  <h3>14.3 고급 기능 아이디어</h3>
+  <h3>14.3 Advanced Feature Ideas</h3>
   <ul>
-    <li><b>예측 스케일링</b>
+    <li><b>Predictive Scaling</b>
       <ul>
         <li>AI/머신러닝 기반 Traffic 예측</li>
-        <li>시간대별 패턴 분석</li>
-        <li>사전 스케일아웃으로 응답 시간 단축</li>
+        <li>Time-based pattern analysis</li>
+        <li>Reduce response time with preemptive scale-out</li>
       </ul>
     </li>
-    <li><b>비용 최적화</b>
+    <li><b>Cost Optimization</b>
       <ul>
-        <li>시간대/요일 기반 스케일링 정책</li>
-        <li>비용 기반 스케일인 우선순위</li>
-        <li>리소스 사용률 기반 최적화</li>
+        <li>Time/day-based scaling policies</li>
+        <li>Cost-based scale-in priority</li>
+        <li>Resource usage-based optimization</li>
       </ul>
     </li>
-    <li><b>하이브리드 오토스케일링</b>
+    <li><b>Hybrid Autoscaling</b>
       <ul>
-        <li>Kubernetes(CAPV)와 연계</li>
-        <li>클라우드와 온프레미스 통합 관리</li>
-        <li>워크로드 특성에 따른 자동 배치</li>
+        <li>Integration with Kubernetes (CAPV)</li>
+        <li>Integrated management of cloud and on-premises</li>
+        <li>Automatic placement based on workload characteristics</li>
       </ul>
     </li>
-    <li><b>고급 모니터링</b>
+    <li><b>Advanced Monitoring</b>
       <ul>
         <li>애플리케이션 레벨 Metric 기반 스케일링</li>
         <li>JMX Metric 활용</li>
@@ -1839,100 +1839,100 @@ export function decideScaleAction(
     </li>
   </ul>
 
-  <!-- 15. 요약 및 핵심 포인트 -->
-  <h2>15. 요약 및 핵심 포인트</h2>
+  <!-- 15. Summary and Key Points -->
+  <h2>15. Summary and Key Points</h2>
 
-  <h3>15.1 핵심 아키텍처 원칙</h3>
+  <h3>15.1 Core Architecture Principles</h3>
   <div class="box">
     <ul>
-      <li><b>비침투형 설계:</b> 기존 인프라(PLG Stack, Jenkins, F5, vSphere)를 최대한 재활용</li>
-      <li><b>단일 기준 원칙:</b> Prometheus Job에 등록된 VM 개수만으로 최소/최대 개수 판단</li>
-      <li><b>쿨다운 메커니즘:</b> 반복 알림 방지 및 리소스 보호</li>
-      <li><b>서비스 독립성:</b> 각 서비스는 독립적으로 운영되며 서로 영향 없음</li>
-      <li><b>자동화:</b> 설정부터 실행까지 전체 프로세스 자동화</li>
+      <li><b>Non-intrusive Design:</b> Maximize reuse of existing infrastructure (PLG Stack, Jenkins, F5, vSphere)</li>
+      <li><b>Single Criteria Principle:</b> Determine min/max count only based on number of VMs registered in Prometheus Job</li>
+      <li><b>Cooldown Mechanism:</b> Prevent repeated alerts and protect resources</li>
+      <li><b>Service Independence:</b> Each service operates independently with no mutual impact</li>
+      <li><b>Automation:</b> Automate entire process from configuration to execution</li>
     </ul>
   </div>
 
-  <h3>15.2 주요 특징</h3>
+  <h3>15.2 Key Features</h3>
   <table>
     <tr>
-      <th>항목</th>
-      <th>설명</th>
+      <th>Item</th>
+      <th>Description</th>
     </tr>
     <tr>
-      <td>템플릿 기반</td>
-      <td>Golden Image 템플릿을 기반으로 빠른 VM Creation</td>
+      <td>Template-Based</td>
+      <td>Fast VM creation based on Golden Image template</td>
     </tr>
     <tr>
       <td>Metric 기반</td>
       <td>Prometheus Node Exporter Metric 기반 자동 판단</td>
     </tr>
     <tr>
-      <td>웹훅 기반</td>
+      <td>Webhook-Based</td>
       <td>Alertmanager → Backend (Validation: Switch/Cooldown/VM Count) → Jenkins 웹훅 체인</td>
     </tr>
     <tr>
-      <td>자동 등록</td>
-      <td>VM Creation 시 F5 Pool 및 Prometheus Target 자동 등록</td>
+      <td>Automatic Registration</td>
+      <td>VM Creation 시 F5 Pool 및 Prometheus Target Automatic Registration</td>
     </tr>
     <tr>
-      <td>안전한 삭제</td>
+      <td>Safe Deletion</td>
       <td>F5 Removal → Monitoring Removal → Prometheus Removal → VM Deletion 순서 보장</td>
     </tr>
   </table>
 
-  <h3>15.3 성능 지표</h3>
+  <h3>15.3 Performance Metrics</h3>
   <table>
     <tr>
-      <th>작업</th>
-      <th>예상 소요 시간</th>
+      <th>Task</th>
+      <th>예상 Duration</th>
     </tr>
     <tr>
-      <td>스케일아웃 (VM Creation)</td>
-      <td>약 3-5분</td>
+      <td>Scale-Out (VM Creation)</td>
+      <td>Approximately 3-5 minutes</td>
     </tr>
     <tr>
-      <td>스케일인 (VM Deletion)</td>
-      <td>약 2분</td>
+      <td>Scale-In (VM Deletion)</td>
+      <td>Approximately 2 minutes</td>
     </tr>
     <tr>
-      <td>쿨다운 기간</td>
+      <td>Cooldown Period</td>
       <td>기본 5분 (설정 Available)</td>
     </tr>
     <tr>
       <td>Alert Evaluation 주기</td>
-      <td>5분 (Prometheus scrape interval)</td>
+      <td>5 minutes (Prometheus scrape interval)</td>
     </tr>
     <tr>
-      <td>Alertmanager 재전송 주기</td>
-      <td>5분 (repeat_interval)</td>
+      <td>Alertmanager Re-transmission 주기</td>
+      <td>5 minutes (repeat_interval)</td>
     </tr>
   </table>
 
-  <h3>15.4 제한사항 및 주의사항</h3>
+  <h3>15.4 Limitations and Considerations</h3>
   <div class="warning">
     <ul>
-      <li><b>IP Pool 범위:</b> IP Pool이 부족하면 스케일아웃이 Block됩니다. 충분한 IP 범위를 확보하세요.</li>
-      <li><b>템플릿 준비:</b> 템플릿이 올바르게 준비되지 않으면 VM Creation이 실패할 수 있습니다.</li>
+      <li><b>IP Pool Range:</b> Scale-out will be blocked if IP pool is insufficient. Ensure sufficient IP range.</li>
+      <li><b>Template Preparation:</b> VM creation may fail if template is not properly prepared.</li>
       <li><b>Network 연결:</b> VM Creation 후 Network 연결이 안정적이어야 F5 Health Check가 Pass합니다.</li>
-      <li><b>쿨다운 기간:</b> 쿨다운 기간 중에는 스케일링이 발생하지 않으므로 급격한 부하 변화에 대응이 늦을 수 있습니다.</li>
-      <li><b>최소 VM 개수:</b> 최소 VM 개수 이하로는 스케일인이 발생하지 않으므로 서비스 가용성이 보장됩니다.</li>
+      <li><b>Cooldown Period:</b> Cooldown Period 중에는 스케일링이 발생하지 않으므로 급격한 부하 변화에 대응이 늦을 수 있습니다.</li>
+      <li><b>Minimum VM Count:</b> Scale-in does not occur below minimum VM count, ensuring service availability.</li>
     </ul>
   </div>
 
-  <!-- 16. 참고 자료 -->
-  <h2>16. 참고 자료</h2>
+  <!-- 16. References -->
+  <h2>16. References</h2>
   <ul>
-    <li><a href="https://prometheus.io/docs/">Prometheus 공식 문서</a></li>
-    <li><a href="https://prometheus.io/docs/alerting/latest/alertmanager/">Alertmanager 공식 문서</a></li>
-    <li><a href="https://www.jenkins.io/doc/">Jenkins 공식 문서</a></li>
-    <li><a href="https://github.com/vmware/govmomi">govc (vSphere CLI) 문서</a></li>
-    <li><a href="https://clouddocs.f5.com/">F5 BIG-IP 문서</a></li>
+    <li><a href="https://prometheus.io/docs/">Prometheus Official Documentation</a></li>
+    <li><a href="https://prometheus.io/docs/alerting/latest/alertmanager/">Alertmanager Official Documentation</a></li>
+    <li><a href="https://www.jenkins.io/doc/">Jenkins Official Documentation</a></li>
+    <li><a href="https://github.com/vmware/govmomi">govc (vSphere CLI) Documentation</a></li>
+    <li><a href="https://clouddocs.f5.com/">F5 BIG-IP Documentation</a></li>
   </ul>
   <ul>
     <li>AI/머신러닝 기반 예측 스케일링</li>
     <li>시간대/요일 기반 비용 최적화 정책</li>
-    <li>Kubernetes(CAPV)와 연계한 하이브리드 오토스케일링</li>
+    <li>Integration with Kubernetes (CAPV)한 하이브리드 오토스케일링</li>
   </ul>
 
 </body>
