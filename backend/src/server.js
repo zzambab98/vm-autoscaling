@@ -1474,7 +1474,31 @@ const server = http.createServer((req, res) => {
           // Prometheus 제거 실패해도 계속 진행 (경고만)
         }
 
-        // 2. 쿨다운 시작
+        // 2. 스케일인 스위치 상태 업데이트 (VM 수가 줄어들었으므로 최소 개수 도달 시 OFF)
+        try {
+          const { getPrometheusTargets } = require('./services/prometheusMonitoringService');
+          const { getConfigs } = require('./services/autoscalingService');
+          const { updateScaleInSwitch } = require('./services/scaleInSwitchService');
+          
+          // 현재 VM 개수 확인
+          const targetsResult = await getPrometheusTargets(prometheusJobName);
+          const currentVmCount = targetsResult.targets?.length || 0;
+          
+          // 설정에서 최소 VM 개수 가져오기
+          const configs = await getConfigs();
+          const config = configs.find(c => c.serviceName === serviceName);
+          const minVms = config?.scaling?.minVms || 1;
+          
+          // 스위치 상태 업데이트 (VM 수가 줄어들었으므로 최소 개수 도달 시 OFF)
+          const switchUpdateResult = updateScaleInSwitch(serviceName, currentVmCount, minVms);
+          if (!switchUpdateResult.enabled) {
+            console.log(`[Webhook] VM 삭제 완료 후 스케일인 스위치 OFF: ${serviceName} - 스케일인 비활성화 (현재 VM: ${currentVmCount}개, 최소: ${minVms}개)`);
+          }
+        } catch (error) {
+          console.warn(`[Webhook] 스케일인 스위치 상태 업데이트 실패 (경고):`, error.message);
+        }
+
+        // 3. 쿨다운 시작
         try {
           const { startCooldown } = require('./services/cooldownService');
           // 설정에서 쿨다운 기간 가져오기 (기본값: 5분)
