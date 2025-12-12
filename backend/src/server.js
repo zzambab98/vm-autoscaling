@@ -1269,6 +1269,17 @@ const server = http.createServer((req, res) => {
               console.log(`[Webhook] 최소 VM 개수 도달: ${serviceName} - 현재 Prometheus Job 등록 개수: ${currentVmCount}, 최소: ${minVms}`);
               console.log(`[Webhook] 스케일인 스위치 OFF: ${serviceName} - 스케일인 비활성화`);
               
+              // Alertmanager Silence 생성하여 웹훅 자체를 차단 (웹훅 발생 방지)
+              try {
+                const { createScaleInSilence } = require('./services/alertmanagerService');
+                // 30분간 silence 생성 (Alertmanager의 repeat_interval보다 훨씬 길게)
+                const silenceResult = await createScaleInSilence(serviceName, 30);
+                console.log(`[Webhook] Alertmanager Silence 생성 성공: ${serviceName} - ${silenceResult.silenceID} (30분간 웹훅 차단)`);
+              } catch (error) {
+                console.error(`[Webhook] Alertmanager Silence 생성 실패 (경고):`, error.message);
+                // Silence 생성 실패해도 스위치로 차단
+              }
+              
               sendJSONResponse(res, 200, {
                 success: false,
                 message: `최소 VM 개수(${minVms})에 도달하여 스케일인할 수 없습니다. (현재 Prometheus Job 등록 개수: ${currentVmCount}개)`,
@@ -1276,9 +1287,21 @@ const server = http.createServer((req, res) => {
                 minVms: minVms,
                 prometheusJobName: prometheusJobName,
                 switchState: switchUpdateResult.state,
-                note: '스케일인 스위치가 OFF 상태입니다. VM 개수가 최소 개수 이상이 되면 자동으로 ON됩니다.'
+                note: '스케일인 스위치가 OFF 상태입니다. Alertmanager Silence가 생성되어 웹훅이 차단됩니다. VM 개수가 최소 개수 이상이 되면 자동으로 ON됩니다.'
               });
               return;
+            }
+            
+            // 최소 VM 수를 넘어서면 기존 Silence 삭제 (스케일인 가능 상태로 복구)
+            try {
+              const { deleteScaleInSilence } = require('./services/alertmanagerService');
+              const deleteResult = await deleteScaleInSilence(serviceName);
+              if (deleteResult.success && deleteResult.silenceID) {
+                console.log(`[Webhook] Alertmanager Silence 삭제 성공: ${serviceName} - 스케일인 가능 상태로 복구`);
+              }
+            } catch (error) {
+              // Silence가 없거나 삭제 실패해도 경고만 남기고 진행
+              console.log(`[Webhook] Silence 삭제 확인: ${serviceName} - ${error.message}`);
             }
             
             // 최소 VM 수를 넘어서면 스위치가 자동으로 ON됨 (updateScaleInSwitch에서 처리)
@@ -1586,6 +1609,17 @@ const server = http.createServer((req, res) => {
           const switchUpdateResult = updateScaleInSwitch(serviceName, currentVmCount, minVms);
           if (switchUpdateResult.enabled) {
             console.log(`[Webhook] VM 생성 완료 후 스케일인 스위치 ON: ${serviceName} - 스케일인 활성화 (현재 VM: ${currentVmCount}개, 최소: ${minVms}개)`);
+            
+            // 스위치가 ON되면 Silence 삭제 (웹훅 가능 상태로 복구)
+            try {
+              const { deleteScaleInSilence } = require('./services/alertmanagerService');
+              const deleteResult = await deleteScaleInSilence(serviceName);
+              if (deleteResult.success && deleteResult.silenceID) {
+                console.log(`[Webhook] VM 생성 완료 후 Alertmanager Silence 삭제 성공: ${serviceName} - 웹훅 가능 상태로 복구`);
+              }
+            } catch (error) {
+              console.log(`[Webhook] Silence 삭제 확인: ${serviceName} - ${error.message}`);
+            }
           }
         } catch (error) {
           console.warn(`[Webhook] 스케일인 스위치 상태 업데이트 실패 (경고):`, error.message);
