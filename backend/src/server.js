@@ -1567,36 +1567,28 @@ const server = http.createServer((req, res) => {
           // Prometheus 추가 실패해도 계속 진행 (경고만)
         }
 
-        // 2. 현재 VM 개수 확인 후 Silence 삭제 (최소 VM 수를 넘으면 스케일인 가능 상태로 복구)
+        // 2. 스케일인 스위치 상태 업데이트 (VM 수가 늘어났으므로 스케일인 가능 상태로 복구)
         try {
-          const { getConfigs } = require('./services/autoscalingService');
           const { getPrometheusTargets } = require('./services/prometheusMonitoringService');
+          const { getConfigs } = require('./services/autoscalingService');
+          const { updateScaleInSwitch } = require('./services/scaleInSwitchService');
+          
+          // 현재 VM 개수 확인
+          const targetsResult = await getPrometheusTargets(prometheusJobName);
+          const currentVmCount = targetsResult.targets?.length || 0;
+          
+          // 설정에서 최소 VM 개수 가져오기
           const configs = await getConfigs();
           const config = configs.find(c => c.serviceName === serviceName);
+          const minVms = config?.scaling?.minVms || 1;
           
-          if (config) {
-            const minVms = config.scaling?.minVms || 1;
-            const targetsResult = await getPrometheusTargets(prometheusJobName);
-            
-            if (targetsResult.success) {
-              const currentVmCount = targetsResult.targets?.length || 0;
-              
-              // 최소 VM 수를 넘으면 Silence 삭제 (스케일인 가능 상태로 복구)
-              if (currentVmCount > minVms) {
-                try {
-                  const { deleteScaleInSilence } = require('./services/alertmanagerService');
-                  const deleteResult = await deleteScaleInSilence(serviceName);
-                  if (deleteResult.success && deleteResult.silenceID) {
-                    console.log(`[Webhook] VM 생성 후 Silence 삭제 성공: ${serviceName} - 스케일인 가능 상태로 복구 (현재 VM: ${currentVmCount}개, 최소: ${minVms}개)`);
-                  }
-                } catch (error) {
-                  console.log(`[Webhook] Silence 삭제 확인: ${serviceName} - ${error.message}`);
-                }
-              }
-            }
+          // 스위치 상태 업데이트 (VM 수가 늘어났으므로 ON될 수 있음)
+          const switchUpdateResult = updateScaleInSwitch(serviceName, currentVmCount, minVms);
+          if (switchUpdateResult.enabled) {
+            console.log(`[Webhook] VM 생성 완료 후 스케일인 스위치 ON: ${serviceName} - 스케일인 활성화 (현재 VM: ${currentVmCount}개, 최소: ${minVms}개)`);
           }
         } catch (error) {
-          console.error(`[Webhook] Silence 삭제 확인 실패 (경고):`, error.message);
+          console.warn(`[Webhook] 스케일인 스위치 상태 업데이트 실패 (경고):`, error.message);
         }
 
         // 3. 쿨다운 시작
