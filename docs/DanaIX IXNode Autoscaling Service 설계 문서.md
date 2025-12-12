@@ -998,8 +998,11 @@ export function decideScaleAction(
   <p><b>요약:</b> 이제 스케일 인/아웃 최소·최대 개수 판단은 Prometheus Job에 등록된 VM 개수만으로 수행하며,</p>
   <ul>
     <li>스케일 아웃: currentVmCount &gt;= maxVms → 차단</li>
-    <li>스케일 인: currentVmCount &lt;= minVms → 차단</li>
+    <li>스케일 인: currentVmCount &lt;= minVms → 차단 + 스위치 OFF + Silence 생성</li>
+    <li>스케일인 스위치: 최소 VM 개수 도달 시 OFF, Alertmanager Silence로 웹훅 자체 차단</li>
+    <li>스위치 자동 복구: VM 개수 증가 시 자동 ON, Silence 삭제</li>
     <li>최소/최대 도달 시 쿨다운을 시작해 Alert 반복 알림에 의한 불필요한 실행을 막는다.</li>
+    <li>웹훅 흐름: Alertmanager → Backend (검증: 스위치, 쿨다운, VM 개수) → Jenkins</li>
   </ul>
 
   <!-- 7. Jenkins 파이프라인 -->
@@ -1046,8 +1049,9 @@ export function decideScaleAction(
   end
   
   AM -->|Webhook| WEBHOOK
-  WEBHOOK --> CHECK
+  WEBHOOK --> CHECK[검증: 스위치/쿨다운/VM개수]
   CHECK -->|통과| JENKINS_TRIGGER
+  CHECK -->|차단| BLOCK[차단: 웹훅 무시]
   JENKINS_TRIGGER -->|Scale-Out| JOB_OUT
   JENKINS_TRIGGER -->|Scale-In| JOB_IN
   
