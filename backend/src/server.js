@@ -1440,6 +1440,18 @@ const server = http.createServer((req, res) => {
           webhookUrl = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookToken}`;
         }
         
+        // 쿨다운을 Jenkins 트리거 직전에 시작 (경쟁 조건 방지)
+        // 여러 웹훅이 동시에 들어와도 쿨다운이 즉시 시작되어 중복 실행 방지
+        try {
+          const { startCooldown } = require('./services/cooldownService');
+          const cooldownPeriod = config.scaling?.cooldownPeriod || 300;
+          await startCooldown(serviceName, scaleAction, cooldownPeriod);
+          console.log(`[Webhook] 쿨다운 시작: ${serviceName} - ${scaleAction} (Jenkins 트리거 직전)`);
+        } catch (error) {
+          console.error(`[Webhook] 쿨다운 시작 실패 (경고):`, error.message);
+          // 쿨다운 시작 실패해도 Jenkins 트리거는 진행
+        }
+        
         // Jenkins webhook에 POST 요청
         const axios = require('axios');
         const JENKINS_WEBHOOK_USER = process.env.JENKINS_WEBHOOK_USER || 'danacloud';
@@ -1534,21 +1546,9 @@ const server = http.createServer((req, res) => {
           console.warn(`[Webhook] 스케일인 스위치 상태 업데이트 실패 (경고):`, error.message);
         }
 
-        // 3. 쿨다운 시작
-        try {
-          const { startCooldown } = require('./services/cooldownService');
-          // 설정에서 쿨다운 기간 가져오기 (기본값: 5분)
-          const { getConfigs } = require('./services/autoscalingService');
-          const configs = await getConfigs();
-          const config = configs.find(c => c.serviceName === serviceName);
-          const cooldownPeriod = config?.scaling?.cooldownPeriod || 300;
-          
-          await startCooldown(serviceName, 'scale-in', cooldownPeriod);
-          console.log(`[Webhook] 쿨다운 시작: ${serviceName} - scale-in`);
-        } catch (error) {
-          console.error(`[Webhook] 쿨다운 시작 실패 (경고):`, error.message);
-          // 쿨다운 시작 실패해도 계속 진행
-        }
+        // 3. 쿨다운은 이미 Jenkins 트리거 직전에 시작되었으므로 여기서는 로그만 남김
+        // (중복 쿨다운 시작 방지, Jenkins 트리거 직전 쿨다운 시작으로 경쟁 조건 해결)
+        console.log(`[Webhook] VM 삭제 완료: ${serviceName} - 쿨다운은 이미 시작됨`);
 
         sendJSONResponse(res, 200, {
           success: true,
@@ -1638,21 +1638,9 @@ const server = http.createServer((req, res) => {
           console.warn(`[Webhook] 스케일인 스위치 상태 업데이트 실패 (경고):`, error.message);
         }
 
-        // 3. 쿨다운 시작
-        try {
-          const { startCooldown } = require('./services/cooldownService');
-          // 설정에서 쿨다운 기간 가져오기 (기본값: 5분)
-          const { getConfigs } = require('./services/autoscalingService');
-          const configs = await getConfigs();
-          const config = configs.find(c => c.serviceName === serviceName);
-          const cooldownPeriod = config?.scaling?.cooldownPeriod || 300;
-          
-          await startCooldown(serviceName, 'scale-out', cooldownPeriod);
-          console.log(`[Webhook] 쿨다운 시작: ${serviceName} - scale-out`);
-        } catch (error) {
-          console.error(`[Webhook] 쿨다운 시작 실패 (경고):`, error.message);
-          // 쿨다운 시작 실패해도 계속 진행
-        }
+        // 3. 쿨다운은 이미 Jenkins 트리거 직전에 시작되었으므로 여기서는 로그만 남김
+        // (중복 쿨다운 시작 방지, Jenkins 트리거 직전 쿨다운 시작으로 경쟁 조건 해결)
+        console.log(`[Webhook] VM 생성 완료: ${serviceName} - 쿨다운은 이미 시작됨`);
 
         sendJSONResponse(res, 200, {
           success: true,
