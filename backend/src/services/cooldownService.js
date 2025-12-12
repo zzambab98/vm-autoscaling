@@ -149,6 +149,86 @@ async function checkCooldown(serviceName, scaleAction) {
 }
 
 /**
+ * 쿨다운 체크 및 시작을 원자적으로 처리 (경쟁 조건 방지)
+ * @param {string} serviceName - 서비스 이름
+ * @param {string} scaleAction - 스케일 액션 ('scale-out' 또는 'scale-in')
+ * @param {number} cooldownPeriod - 쿨다운 기간 (초)
+ * @returns {Promise<object>} 쿨다운 체크 및 시작 결과
+ */
+async function checkAndStartCooldown(serviceName, scaleAction, cooldownPeriod = undefined) {
+  try {
+    // 원자적 연산을 위해 데이터를 한 번에 로드하고 업데이트
+    const data = await loadCooldownData();
+    const now = Math.floor(Date.now() / 1000);
+    const period = cooldownPeriod || DEFAULT_COOLDOWN_PERIOD;
+    
+    if (!data[serviceName]) {
+      data[serviceName] = {};
+    }
+
+    let lastActionTime = null;
+    let existingCooldownPeriod = null;
+
+    if (scaleAction === 'scale-out') {
+      lastActionTime = data[serviceName].lastScaleOutTime;
+      existingCooldownPeriod = data[serviceName].scaleOutCooldownPeriod || DEFAULT_COOLDOWN_PERIOD;
+    } else if (scaleAction === 'scale-in') {
+      lastActionTime = data[serviceName].lastScaleInTime;
+      existingCooldownPeriod = data[serviceName].scaleInCooldownPeriod || DEFAULT_COOLDOWN_PERIOD;
+    } else {
+      throw new Error(`잘못된 스케일 액션: ${scaleAction}`);
+    }
+
+    // 쿨다운 체크
+    if (lastActionTime) {
+      const elapsed = now - lastActionTime;
+      const remaining = Math.max(0, existingCooldownPeriod - elapsed);
+      if (remaining > 0) {
+        // 쿨다운 중이면 시작하지 않고 반환
+        return {
+          success: false,
+          inCooldown: true,
+          remainingTime: remaining,
+          message: `쿨다운 중입니다. ${remaining}초 후에 다시 시도하세요.`
+        };
+      }
+    }
+
+    // 쿨다운이 없거나 종료되었으면 즉시 시작 (원자적 연산)
+    if (scaleAction === 'scale-out') {
+      data[serviceName].lastScaleOutTime = now;
+      data[serviceName].scaleOutCooldownPeriod = period;
+    } else if (scaleAction === 'scale-in') {
+      data[serviceName].lastScaleInTime = now;
+      data[serviceName].scaleInCooldownPeriod = period;
+    }
+
+    await saveCooldownData(data);
+
+    console.log(`[Cooldown] ${serviceName}의 ${scaleAction} 쿨다운 체크 및 시작 완료 (${period}초)`);
+
+    return {
+      success: true,
+      inCooldown: false,
+      remainingTime: 0,
+      cooldownPeriod: period,
+      startTime: now,
+      endTime: now + period,
+      message: '쿨다운 시작됨'
+    };
+  } catch (error) {
+    console.error(`[Cooldown] 쿨다운 체크 및 시작 실패:`, error);
+    // 에러 발생 시 쿨다운 없음으로 처리 (안전하게 진행)
+    return {
+      success: false,
+      inCooldown: false,
+      remainingTime: 0,
+      message: `쿨다운 체크 및 시작 실패: ${error.message}`
+    };
+  }
+}
+
+/**
  * 쿨다운 강제 종료 (테스트용)
  * @param {string} serviceName - 서비스 이름
  * @param {string} scaleAction - 스케일 액션 ('scale-out' 또는 'scale-in')
@@ -195,6 +275,7 @@ async function clearCooldown(serviceName, scaleAction) {
 module.exports = {
   startCooldown,
   checkCooldown,
+  checkAndStartCooldown,
   clearCooldown
 };
 

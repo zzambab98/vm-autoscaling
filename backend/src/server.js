@@ -1152,18 +1152,27 @@ const server = http.createServer((req, res) => {
           }
         }
 
-        // 쿨다운 체크
+        // 쿨다운 체크 및 시작을 원자적으로 처리 (경쟁 조건 방지)
         if (scaleAction) {
-          const cooldownStatus = await checkCooldown(serviceName, scaleAction);
-          if (cooldownStatus.inCooldown) {
-            console.log(`[Webhook] 쿨다운 중: ${serviceName} - ${scaleAction} (${cooldownStatus.remainingTime}초 남음)`);
+          const { checkAndStartCooldown } = require('./services/cooldownService');
+          const cooldownPeriod = config.scaling?.cooldownPeriod || 300;
+          const cooldownResult = await checkAndStartCooldown(serviceName, scaleAction, cooldownPeriod);
+          
+          if (!cooldownResult.success || cooldownResult.inCooldown) {
+            console.log(`[Webhook] 쿨다운 중: ${serviceName} - ${scaleAction} (${cooldownResult.remainingTime}초 남음)`);
             sendJSONResponse(res, 200, {
               success: false,
-              message: `쿨다운 중입니다. ${cooldownStatus.remainingTime}초 후에 다시 시도하세요.`,
-              cooldownStatus: cooldownStatus
+              message: cooldownResult.message || `쿨다운 중입니다. ${cooldownResult.remainingTime}초 후에 다시 시도하세요.`,
+              cooldownStatus: {
+                inCooldown: true,
+                remainingTime: cooldownResult.remainingTime
+              }
             });
             return;
           }
+          
+          // 쿨다운이 성공적으로 시작됨
+          console.log(`[Webhook] 쿨다운 시작: ${serviceName} - ${scaleAction} (${cooldownPeriod}초)`);
         }
 
         // 스케일아웃인 경우 최대 VM 개수 체크 (Prometheus Job에 등록된 개수 기준)
