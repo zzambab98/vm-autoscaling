@@ -1431,9 +1431,9 @@ const server = http.createServer((req, res) => {
           webhookToken = 'plg-autoscale-in-token';
           webhookUrl = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookToken}`;
         } else {
-          // 스케일아웃: 서비스별 Job 사용
-          jobName = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}`;
-          webhookToken = `autoscale-${serviceName.toLowerCase().replace(/\s+/g, '-')}-token`;
+          // 스케일아웃: 공통 plg-autoscale-out Job 사용
+          jobName = 'plg-autoscale-out';
+          webhookToken = 'plg-autoscale-out-token';
           webhookUrl = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookToken}`;
         }
         
