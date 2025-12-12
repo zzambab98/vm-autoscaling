@@ -297,47 +297,6 @@
             ">DanaIX IXNode Autoscaling Service Design Document</h1>
           </div>
         </div>
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-          <button id="lang-ko-btn" onclick="switchLanguage('ko')" style="
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 20px;
-            background: linear-gradient(120deg, #546bff, #7c3aed);
-            color: #ffffff;
-            border: none;
-            border-radius: 10px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(84, 107, 255, 0.3);
-            transition: all 0.2s;
-            font-family: 'Poppins', 'Noto Sans KR', sans-serif;
-          " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(84, 107, 255, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(84, 107, 255, 0.3)';">
-            <span>📄</span>
-            <span>Design Document (Korean)</span>
-          </button>
-          <button id="lang-en-btn" onclick="switchLanguage('en')" style="
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 20px;
-            background: linear-gradient(120deg, #7c3aed, #a855f7);
-            color: #ffffff;
-            border: none;
-            border-radius: 10px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
-            transition: all 0.2s;
-            opacity: 0.7;
-            font-family: 'Poppins', 'Noto Sans KR', sans-serif;
-          " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(124, 58, 237, 0.4)'; this.style.opacity='1';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(124, 58, 237, 0.3)'; this.style.opacity='0.7';">
-            <span>📄</span>
-            <span>Design Doc (English)</span>
-          </button>
-        </div>
       </div>
       <p id="doc-description" style="
         margin-top: 18px;
