@@ -28,6 +28,7 @@ function App() {
   const [refreshTemplates, setRefreshTemplates] = useState(0);
   const [refreshConfigs, setRefreshConfigs] = useState(0);
   const [editingConfigId, setEditingConfigId] = useState(null);
+  const [language, setLanguage] = useState('ko'); // 'ko' or 'en'
 
   const activeTabMeta = useMemo(
     () => TAB_FLOW.find((tab) => tab.id === activeTab),
@@ -90,34 +91,84 @@ function App() {
                 </h1>
               </div>
             </div>
-            <a
-              href={`${API_BASE_URL}/docs/design`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '10px 16px',
-                backgroundColor: '#0e7777',
-                color: '#ffffff',
-                textDecoration: 'none',
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontWeight: '500',
-                transition: 'background-color 0.2s',
-                whiteSpace: 'nowrap'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#0a5a5a';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#0e7777';
-              }}
-            >
-              <span>📘</span>
-              <span>설계 문서</span>
-            </a>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <button
+                  onClick={() => {
+                    setLanguage('ko');
+                    window.open(`${API_BASE_URL}/docs/design`, '_blank');
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '12px 20px',
+                    background: language === 'ko' 
+                      ? 'linear-gradient(120deg, #546bff, #7c3aed)' 
+                      : 'linear-gradient(120deg, #546bff, #7c3aed)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(84, 107, 255, 0.3)',
+                    transition: 'all 0.2s',
+                    opacity: language === 'ko' ? 1 : 0.7,
+                    fontFamily: "'Poppins', 'Noto Sans KR', sans-serif"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(84, 107, 255, 0.4)';
+                    if (language !== 'ko') e.currentTarget.style.opacity = '1';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(84, 107, 255, 0.3)';
+                    if (language !== 'ko') e.currentTarget.style.opacity = '0.7';
+                  }}
+                >
+                  <span>📄</span>
+                  <span>설계 문서 (한글)</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setLanguage('en');
+                    window.open(`${API_BASE_URL}/docs/design`, '_blank');
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '12px 20px',
+                    background: 'linear-gradient(120deg, #7c3aed, #a855f7)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)',
+                    transition: 'all 0.2s',
+                    opacity: language === 'en' ? 1 : 0.7,
+                    fontFamily: "'Poppins', 'Noto Sans KR', sans-serif"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(124, 58, 237, 0.4)';
+                    if (language !== 'en') e.currentTarget.style.opacity = '1';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(124, 58, 237, 0.3)';
+                    if (language !== 'en') e.currentTarget.style.opacity = '0.7';
+                  }}
+                >
+                  <span>📄</span>
+                  <span>Design Doc (EN)</span>
+                </button>
+              </div>
+            </div>
           </div>
           <p style={{ marginTop: 18, color: 'var(--text-muted)', fontSize: 16, lineHeight: 1.6 }}>
             템플릿 → Node Exporter → Prometheus → Autoscaling → Alertmanager → Grafana까지 이어지는 DanaIX 확장 파이프라인을
