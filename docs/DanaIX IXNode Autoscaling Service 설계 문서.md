@@ -339,7 +339,7 @@
           </button>
         </div>
       </div>
-      <p style="
+      <p id="doc-description" style="
         margin-top: 18px;
         color: rgba(13, 21, 56, 0.65);
         font-size: 16px;
@@ -365,7 +365,7 @@
           margin-top: 0;
         ">
           <!-- React -->
-          <div style="
+          <div id="tech-react" style="
             background: #ffffff;
             border-radius: 12px;
             padding: 24px 20px;
@@ -375,8 +375,8 @@
             transition: transform 0.2s, box-shadow 0.2s;
           " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
             <div style="font-size: 36px; margin-bottom: 12px;">⚛️</div>
-            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">React</div>
-            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">프론트엔드 프레임워크</div>
+            <div class="tech-name" style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">React</div>
+            <div class="tech-desc" style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">프론트엔드 프레임워크</div>
           </div>
 
           <!-- Vite -->
