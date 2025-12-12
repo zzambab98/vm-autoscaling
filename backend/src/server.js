@@ -1106,11 +1106,15 @@ const server = http.createServer((req, res) => {
   // Webhook 엔드포인트: Alertmanager에서 받은 webhook을 설정 정보와 함께 Jenkins에 전달
   if (req.method === 'POST' && parsedUrl.pathname.startsWith('/api/webhook/autoscale/')) {
     const serviceName = decodeURIComponent(parsedUrl.pathname.split('/').pop());
+    console.log(`[Webhook] 웹훅 수신: ${serviceName} - ${req.method} ${parsedUrl.pathname}`);
     let body = '';
     req.on('data', chunk => { body += chunk.toString(); });
     req.on('end', async () => {
       try {
         const alertmanagerPayload = JSON.parse(body || '{}');
+        const alerts = alertmanagerPayload.alerts || [];
+        const alertName = alerts[0]?.labels?.alertname || '';
+        console.log(`[Webhook] 웹훅 처리 시작: ${serviceName} - Alert: ${alertName}`);
         
         // 설정 정보 조회
         const { getConfigs } = require('./services/autoscalingService');
