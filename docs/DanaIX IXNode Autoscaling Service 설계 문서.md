@@ -1783,7 +1783,7 @@ export function decideScaleAction(
       <tr>
         <td>스케일아웃: 3번 → 4번</td>
         <td>약 10분 후</td>
-        <td>쿨다운(5분) + Alert 재전송(5분) = 최소 10분 후</td>
+        <td>쿨다운(5분) + Alertmanager 재전송 대기(약 5분) = 약 10분 후<br/><strong>실제 테스트:</strong> 15:48 (3번째 VM) → 15:58 (4번째 VM) 배포 완료<br/>쿨다운 종료 후 Alertmanager의 repeat_interval(5분)과 시점이 맞지 않아 추가 대기 발생</td>
       </tr>
       <tr>
         <td>스케일인: 4번 삭제</td>

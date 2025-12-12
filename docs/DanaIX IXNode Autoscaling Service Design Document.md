@@ -1677,12 +1677,14 @@ export function decideScaleAction(
       </li>
       <li><strong>VM 4 Creation:</strong>
         <ul>
-          <li>Load still high, CPU exceeds 80% continuously</li>
+          <li>Load still high, CPU exceeds 80% continuously (e.g., existing server maintains 95% CPU)</li>
           <li>Wait for cooldown end (5 minutes)</li>
-          <li>Alertmanager re-sends after 5 minutes (repeat_interval)</li>
-          <li>Create VM 4 after cooldown end verification (approximately 5 minutes)</li>
+          <li>Additional wait occurs due to timing mismatch between cooldown end and Alertmanager's repeat_interval (5 min)</li>
+          <li>When Alertmanager re-transmits, Backend checks cooldown and passes → Jenkins pipeline executes</li>
+          <li>Create VM 4 (approximately 3-5 minutes)</li>
           <li>VM 4 Service Deployment Complete</li>
           <li>Scale-out blocked thereafter as max VM count (4) reached</li>
+          <li><strong>Actual Test Result:</strong> 4th VM deployed approximately 10 minutes after 3rd VM deployment (15:48 → 15:58)</li>
         </ul>
       </li>
     </ol>
@@ -1784,7 +1786,7 @@ export function decideScaleAction(
       <tr>
         <td>Scale-Out: 3 → 4</td>
         <td>Approximately 10 minutes later</td>
-        <td>Cooldown (5 min) + Alert re-transmission (5 min) = minimum 10 minutes later</td>
+        <td>Cooldown (5 min) + Alertmanager re-transmission wait (approximately 5 min) = approximately 10 minutes later<br/><strong>Actual Test:</strong> 3rd VM deployed at 15:48 → 4th VM deployed at 15:58<br/>Additional wait occurs due to timing mismatch between cooldown end and Alertmanager's repeat_interval (5 min)</td>
       </tr>
       <tr>
         <td>Scale-In: Delete 4</td>
