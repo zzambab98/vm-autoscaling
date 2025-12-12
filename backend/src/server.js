@@ -1112,9 +1112,6 @@ const server = http.createServer((req, res) => {
     req.on('end', async () => {
       try {
         const alertmanagerPayload = JSON.parse(body || '{}');
-        const alerts = alertmanagerPayload.alerts || [];
-        const alertName = alerts[0]?.labels?.alertname || '';
-        console.log(`[Webhook] 웹훅 처리 시작: ${serviceName} - Alert: ${alertName}`);
         
         // 설정 정보 조회
         const { getConfigs } = require('./services/autoscalingService');
@@ -1132,6 +1129,7 @@ const server = http.createServer((req, res) => {
         // Alert 타입 확인 (스케일아웃 vs 스케일인)
         const alerts = alertmanagerPayload.alerts || [];
         const alertName = alerts[0]?.labels?.alertname || '';
+        console.log(`[Webhook] 웹훅 처리 시작: ${serviceName} - Alert: ${alertName}`);
         const isScaleOut = alertName.includes('HighResourceUsage');
         const isScaleIn = alertName.includes('LowResourceUsage');
         const scaleAction = isScaleOut ? 'scale-out' : (isScaleIn ? 'scale-in' : null);
