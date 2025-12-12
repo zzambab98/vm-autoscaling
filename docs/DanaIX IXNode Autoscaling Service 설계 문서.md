@@ -308,7 +308,7 @@
 
       <div style="
         margin-top: 28px;
-        padding: 24px 32px;
+        padding: 32px;
         border-radius: 18px;
         border: 1px solid rgba(84, 107, 255, 0.25);
         background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(230, 240, 255, 0.9));
@@ -316,68 +316,220 @@
         backdrop-filter: blur(16px);
       ">
         <div style="
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-wrap: wrap;
-          gap: 16px;
-          font-size: 16px;
-          font-weight: 600;
-          color: #0d1538;
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 20px;
+          margin-top: 0;
         ">
+          <!-- React -->
           <div style="
-            padding: 12px 20px;
-            background: linear-gradient(120deg, #546bff, #1fc9a7);
-            color: #ffffff;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(84, 107, 255, 0.3);
-            white-space: nowrap;
-          ">템플릿</div>
-          <div style="color: rgba(13, 21, 56, 0.6); font-size: 20px;">→</div>
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(84, 107, 255, 0.15);
+            transition: transform 0.2s, box-shadow 0.2s;
+          " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
+            <div style="font-size: 36px; margin-bottom: 12px;">⚛️</div>
+            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">React</div>
+            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">프론트엔드 프레임워크</div>
+          </div>
+
+          <!-- Vite -->
           <div style="
-            padding: 12px 20px;
-            background: linear-gradient(120deg, #546bff, #1fc9a7);
-            color: #ffffff;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(84, 107, 255, 0.3);
-            white-space: nowrap;
-          ">Node Exporter</div>
-          <div style="color: rgba(13, 21, 56, 0.6); font-size: 20px;">→</div>
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(84, 107, 255, 0.15);
+            transition: transform 0.2s, box-shadow 0.2s;
+          " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
+            <div style="font-size: 36px; margin-bottom: 12px;">⚡</div>
+            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Vite</div>
+            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">빌드 도구</div>
+          </div>
+
+          <!-- Node.js -->
           <div style="
-            padding: 12px 20px;
-            background: linear-gradient(120deg, #546bff, #1fc9a7);
-            color: #ffffff;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(84, 107, 255, 0.3);
-            white-space: nowrap;
-          ">Prometheus</div>
-          <div style="color: rgba(13, 21, 56, 0.6); font-size: 20px;">→</div>
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(84, 107, 255, 0.15);
+            transition: transform 0.2s, box-shadow 0.2s;
+          " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
+            <div style="font-size: 36px; margin-bottom: 12px;">🟢</div>
+            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Node.js</div>
+            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">백엔드 런타임</div>
+          </div>
+
+          <!-- vCenter -->
           <div style="
-            padding: 12px 20px;
-            background: linear-gradient(120deg, #546bff, #1fc9a7);
-            color: #ffffff;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(84, 107, 255, 0.3);
-            white-space: nowrap;
-          ">Autoscaling</div>
-          <div style="color: rgba(13, 21, 56, 0.6); font-size: 20px;">→</div>
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(84, 107, 255, 0.15);
+            transition: transform 0.2s, box-shadow 0.2s;
+          " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
+            <div style="font-size: 36px; margin-bottom: 12px;">🖥️</div>
+            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">vCenter</div>
+            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">가상화 플랫폼</div>
+          </div>
+
+          <!-- GitHub -->
           <div style="
-            padding: 12px 20px;
-            background: linear-gradient(120deg, #546bff, #1fc9a7);
-            color: #ffffff;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(84, 107, 255, 0.3);
-            white-space: nowrap;
-          ">Alertmanager</div>
-          <div style="color: rgba(13, 21, 56, 0.6); font-size: 20px;">→</div>
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(84, 107, 255, 0.15);
+            transition: transform 0.2s, box-shadow 0.2s;
+          " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
+            <div style="font-size: 36px; margin-bottom: 12px;">🐙</div>
+            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">GitHub</div>
+            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">코드 저장소</div>
+          </div>
+
+          <!-- Jenkins -->
           <div style="
-            padding: 12px 20px;
-            background: linear-gradient(120deg, #546bff, #1fc9a7);
-            color: #ffffff;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(84, 107, 255, 0.3);
-            white-space: nowrap;
-          ">Grafana</div>
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(84, 107, 255, 0.15);
+            transition: transform 0.2s, box-shadow 0.2s;
+          " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
+            <div style="font-size: 36px; margin-bottom: 12px;">🔧</div>
+            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Jenkins</div>
+            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">CI/CD 파이프라인</div>
+          </div>
+
+          <!-- F5 BIG-IP -->
+          <div style="
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(84, 107, 255, 0.15);
+            transition: transform 0.2s, box-shadow 0.2s;
+          " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
+            <div style="font-size: 36px; margin-bottom: 12px;">⚖️</div>
+            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">F5 BIG-IP</div>
+            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">로드밸런서</div>
+          </div>
+
+          <!-- Prometheus -->
+          <div style="
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(84, 107, 255, 0.15);
+            transition: transform 0.2s, box-shadow 0.2s;
+          " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
+            <div style="font-size: 36px; margin-bottom: 12px;">📊</div>
+            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Prometheus</div>
+            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">메트릭 수집</div>
+          </div>
+
+          <!-- Grafana -->
+          <div style="
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(84, 107, 255, 0.15);
+            transition: transform 0.2s, box-shadow 0.2s;
+          " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
+            <div style="font-size: 36px; margin-bottom: 12px;">📈</div>
+            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Grafana</div>
+            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">모니터링 대시보드</div>
+          </div>
+
+          <!-- Loki -->
+          <div style="
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(84, 107, 255, 0.15);
+            transition: transform 0.2s, box-shadow 0.2s;
+          " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
+            <div style="font-size: 36px; margin-bottom: 12px;">📝</div>
+            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Loki</div>
+            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">로그 수집</div>
+          </div>
+
+          <!-- Alertmanager -->
+          <div style="
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(84, 107, 255, 0.15);
+            transition: transform 0.2s, box-shadow 0.2s;
+          " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
+            <div style="font-size: 36px; margin-bottom: 12px;">🔔</div>
+            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Alertmanager</div>
+            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">알림 관리</div>
+          </div>
+
+          <!-- Node Exporter -->
+          <div style="
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(84, 107, 255, 0.15);
+            transition: transform 0.2s, box-shadow 0.2s;
+          " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
+            <div style="font-size: 36px; margin-bottom: 12px;">📡</div>
+            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Node Exporter</div>
+            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">메트릭 에이전트</div>
+          </div>
+
+          <!-- Promtail -->
+          <div style="
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(84, 107, 255, 0.15);
+            transition: transform 0.2s, box-shadow 0.2s;
+          " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
+            <div style="font-size: 36px; margin-bottom: 12px;">📋</div>
+            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Promtail</div>
+            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">로그 에이전트</div>
+          </div>
+
+          <!-- govc -->
+          <div style="
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(84, 107, 255, 0.15);
+            transition: transform 0.2s, box-shadow 0.2s;
+          " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
+            <div style="font-size: 36px; margin-bottom: 12px;">🛠️</div>
+            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">govc</div>
+            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">vCenter CLI 도구</div>
+          </div>
         </div>
       </div>
     </div>
