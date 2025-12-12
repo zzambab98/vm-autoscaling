@@ -255,45 +255,88 @@
     backdrop-filter: blur(16px);
   ">
     <div style="position: relative; z-index: 1;">
-      <div style="display: flex; align-items: center; gap: 18px; flex-wrap: wrap;">
-        <img
-          src="/logo.svg"
-          alt="DanaIX"
-          style="height: 64px; width: auto;"
-          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-        />
-        <div style="
-          width: 64px;
-          height: 64px;
-          background: linear-gradient(120deg, #546bff, #1fc9a7);
-          border-radius: 12px;
-          display: none;
-          align-items: center;
-          justify-content: center;
-          font-size: 32px;
-          font-weight: 700;
-          color: white;
-          box-shadow: 0 10px 20px rgba(84, 107, 255, 0.3);
-        ">V</div>
-        <div>
-            <p style="
-              text-transform: uppercase;
-              font-size: 12px;
-              letter-spacing: 0.35em;
-              color: rgba(13, 21, 56, 0.65);
-              margin: 0;
-              font-weight: 500;
-            ">Dana Cloud</p>
-          <h1 style="
-            margin-top: 6px;
-            margin-bottom: 0;
-            font-size: 36px;
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 18px; flex-wrap: wrap; flex: 1;">
+          <img
+            src="/logo.svg"
+            alt="DanaIX"
+            style="height: 64px; width: auto;"
+            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+          />
+          <div style="
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(120deg, #546bff, #1fc9a7);
+            border-radius: 12px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
             font-weight: 700;
-            letter-spacing: -0.02em;
-            color: #0d1538;
-            background: none;
-            -webkit-text-fill-color: #0d1538;
-          ">DanaIX IXNode Autoscaling Service 설계 문서</h1>
+            color: white;
+            box-shadow: 0 10px 20px rgba(84, 107, 255, 0.3);
+          ">V</div>
+          <div>
+              <p style="
+                text-transform: uppercase;
+                font-size: 12px;
+                letter-spacing: 0.35em;
+                color: rgba(13, 21, 56, 0.65);
+                margin: 0;
+                font-weight: 500;
+              ">Dana Cloud</p>
+            <h1 id="doc-title" style="
+              margin-top: 6px;
+              margin-bottom: 0;
+              font-size: 36px;
+              font-weight: 700;
+              letter-spacing: -0.02em;
+              color: #0d1538;
+              background: none;
+              -webkit-text-fill-color: #0d1538;
+            ">DanaIX IXNode Autoscaling Service 설계 문서</h1>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <button id="lang-ko-btn" onclick="switchLanguage('ko')" style="
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: linear-gradient(120deg, #546bff, #7c3aed);
+            color: #ffffff;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(84, 107, 255, 0.3);
+            transition: all 0.2s;
+            font-family: 'Poppins', 'Noto Sans KR', sans-serif;
+          " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(84, 107, 255, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(84, 107, 255, 0.3)';">
+            <span>📄</span>
+            <span>설계 문서 (한글)</span>
+          </button>
+          <button id="lang-en-btn" onclick="switchLanguage('en')" style="
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: linear-gradient(120deg, #7c3aed, #a855f7);
+            color: #ffffff;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+            transition: all 0.2s;
+            opacity: 0.7;
+            font-family: 'Poppins', 'Noto Sans KR', sans-serif;
+          " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(124, 58, 237, 0.4)'; this.style.opacity='1';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(124, 58, 237, 0.3)'; this.style.opacity='0.7';">
+            <span>📄</span>
+            <span>Design Doc (EN)</span>
+          </button>
         </div>
       </div>
       <p style="
@@ -337,7 +380,7 @@
           </div>
 
           <!-- Vite -->
-          <div style="
+          <div id="tech-vite" style="
             background: #ffffff;
             border-radius: 12px;
             padding: 24px 20px;
@@ -347,12 +390,12 @@
             transition: transform 0.2s, box-shadow 0.2s;
           " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
             <div style="font-size: 36px; margin-bottom: 12px;">⚡</div>
-            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Vite</div>
-            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">빌드 도구</div>
+            <div class="tech-name" style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Vite</div>
+            <div class="tech-desc" style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">빌드 도구</div>
           </div>
 
           <!-- Node.js -->
-          <div style="
+          <div id="tech-nodejs" style="
             background: #ffffff;
             border-radius: 12px;
             padding: 24px 20px;
@@ -362,12 +405,12 @@
             transition: transform 0.2s, box-shadow 0.2s;
           " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
             <div style="font-size: 36px; margin-bottom: 12px;">🟢</div>
-            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Node.js</div>
-            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">백엔드 런타임</div>
+            <div class="tech-name" style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Node.js</div>
+            <div class="tech-desc" style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">백엔드 런타임</div>
           </div>
 
           <!-- vCenter -->
-          <div style="
+          <div id="tech-vcenter" style="
             background: #ffffff;
             border-radius: 12px;
             padding: 24px 20px;
@@ -377,12 +420,12 @@
             transition: transform 0.2s, box-shadow 0.2s;
           " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
             <div style="font-size: 36px; margin-bottom: 12px;">🖥️</div>
-            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">vCenter</div>
-            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">가상화 플랫폼</div>
+            <div class="tech-name" style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">vCenter</div>
+            <div class="tech-desc" style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">가상화 플랫폼</div>
           </div>
 
           <!-- GitHub -->
-          <div style="
+          <div id="tech-github" style="
             background: #ffffff;
             border-radius: 12px;
             padding: 24px 20px;
@@ -392,12 +435,12 @@
             transition: transform 0.2s, box-shadow 0.2s;
           " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
             <div style="font-size: 36px; margin-bottom: 12px;">🐙</div>
-            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">GitHub</div>
-            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">코드 저장소</div>
+            <div class="tech-name" style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">GitHub</div>
+            <div class="tech-desc" style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">코드 저장소</div>
           </div>
 
           <!-- Jenkins -->
-          <div style="
+          <div id="tech-jenkins" style="
             background: #ffffff;
             border-radius: 12px;
             padding: 24px 20px;
@@ -407,12 +450,12 @@
             transition: transform 0.2s, box-shadow 0.2s;
           " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
             <div style="font-size: 36px; margin-bottom: 12px;">🔧</div>
-            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Jenkins</div>
-            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">CI/CD 파이프라인</div>
+            <div class="tech-name" style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Jenkins</div>
+            <div class="tech-desc" style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">CI/CD 파이프라인</div>
           </div>
 
           <!-- F5 BIG-IP -->
-          <div style="
+          <div id="tech-f5" style="
             background: #ffffff;
             border-radius: 12px;
             padding: 24px 20px;
@@ -422,12 +465,12 @@
             transition: transform 0.2s, box-shadow 0.2s;
           " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
             <div style="font-size: 36px; margin-bottom: 12px;">⚖️</div>
-            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">F5 BIG-IP</div>
-            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">로드밸런서</div>
+            <div class="tech-name" style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">F5 BIG-IP</div>
+            <div class="tech-desc" style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">로드밸런서</div>
           </div>
 
           <!-- Prometheus -->
-          <div style="
+          <div id="tech-prometheus" style="
             background: #ffffff;
             border-radius: 12px;
             padding: 24px 20px;
@@ -437,12 +480,12 @@
             transition: transform 0.2s, box-shadow 0.2s;
           " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
             <div style="font-size: 36px; margin-bottom: 12px;">📊</div>
-            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Prometheus</div>
-            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">메트릭 수집</div>
+            <div class="tech-name" style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Prometheus</div>
+            <div class="tech-desc" style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">메트릭 수집</div>
           </div>
 
           <!-- Grafana -->
-          <div style="
+          <div id="tech-grafana" style="
             background: #ffffff;
             border-radius: 12px;
             padding: 24px 20px;
@@ -452,12 +495,12 @@
             transition: transform 0.2s, box-shadow 0.2s;
           " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
             <div style="font-size: 36px; margin-bottom: 12px;">📈</div>
-            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Grafana</div>
-            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">모니터링 대시보드</div>
+            <div class="tech-name" style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Grafana</div>
+            <div class="tech-desc" style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">모니터링 대시보드</div>
           </div>
 
           <!-- Loki -->
-          <div style="
+          <div id="tech-loki" style="
             background: #ffffff;
             border-radius: 12px;
             padding: 24px 20px;
@@ -467,12 +510,12 @@
             transition: transform 0.2s, box-shadow 0.2s;
           " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
             <div style="font-size: 36px; margin-bottom: 12px;">📝</div>
-            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Loki</div>
-            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">로그 수집</div>
+            <div class="tech-name" style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Loki</div>
+            <div class="tech-desc" style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">로그 수집</div>
           </div>
 
           <!-- Alertmanager -->
-          <div style="
+          <div id="tech-alertmanager" style="
             background: #ffffff;
             border-radius: 12px;
             padding: 24px 20px;
@@ -482,12 +525,12 @@
             transition: transform 0.2s, box-shadow 0.2s;
           " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
             <div style="font-size: 36px; margin-bottom: 12px;">🔔</div>
-            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Alertmanager</div>
-            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">알림 관리</div>
+            <div class="tech-name" style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Alertmanager</div>
+            <div class="tech-desc" style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">알림 관리</div>
           </div>
 
           <!-- Node Exporter -->
-          <div style="
+          <div id="tech-nodeexporter" style="
             background: #ffffff;
             border-radius: 12px;
             padding: 24px 20px;
@@ -497,12 +540,12 @@
             transition: transform 0.2s, box-shadow 0.2s;
           " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
             <div style="font-size: 36px; margin-bottom: 12px;">📡</div>
-            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Node Exporter</div>
-            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">메트릭 에이전트</div>
+            <div class="tech-name" style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Node Exporter</div>
+            <div class="tech-desc" style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">메트릭 에이전트</div>
           </div>
 
           <!-- Promtail -->
-          <div style="
+          <div id="tech-promtail" style="
             background: #ffffff;
             border-radius: 12px;
             padding: 24px 20px;
@@ -512,12 +555,12 @@
             transition: transform 0.2s, box-shadow 0.2s;
           " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
             <div style="font-size: 36px; margin-bottom: 12px;">📋</div>
-            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Promtail</div>
-            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">로그 에이전트</div>
+            <div class="tech-name" style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">Promtail</div>
+            <div class="tech-desc" style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">로그 에이전트</div>
           </div>
 
           <!-- govc -->
-          <div style="
+          <div id="tech-govc" style="
             background: #ffffff;
             border-radius: 12px;
             padding: 24px 20px;
@@ -527,8 +570,8 @@
             transition: transform 0.2s, box-shadow 0.2s;
           " onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 20px rgba(84, 107, 255, 0.2)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.08)';">
             <div style="font-size: 36px; margin-bottom: 12px;">🛠️</div>
-            <div style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">govc</div>
-            <div style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">vCenter CLI 도구</div>
+            <div class="tech-name" style="font-weight: 600; font-size: 16px; color: #0d1538; margin-bottom: 6px;">govc</div>
+            <div class="tech-desc" style="font-size: 13px; color: rgba(13, 21, 56, 0.65);">vCenter CLI 도구</div>
           </div>
         </div>
       </div>
