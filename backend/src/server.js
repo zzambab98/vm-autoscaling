@@ -1449,17 +1449,8 @@ const server = http.createServer((req, res) => {
           webhookUrl = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookToken}`;
         }
         
-        // 쿨다운을 Jenkins 트리거 직전에 시작 (경쟁 조건 방지)
-        // 여러 웹훅이 동시에 들어와도 쿨다운이 즉시 시작되어 중복 실행 방지
-        try {
-          const { startCooldown } = require('./services/cooldownService');
-          const cooldownPeriod = config.scaling?.cooldownPeriod || 300;
-          await startCooldown(serviceName, scaleAction, cooldownPeriod);
-          console.log(`[Webhook] 쿨다운 시작: ${serviceName} - ${scaleAction} (Jenkins 트리거 직전)`);
-        } catch (error) {
-          console.error(`[Webhook] 쿨다운 시작 실패 (경고):`, error.message);
-          // 쿨다운 시작 실패해도 Jenkins 트리거는 진행
-        }
+        // 쿨다운은 이미 checkAndStartCooldown에서 원자적으로 처리되었으므로 여기서는 로그만 남김
+        // (경쟁 조건 해결: 쿨다운 체크와 시작이 원자적으로 처리됨)
         
         // Jenkins webhook에 POST 요청
         const axios = require('axios');
