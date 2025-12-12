@@ -1863,6 +1863,24 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 영문 설계 문서 서빙 (HTML 파일)
+  if (req.method === 'GET' && parsedUrl.pathname === '/docs/design-en') {
+    try {
+      const docPath = path.join(__dirname, '../../docs/DanaIX IXNode Autoscaling Service Design Document.md');
+      const content = fs.readFileSync(docPath, 'utf8');
+      
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Access-Control-Allow-Origin': '*'
+      });
+      res.end(content);
+    } catch (error) {
+      console.error('[API] 영문 설계 문서 읽기 실패:', error.message);
+      sendJSONResponse(res, 404, { error: '영문 설계 문서를 찾을 수 없습니다.' });
+    }
+    return;
+  }
+
   // 404 Not Found
   sendJSONResponse(res, 404, { error: 'Not Found' });
 });

@@ -131,11 +131,11 @@ function App() {
                   <span>📄</span>
                   <span>설계 문서 (한글)</span>
                 </button>
-                <button
-                  onClick={() => {
-                    setLanguage('en');
-                    window.open(`${API_BASE_URL}/docs/design`, '_blank');
-                  }}
+              <button
+                onClick={() => {
+                  setLanguage('en');
+                  window.open(`${API_BASE_URL}/docs/design-en`, '_blank');
+                }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
