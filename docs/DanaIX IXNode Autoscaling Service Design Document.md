@@ -1858,15 +1858,22 @@ export function decideScaleAction(
   <!-- 14. Future Enhancements -->
   <h2 id="section-14">14. Future Enhancement Directions</h2>
 
-  <h3 id="section-14-1">14.1 Tenant-Based Permission Separation</h3>
+  <h3 id="section-14-1">14.1 Enhancement for Individual Service Provision</h3>
   <ul>
-    <li>Currently only administrators can configure all services</li>
-    <li>Future: Separate accessible services and autoscaling configurations per tenant</li>
-    <li>Role-based access control (RBAC) examples:
+    <li><b>Current Status:</b> The current completed version is structured so that only Dana Cloud operators or administrators can receive requests and perform configurations.</li>
+    <li><b>Database Integration:</b> Future database integration for configuration and history management</li>
+    <li><b>Permission Separation:</b> Separate accessible services and autoscaling configurations per tenant
       <ul>
-        <li>GLOBAL_ADMIN, TENANT_ADMIN, TENANT_VIEWER, etc.</li>
+        <li>Role-based access control (RBAC) examples: GLOBAL_ADMIN, TENANT_ADMIN, TENANT_VIEWER, etc.</li>
       </ul>
     </li>
+    <li><b>Page Separation:</b> Separation of administrator and user pages
+      <ul>
+        <li>Administrator Page: Overall service management, system settings, monitoring</li>
+        <li>User Page: Autoscaling configuration and monitoring for assigned services</li>
+      </ul>
+    </li>
+    <li><b>Individual Service Provision:</b> After completion of the above enhancements, individual service provision to each user will be enabled</li>
   </ul>
 
   <h3 id="section-14-2">14.2 Tenant-Dedicated Server/Infrastructure</h3>
@@ -1979,6 +1986,13 @@ export function decideScaleAction(
 
   <h3 id="section-15-4">15.4 Limitations and Considerations</h3>
   <div class="warning">
+    <h4>Service Provision Status</h4>
+    <ul>
+      <li><b>Current Version Service Scope:</b> The current completed version is not in a service state or structure that can be provided to individual users.</li>
+      <li><b>Operation Mode:</b> The current completed version is structured so that only Dana Cloud operators or administrators can receive requests and perform configurations.</li>
+      <li><b>Future Individual Service Provision Plan:</b> After additional enhancement work including database integration, permission separation, and separation of administrator and user pages, individual service provision will be enabled.</li>
+    </ul>
+    <h4>Technical Limitations</h4>
     <ul>
       <li><b>IP Pool Range:</b> Scale-out will be blocked if IP pool is insufficient. Ensure sufficient IP range.</li>
       <li><b>Template Preparation:</b> VM creation may fail if template is not properly prepared.</li>
