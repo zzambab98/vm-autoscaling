@@ -1499,7 +1499,33 @@ const server = http.createServer((req, res) => {
 
         console.log(`[Webhook] VM 삭제 완료 수신: ${serviceName} - ${vmName} (${vmIp})`);
 
-        // 1. Prometheus Job에서 target 제거
+        // 1. 현재 VM 개수를 먼저 확인 (Prometheus target 제거 전에 확인)
+        // Jenkins가 이미 Prometheus에서 target을 제거했을 수 있으므로, 제거 전 개수를 계산
+        let currentVmCount = 0;
+        try {
+          const { getPrometheusTargets } = require('./services/prometheusMonitoringService');
+          const targetsResult = await getPrometheusTargets(prometheusJobName);
+          const currentTargets = targetsResult.targets || [];
+          
+          // 삭제된 VM의 target이 아직 남아있으면 그대로 사용, 없으면 +1
+          const deletedTarget = `${vmIp}:${process.env.NODE_EXPORTER_PORT || '9100'}`;
+          const targetExists = currentTargets.some(t => t.instance === deletedTarget);
+          
+          if (targetExists) {
+            // target이 아직 있으면 현재 개수 사용 (Jenkins가 아직 제거하지 않음)
+            currentVmCount = currentTargets.length;
+          } else {
+            // target이 없으면 현재 개수 + 1 (Jenkins가 이미 제거함)
+            currentVmCount = currentTargets.length + 1;
+          }
+          
+          console.log(`[Webhook] VM 삭제 완료 후 현재 VM 개수 계산: ${currentVmCount}개 (Prometheus target 존재: ${targetExists})`);
+        } catch (error) {
+          console.warn(`[Webhook] VM 개수 확인 실패 (경고):`, error.message);
+          // VM 개수 확인 실패 시 기본값 사용
+        }
+
+        // 2. Prometheus Job에서 target 제거 (Jenkins가 이미 제거했을 수 있음)
         const nodeExporterPort = process.env.NODE_EXPORTER_PORT || '9100';
         const target = `${vmIp}:${nodeExporterPort}`;
         
@@ -1507,19 +1533,14 @@ const server = http.createServer((req, res) => {
           await removeTargetFromJob(prometheusJobName, target);
           console.log(`[Webhook] Prometheus Job에서 target 제거 완료: ${prometheusJobName} - ${target}`);
         } catch (error) {
-          console.error(`[Webhook] Prometheus Job에서 target 제거 실패:`, error.message);
-          // Prometheus 제거 실패해도 계속 진행 (경고만)
+          // 이미 제거되었거나 제거 실패해도 계속 진행 (경고만)
+          console.log(`[Webhook] Prometheus Job에서 target 제거 확인: ${prometheusJobName} - ${target} (${error.message})`);
         }
 
-        // 2. 스케일인 스위치 상태 업데이트 (VM 수가 줄어들었으므로 최소 개수 도달 시 OFF)
+        // 3. 스케일인 스위치 상태 업데이트 (VM 수가 줄어들었으므로 최소 개수 도달 시 OFF)
         try {
-          const { getPrometheusTargets } = require('./services/prometheusMonitoringService');
           const { getConfigs } = require('./services/autoscalingService');
           const { updateScaleInSwitch } = require('./services/scaleInSwitchService');
-          
-          // 현재 VM 개수 확인
-          const targetsResult = await getPrometheusTargets(prometheusJobName);
-          const currentVmCount = targetsResult.targets?.length || 0;
           
           // 설정에서 최소 VM 개수 가져오기
           const configs = await getConfigs();
