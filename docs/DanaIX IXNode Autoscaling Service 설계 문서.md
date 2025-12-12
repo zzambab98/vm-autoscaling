@@ -1676,12 +1676,14 @@ export function decideScaleAction(
       </li>
       <li><strong>VM 4번 생성:</strong>
         <ul>
-          <li>부하가 여전히 높아 CPU 80% 초과 지속</li>
+          <li>부하가 여전히 높아 CPU 80% 초과 지속 (예: 기존 서버가 계속 95% CPU 유지)</li>
           <li>쿨다운 종료 대기 (5분)</li>
-          <li>Alertmanager가 5분 후 재전송 (repeat_interval)</li>
-          <li>쿨다운 종료 확인 후 VM 4번 생성 (약 5분 소요)</li>
+          <li>쿨다운 종료 후 Alertmanager의 repeat_interval(5분)과 시점이 맞지 않아 추가 대기 발생</li>
+          <li>Alertmanager가 재전송하면 Backend에서 쿨다운 체크 통과 → Jenkins 파이프라인 실행</li>
+          <li>VM 4번 생성 (약 3-5분 소요)</li>
           <li>VM 4번 서비스 투입 완료</li>
           <li>최대 VM 개수(4개) 도달로 이후 스케일아웃 차단</li>
+          <li><strong>실제 테스트 결과:</strong> 3번째 VM 배포(15:48) 후 약 10분 후(15:58) 4번째 VM 배포 완료</li>
         </ul>
       </li>
     </ol>
