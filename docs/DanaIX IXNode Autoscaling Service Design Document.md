@@ -1105,7 +1105,7 @@ export interface AutoscalingConfig {
 
   <h3 id="section-5-1">5.1 Scale-Out Conditions</h3>
   <div class="info">
-    <p><strong>주의:</strong> Scale-out conditions are triggered when the <strong>maximum value among all instances</strong> exceeds the threshold using the <code>max()</code> function. That is, scale-out occurs if any instance has high usage.</p>
+    <p><strong>Note:</strong> Scale-out conditions are triggered when the <strong>maximum value among all instances</strong> exceeds the threshold using the <code>max()</code> function. That is, scale-out occurs if any instance has high usage.</p>
   </div>
   
   <h4>5.1.1 CPU Usage-Based Scale-Out (Example PromQL)</h4>
@@ -1125,7 +1125,7 @@ export interface AutoscalingConfig {
 
   <h3 id="section-5-2">5.2 Scale-In Conditions</h3>
   <div class="info">
-    <p><strong>주의:</strong> Scale-in conditions are triggered when the <strong>maximum value of all instances</strong> is below the threshold using the <code>max()</code> function. That is, scale-in occurs only when all VMs have low usage.</p>
+    <p><strong>Note:</strong> Scale-in conditions are triggered when the <strong>maximum value of all instances</strong> is below the threshold using the <code>max()</code> function. That is, scale-in occurs only when all VMs have low usage.</p>
   </div>
   
   <h4>5.2.1 CPU and Memory Usage-Based Scale-In (Example PromQL)</h4>
@@ -1164,7 +1164,7 @@ AND
     <li><b>Single Criteria:</b> Both scale-in and scale-out are determined based on the <b>number of VM targets registered in Prometheus Job</b> (currentVmCount)</li>
     <li><b>Scale-Out Block Condition:</b> currentVmCount &gt;= maxVms → Scale-Out Block</li>
     <li><b>Scale-In Block Condition:</b> currentVmCount &lt;= minVms → Scale-In Block</li>
-    <li><b>스케일인 스위치 방식:</b> 최소 VM 개수 Reached 시 Turn scale-in switch OFF and create Alertmanager Silence to block webhooks</li>
+    <li><b>Scale-In Switch Method:</b> When minimum VM count is reached, turn scale-in switch OFF and create Alertmanager Silence to block webhooks</li>
     <li><b>Automatic Switch Recovery:</b> When VM count reaches above minimum, automatically turn switch ON and delete Silence</li>
     <li><b>Start Cooldown:</b> Start cooldown when min/max count is reached to prevent pipeline overload from Alertmanager repeated alerts</li>
     <li><b>Logic Simplification:</b> Remove unnecessary duplicate checks, determine min/max count only from Prometheus Job targets</li>
@@ -1251,7 +1251,7 @@ export function decideScaleAction(
   return "ALLOW";
 }</code></pre>
 
-  <p><b>요약:</b> Now, scale-in/out min/max count determination is performed only based on the number of VMs registered in Prometheus Job,</p>
+  <p><b>Summary:</b> Now, scale-in/out min/max count determination is performed only based on the number of VMs registered in Prometheus Job,</p>
   <ul>
     <li>Scale-Out: currentVmCount &gt;= maxVms → Block</li>
     <li>Scale-In: currentVmCount &lt;= minVms → Block + Switch OFF + Create Silence</li>
@@ -1397,7 +1397,7 @@ export function decideScaleAction(
   <!-- 10. Events -->
   <h2 id="section-10">10. Autoscaling Event Management (Concept)</h2>
   <ul>
-    <li>Scale-Out/Scale-In Execution 시 Backend로 Event 기록 요청</li>
+    <li>Request event logging to Backend when Scale-Out/Scale-In is executed</li>
     <li>Expected Fields
       <ul>
         <li>serviceName, action(scale-out | scale-in)</li>
@@ -1424,7 +1424,7 @@ export function decideScaleAction(
       <ul>
         <li>Select Create Template menu in UI</li>
         <li>Select source VM and specify template name</li>
-        <li>vCenter에서 Create Template Complete 확인</li>
+        <li>Verify template creation completion in vCenter</li>
       </ul>
     </li>
     <li><b>Create Autoscaling Configuration</b>
@@ -1445,9 +1445,9 @@ export function decideScaleAction(
     </li>
     <li><b>Test and Verify</b>
       <ul>
-        <li>부하 생성 스크립트로 CPU/Memory Usage 증가</li>
+        <li>Increase CPU/Memory usage with load generation script</li>
         <li>Verify scale-out trigger</li>
-        <li>VM Creation, F5 Registration, Prometheus Add Target 확인</li>
+        <li>Verify VM creation, F5 registration, Prometheus target addition</li>
         <li>Verify scale-in trigger after load removal</li>
       </ul>
     </li>
@@ -1458,7 +1458,7 @@ export function decideScaleAction(
     <li><b>Check Monitoring Dashboard</b>
       <ul>
         <li>Monitor CPU/Memory usage graphs</li>
-        <li>Current VM Count 및 Check Scale Events</li>
+        <li>Check current VM count and scale events</li>
         <li>Check alert status</li>
       </ul>
     </li>
@@ -1558,11 +1558,11 @@ export function decideScaleAction(
         <li>Add .env file to .gitignore</li>
       </ul>
     </li>
-    <li><b>Network 보안</b>
+    <li><b>Network Security</b>
       <ul>
-        <li>Backend/Frontend는 사내망에서만 접근 Available</li>
+        <li>Backend/Frontend accessible only from internal network</li>
         <li>Block external access via VPN or firewall rules</li>
-        <li>서비스 간 통신은 내부 Network 사용</li>
+        <li>Use internal network for inter-service communication</li>
       </ul>
     </li>
     <li><b>SSH Key Management</b>
@@ -1591,7 +1591,7 @@ export function decideScaleAction(
       <ul>
         <li>Default cooldown period: 5 minutes (300 seconds)</li>
         <li>Independent cooldown management for scale-out/in</li>
-        <li>최소/Max Count Reached 시 자동 Start Cooldown</li>
+        <li>Automatically start cooldown when min/max count is reached</li>
         <li>Prevent Alertmanager repeated alerts</li>
       </ul>
     </li>
@@ -1599,16 +1599,16 @@ export function decideScaleAction(
       <ul>
         <li>Template clone: approximately 1-2 minutes</li>
         <li>VM boot and IP configuration: approximately 1-2 minutes</li>
-        <li>Health Check Wait: 약 30초</li>
-        <li>F5 Registration 및 Prometheus 추가: 약 30초</li>
+        <li>Health check wait: approximately 30 seconds</li>
+        <li>F5 registration and Prometheus addition: approximately 30 seconds</li>
         <li>Total time: approximately 3-5 minutes</li>
       </ul>
     </li>
     <li><b>VM Deletion Time</b>
       <ul>
-        <li>F5 Removal: 약 10초</li>
-        <li>Prometheus Removal: 약 10초</li>
-        <li>VM Power Off: 약 30초</li>
+        <li>F5 removal: approximately 10 seconds</li>
+        <li>Prometheus removal: approximately 10 seconds</li>
+        <li>VM power off: approximately 30 seconds</li>
         <li>VM deletion: approximately 1 minute</li>
         <li>Total time: approximately 2 minutes</li>
       </ul>
@@ -1642,7 +1642,7 @@ export function decideScaleAction(
     Cooldown Check :done, cd1, 00:06, 1m
     
     section VM 3 Creation
-    VM 3 Creation 시작 :active, vm3_create, 00:07, 5m
+    VM 3 Creation Started :active, vm3_create, 00:07, 5m
     VM 3 Service Deployment :done, vm3_ready, 00:12, 0m
     Start Cooldown (5 minutes) :active, cooldown1, 00:12, 5m
     
@@ -1650,30 +1650,30 @@ export function decideScaleAction(
     CPU Still Exceeds 80% :crit, load2, 00:12, 1m
     Alert Re-triggered (after 5 minutes) :milestone, alert2, 00:17, 0m
     Cooldown End Verified :done, cd2, 00:17, 1m
-    VM 4 Creation 시작 :active, vm4_create, 00:18, 5m
+    VM 4 Creation Started :active, vm4_create, 00:18, 5m
     VM 4 Service Deployment :done, vm4_ready, 00:23, 0m
     Start Cooldown (5 minutes) :active, cooldown2, 00:23, 5m</div>
 
     <p><strong>Scale-Out Process:</strong></p>
     <ol>
-      <li><strong>Initial State:</strong> VM 1번, VM 2 Running 중</li>
-      <li><strong>Load Increase:</strong> CPU 사용률이 80% 초과하여 1분 이상 지속</li>
-      <li><strong>Alert Triggered:</strong> Prometheus에서 Alert Firing → Alertmanager로 전달</li>
+      <li><strong>Initial State:</strong> VM 1 and VM 2 running</li>
+      <li><strong>Load Increase:</strong> CPU usage exceeds 80% for more than 1 minute</li>
+      <li><strong>Alert Triggered:</strong> Alert firing from Prometheus → sent to Alertmanager</li>
       <li><strong>VM 3 Creation:</strong> 
         <ul>
-          <li>Cooldown Check Pass (Initial State이므로 쿨다운 없음)</li>
-          <li>Max VM Count Check Pass (현재 2개 < 최대 4개)</li>
-          <li>Jenkins 파이프라인 실행: VM Creation, F5 Registration, Prometheus Registration (약 5분 소요)</li>
+          <li>Cooldown check passed (no cooldown in initial state)</li>
+          <li>Max VM count check passed (current 2 < max 4)</li>
+          <li>Jenkins pipeline execution: VM creation, F5 registration, Prometheus registration (approximately 5 minutes)</li>
           <li>VM 3 Service Deployment Complete</li>
           <li>Start Cooldown (5 minutes)</li>
         </ul>
       </li>
       <li><strong>VM 4 Creation:</strong>
         <ul>
-          <li>부하가 여전히 높아 CPU Exceeds 80% 지속</li>
+          <li>Load still high, CPU exceeds 80% continuously</li>
           <li>Wait for cooldown end (5 minutes)</li>
           <li>Alertmanager re-sends after 5 minutes (repeat_interval)</li>
-          <li>Cooldown End Verified 후 VM 4 Creation (약 5분 소요)</li>
+          <li>Create VM 4 after cooldown end verification (approximately 5 minutes)</li>
           <li>VM 4 Service Deployment Complete</li>
           <li>Scale-out blocked thereafter as max VM count (4) reached</li>
         </ul>
@@ -1698,7 +1698,7 @@ export function decideScaleAction(
     Cooldown Check :done, cd_in1, 00:10, 1m
     
     section VM 4 Deletion
-    VM 4 Deletion 시작 :active, vm4_del, 00:11, 2m
+    VM 4 Deletion Started :active, vm4_del, 00:11, 2m
     VM 4 Deletion Complete :milestone, vm4_done, 00:13, 0m
     Start Cooldown (5 minutes) :active, cooldown_in1, 00:13, 5m
     
@@ -1706,25 +1706,25 @@ export function decideScaleAction(
     CPU Still Below 30% :done, low_load2, 00:13, 5m
     Alert Re-triggered (after 5 minutes) :milestone, alert_in2, 00:18, 0m
     Cooldown End Verified :done, cd_in2, 00:18, 1m
-    VM 3 Deletion 시작 :active, vm3_del, 00:19, 2m
+    VM 3 Deletion Started :active, vm3_del, 00:19, 2m
     VM 3 Deletion Complete :milestone, vm3_done, 00:21, 0m
     Start Cooldown (5 minutes) :active, cooldown_in2, 00:21, 5m
     
     section Maintain Min Count
     VM 1 Maintained :active, vm1_keep, 00:21, 10m
     VM 2 Maintained :active, vm2_keep, 00:21, 10m
-    Min Count Reached로 스케일인 Block :crit, block, 00:21, 10m</div>
+    Scale-In Blocked as Min Count Reached :crit, block, 00:21, 10m</div>
 
     <p><strong>Scale-In Process:</strong></p>
     <ol>
       <li><strong>Max Count Reached:</strong> VM 1, 2, 3, 4 all running</li>
       <li><strong>Load Decrease:</strong> Overall CPU usage below 30% for more than 5 minutes</li>
-      <li><strong>Alert Triggered:</strong> Prometheus에서 Alert Firing → Alertmanager로 전달</li>
-      <li><strong>VM 4 Deletion (가장 최신 VM):</strong>
+      <li><strong>Alert Triggered:</strong> Alert firing from Prometheus → sent to Alertmanager</li>
+      <li><strong>VM 4 Deletion (Newest VM):</strong>
         <ul>
           <li>Cooldown Check Pass</li>
-          <li>Min VM Count Check Pass (현재 4개 > 최소 2개)</li>
-          <li>Jenkins 파이프라인 실행: 가장 최신 VM(4번) 선택, F5 Removal, Prometheus Removal, VM Deletion (Approximately 2 minutes 소요)</li>
+          <li>Min VM count check passed (current 4 > min 2)</li>
+          <li>Jenkins pipeline execution: select newest VM (4), F5 removal, Prometheus removal, VM deletion (approximately 2 minutes)</li>
           <li>VM 4 Deletion Complete</li>
           <li>Start Cooldown (5 minutes)</li>
         </ul>
@@ -1734,13 +1734,13 @@ export function decideScaleAction(
           <li>Load still low, CPU below 30% continuously</li>
           <li>Wait for cooldown end (5 minutes)</li>
           <li>Alertmanager re-sends after 5 minutes (repeat_interval)</li>
-          <li>Cooldown End Verified 후 VM 3 Deletion (Approximately 2 minutes 소요)</li>
+          <li>Delete VM 3 after cooldown end verification (approximately 2 minutes)</li>
           <li>VM 3 Deletion Complete</li>
         </ul>
       </li>
       <li><strong>Maintain Min Count:</strong>
         <ul>
-          <li>Current VM Count: 2개 (VM 1번, VM 2번)</li>
+          <li>Current VM count: 2 (VM 1, VM 2)</li>
           <li>Scale-in blocked thereafter as min VM count (2) reached</li>
           <li>VM 1 and VM 2 maintained at minimum count</li>
         </ul>
@@ -1756,8 +1756,8 @@ export function decideScaleAction(
       </tr>
       <tr>
         <td>VM Creation (Scale-Out)</td>
-        <td>약 5분</td>
-        <td>템플릿 Clone, IP Configuration, F5 Registration, Prometheus Registration</td>
+        <td>Approximately 5 minutes</td>
+        <td>Template clone, IP configuration, F5 registration, Prometheus registration</td>
       </tr>
       <tr>
         <td>VM Deletion (Scale-In)</td>
@@ -1766,12 +1766,12 @@ export function decideScaleAction(
       </tr>
       <tr>
         <td>Cooldown Period</td>
-        <td>5분</td>
+        <td>5 minutes</td>
         <td>Wait time until next action after scale-out/in</td>
       </tr>
       <tr>
         <td>Alertmanager Re-transmission</td>
-        <td>5분</td>
+        <td>5 minutes</td>
         <td>Re-transmit every 5 minutes if alert is not resolved</td>
       </tr>
       <tr>
@@ -1782,12 +1782,12 @@ export function decideScaleAction(
       <tr>
         <td>Scale-In: Delete 4</td>
         <td>Approximately 10 minutes later</td>
-        <td>스케일인 조건 지속(5분) + Alert Triggered + 처리(2분) = Approximately 10 minutes later</td>
+        <td>Scale-in condition duration (5 min) + Alert trigger + Processing (2 min) = approximately 10 minutes later</td>
       </tr>
       <tr>
         <td>Scale-In: Delete 3</td>
         <td>Approximately 10 minutes later</td>
-        <td>쿨다운(5분) + Alert 재전송(5분) + 처리(2분) = Approximately 10 minutes later</td>
+        <td>Cooldown (5 min) + Alert re-transmission (5 min) + Processing (2 min) = approximately 10 minutes later</td>
       </tr>
     </table>
   </div>
@@ -1798,7 +1798,7 @@ export function decideScaleAction(
       <ul>
         <li>Each service uses independent configuration and jobs</li>
         <li>No impact between services</li>
-        <li>동시에 여러 서비스 오토스케일링 Available</li>
+        <li>Multiple services can autoscale simultaneously</li>
       </ul>
     </li>
     <li><b>IP Pool Management</b>
@@ -1821,15 +1821,15 @@ export function decideScaleAction(
   <div class="box">
     <h4>Monitoring Items</h4>
     <ul>
-      <li><b>시스템 Metric</b>
+      <li><b>System Metrics</b>
         <ul>
           <li>CPU usage (overall and per instance)</li>
           <li>Memory usage (overall and per instance)</li>
           <li>Current VM Count</li>
-          <li>스케일 Event 발생 횟수</li>
+          <li>Number of scale events</li>
         </ul>
       </li>
-      <li><b>인프라 Metric</b>
+      <li><b>Infrastructure Metrics</b>
         <ul>
           <li>vCenter connection status</li>
           <li>Prometheus target status</li>
@@ -1839,9 +1839,9 @@ export function decideScaleAction(
       </li>
       <li><b>Alerts</b>
         <ul>
-          <li>스케일아웃/인 Event 알림</li>
+          <li>Scale-out/in event alerts</li>
           <li>Error occurrence alerts</li>
-          <li>최대/Min Count Reached 알림</li>
+          <li>Max/min count reached alerts</li>
           <li>IP pool shortage alerts</li>
         </ul>
       </li>
@@ -1853,8 +1853,8 @@ export function decideScaleAction(
 
   <h3 id="section-14-1">14.1 Tenant-Based Permission Separation</h3>
   <ul>
-    <li>현재는 관리자만 모든 서비스에 대해 설정 Available</li>
-    <li>향후에는 고객사(테넌트) 별로 접근 Available한 서비스와 오토스케일링 설정을 분리</li>
+    <li>Currently only administrators can configure all services</li>
+    <li>Future: Separate accessible services and autoscaling configurations per tenant</li>
     <li>Role-based access control (RBAC) examples:
       <ul>
         <li>GLOBAL_ADMIN, TENANT_ADMIN, TENANT_VIEWER, etc.</li>
@@ -1872,7 +1872,7 @@ export function decideScaleAction(
   <ul>
     <li><b>Predictive Scaling</b>
       <ul>
-        <li>AI/머신러닝 기반 Traffic 예측</li>
+        <li>AI/machine learning-based traffic prediction</li>
         <li>Time-based pattern analysis</li>
         <li>Reduce response time with preemptive scale-out</li>
       </ul>
@@ -1893,9 +1893,9 @@ export function decideScaleAction(
     </li>
     <li><b>Advanced Monitoring</b>
       <ul>
-        <li>애플리케이션 레벨 Metric 기반 스케일링</li>
-        <li>JMX Metric 활용</li>
-        <li>커스텀 Metric 지원</li>
+        <li>Application-level metric-based scaling</li>
+        <li>Utilize JMX metrics</li>
+        <li>Custom metric support</li>
       </ul>
     </li>
   </ul>
@@ -1925,20 +1925,20 @@ export function decideScaleAction(
       <td>Fast VM creation based on Golden Image template</td>
     </tr>
     <tr>
-      <td>Metric 기반</td>
-      <td>Prometheus Node Exporter Metric 기반 자동 판단</td>
+      <td>Metric-Based</td>
+      <td>Automatic determination based on Prometheus Node Exporter metrics</td>
     </tr>
     <tr>
       <td>Webhook-Based</td>
-      <td>Alertmanager → Backend (Validation: Switch/Cooldown/VM Count) → Jenkins 웹훅 체인</td>
+      <td>Alertmanager → Backend (validation: switch/cooldown/VM count) → Jenkins webhook chain</td>
     </tr>
     <tr>
       <td>Automatic Registration</td>
-      <td>VM Creation 시 F5 Pool 및 Prometheus Target Automatic Registration</td>
+      <td>Automatic registration of F5 Pool and Prometheus Target on VM creation</td>
     </tr>
     <tr>
       <td>Safe Deletion</td>
-      <td>F5 Removal → Monitoring Removal → Prometheus Removal → VM Deletion 순서 보장</td>
+      <td>Guaranteed order: F5 removal → Monitoring removal → Prometheus removal → VM deletion</td>
     </tr>
   </table>
 
@@ -1946,7 +1946,7 @@ export function decideScaleAction(
   <table>
     <tr>
       <th>Task</th>
-      <th>예상 Duration</th>
+      <th>Expected Duration</th>
     </tr>
     <tr>
       <td>Scale-Out (VM Creation)</td>
@@ -1958,14 +1958,14 @@ export function decideScaleAction(
     </tr>
     <tr>
       <td>Cooldown Period</td>
-      <td>기본 5분 (설정 Available)</td>
+      <td>Default 5 minutes (configurable)</td>
     </tr>
     <tr>
-      <td>Alert Evaluation 주기</td>
+      <td>Alert Evaluation Cycle</td>
       <td>5 minutes (Prometheus scrape interval)</td>
     </tr>
     <tr>
-      <td>Alertmanager Re-transmission 주기</td>
+      <td>Alertmanager Re-transmission Cycle</td>
       <td>5 minutes (repeat_interval)</td>
     </tr>
   </table>
@@ -1975,8 +1975,8 @@ export function decideScaleAction(
     <ul>
       <li><b>IP Pool Range:</b> Scale-out will be blocked if IP pool is insufficient. Ensure sufficient IP range.</li>
       <li><b>Template Preparation:</b> VM creation may fail if template is not properly prepared.</li>
-      <li><b>Network 연결:</b> VM Creation 후 Network 연결이 안정적이어야 F5 Health Check가 Pass합니다.</li>
-      <li><b>Cooldown Period:</b> Cooldown Period 중에는 스케일링이 발생하지 않으므로 급격한 부하 변화에 대응이 늦을 수 있습니다.</li>
+      <li><b>Network Connectivity:</b> Network connection must be stable after VM creation for F5 health check to pass.</li>
+      <li><b>Cooldown Period:</b> Scaling does not occur during cooldown period, so response to sudden load changes may be delayed.</li>
       <li><b>Minimum VM Count:</b> Scale-in does not occur below minimum VM count, ensuring service availability.</li>
     </ul>
   </div>
@@ -1991,9 +1991,9 @@ export function decideScaleAction(
     <li><a href="https://clouddocs.f5.com/">F5 BIG-IP Documentation</a></li>
   </ul>
   <ul>
-    <li>AI/머신러닝 기반 예측 스케일링</li>
-    <li>시간대/요일 기반 비용 최적화 정책</li>
-    <li>Integration with Kubernetes (CAPV)한 하이브리드 오토스케일링</li>
+    <li>AI/machine learning-based predictive scaling</li>
+    <li>Time/day-based cost optimization policies</li>
+    <li>Hybrid autoscaling integrated with Kubernetes (CAPV)</li>
   </ul>
 
 </body>
