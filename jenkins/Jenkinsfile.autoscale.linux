@@ -393,7 +393,6 @@ pipeline {
                             def serviceName = env.ALERT_SERVICE
                             
                             if (serviceName) {
-                                def { startCooldown } = require('./services/cooldownService')
                                 // 쿨다운은 백엔드에서 처리하므로 여기서는 로그만 남김
                                 echo "백엔드에 IP Pool 부족 알림 전송 (쿨다운 시작을 위해)"
                             }

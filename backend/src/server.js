@@ -1387,6 +1387,7 @@ const server = http.createServer((req, res) => {
         
         // Jenkins에 전달할 payload 구성 (설정 정보 포함)
         const jenkinsPayload = {
+          status: 'firing', // Jenkins Generic Webhook Trigger 필터용 (정규식: ^firing$)
           alerts: alertmanagerPayload.alerts || [],
           scaleAction: scaleAction, // 'scale-out' 또는 'scale-in'
           vmToDelete: vmToDelete, // 스케일인인 경우 삭제할 VM 정보
