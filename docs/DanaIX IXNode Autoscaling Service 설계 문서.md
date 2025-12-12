@@ -503,9 +503,9 @@
   PM -->|메트릭 수집| VM2
   PM -->|메트릭 수집| VMN
   PM -->|Alert 전송| AM
-  AM -->|Webhook| JN_OUT
-  AM -->|Webhook| JN_IN
   AM -->|Webhook| Backend
+  Backend -->|Webhook| JN_OUT
+  Backend -->|Webhook| JN_IN
 
   JN_OUT -->|govc clone| VC
   JN_IN -->|govc destroy| VC
@@ -554,10 +554,12 @@
   CHECK_MAX -->|도달| BLOCK_MAX[차단 + 쿨다운 시작]
   CHECK_MAX -->|미도달| JENKINS_OUT[Jenkins: Scale-Out 실행]
 
-  WEBHOOK_IN --> CHECK_COOLDOWN_IN{쿨다운 체크}
+  WEBHOOK_IN --> CHECK_SWITCH{스케일인 스위치 체크}
+  CHECK_SWITCH -->|OFF| BLOCK_SWITCH[차단 + Silence 생성]
+  CHECK_SWITCH -->|ON| CHECK_COOLDOWN_IN{쿨다운 체크}
   CHECK_COOLDOWN_IN -->|쿨다운 중| BLOCK_IN[차단]
   CHECK_COOLDOWN_IN -->|가능| CHECK_MIN{최소 VM 개수 체크}
-  CHECK_MIN -->|도달| BLOCK_MIN[차단 + 쿨다운 시작]
+  CHECK_MIN -->|도달| BLOCK_MIN[차단 + 스위치 OFF + Silence 생성]
   CHECK_MIN -->|미도달| JENKINS_IN[Jenkins: Scale-In 실행]
 
   JENKINS_OUT --> VM_CREATE[VM 생성]
@@ -575,6 +577,7 @@
   BLOCK_OUT --> END([종료])
   BLOCK_MAX --> END
   BLOCK_IN --> END
+  BLOCK_SWITCH --> END
   BLOCK_MIN --> END
   COOLDOWN_START_OUT --> END
   COOLDOWN_START_IN --> END</div>
@@ -905,8 +908,11 @@ AND
     <li><b>단일 기준:</b> 스케일 인/아웃 모두 <b>Prometheus Job에 등록된 VM 타겟 개수</b>(currentVmCount)를 기준으로 판단</li>
     <li><b>스케일 아웃 차단 조건:</b> currentVmCount &gt;= maxVms → 스케일 아웃 차단</li>
     <li><b>스케일 인 차단 조건:</b> currentVmCount &lt;= minVms → 스케일 인 차단</li>
+    <li><b>스케일인 스위치 방식:</b> 최소 VM 개수 도달 시 스케일인 스위치 OFF, Alertmanager Silence 생성하여 웹훅 자체 차단</li>
+    <li><b>스위치 자동 복구:</b> VM 개수가 최소 개수 이상이 되면 스위치 자동 ON, Silence 삭제</li>
     <li><b>쿨다운 시작:</b> 최소/최대 개수에 도달한 시점에 쿨다운을 시작하여 Alertmanager 반복 알림에 의한 파이프라인 폭주 방지</li>
     <li><b>로직 단순화:</b> 불필요한 중복 체크 제거, Prometheus Job 타겟만으로 최소/최대 개수 판단</li>
+    <li><b>웹훅 흐름:</b> Alertmanager → Backend (검증) → Jenkins (실행)</li>
   </ul>
 
   <h3>6.3 판단 로직 플로우차트</h3>
@@ -923,14 +929,17 @@ AND
   CHECK_MAX -->|No| ALLOW_OUT[허용: 스케일아웃 실행]
   
   CHECK_COOLDOWN_IN -->|쿨다운 중| REJECT_COOLDOWN_IN[차단: 쿨다운]
-  CHECK_COOLDOWN_IN -->|가능| GET_COUNT_IN[Prometheus Target 개수 조회]
+  CHECK_COOLDOWN_IN -->|가능| CHECK_SWITCH_IN{스케일인 스위치 체크}
+  CHECK_SWITCH_IN -->|OFF| REJECT_SWITCH[차단: 스위치 OFF<br/>Silence 생성]
+  CHECK_SWITCH_IN -->|ON| GET_COUNT_IN[Prometheus Target 개수 조회]
   GET_COUNT_IN --> CHECK_MIN{currentVmCount <= minVms?}
-  CHECK_MIN -->|Yes| REJECT_MIN[차단: 최소 개수 도달<br/>쿨다운 시작]
+  CHECK_MIN -->|Yes| REJECT_MIN[차단: 최소 개수 도달<br/>스위치 OFF + Silence 생성]
   CHECK_MIN -->|No| ALLOW_IN[허용: 스케일인 실행]
   
   REJECT_COOLDOWN_OUT --> END([종료])
   REJECT_MAX --> END
   REJECT_COOLDOWN_IN --> END
+  REJECT_SWITCH --> END
   REJECT_MIN --> END
   ALLOW_OUT --> END
   ALLOW_IN --> END</div>
