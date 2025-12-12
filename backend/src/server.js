@@ -1132,43 +1132,21 @@ const server = http.createServer((req, res) => {
         const isScaleIn = alertName.includes('LowResourceUsage');
         const scaleAction = isScaleOut ? 'scale-out' : (isScaleIn ? 'scale-in' : null);
 
-        // 스케일인인 경우 Silence 상태 확인 (최소 VM 수 도달 시 차단)
+        // 스케일인인 경우 스위치 상태 확인 (최소 VM 수 도달 시 차단)
         if (isScaleIn) {
-          try {
-            const axios = require('axios');
-            const ALERTMANAGER_URL = process.env.ALERTMANAGER_URL || 'http://10.255.1.254:9093';
-            
-            // 활성화된 Silence 확인
-            const silencesResponse = await axios.get(
-              `${ALERTMANAGER_URL}/api/v2/silences`,
-              { params: { active: true }, timeout: 5000 }
-            ).catch(() => ({ data: [] }));
-            
-            const activeSilence = silencesResponse.data.find(silence => {
-              const matchers = silence.matchers || [];
-              const hasService = matchers.some(m => m.name === 'service' && m.value === serviceName);
-              const hasAlertname = matchers.some(m => m.name === 'alertname' && m.value === `${serviceName}_LowResourceUsage`);
-              return hasService && hasAlertname && silence.status?.state === 'active';
+          const { isScaleInEnabled } = require('./services/scaleInSwitchService');
+          
+          // 스케일인 스위치 상태 확인
+          if (!isScaleInEnabled(serviceName)) {
+            const switchState = require('./services/scaleInSwitchService').getScaleInSwitchState(serviceName);
+            console.log(`[Webhook] 스케일인 스위치 OFF: ${serviceName} - ${switchState.reason}`);
+            sendJSONResponse(res, 200, {
+              success: false,
+              message: `스케일인 스위치가 OFF 상태입니다. ${switchState.reason}`,
+              switchState: switchState,
+              note: '최소 VM 개수 도달로 인해 스케일인이 비활성화되었습니다. VM 개수가 최소 개수 이상이 되면 자동으로 활성화됩니다.'
             });
-            
-            if (activeSilence) {
-              const endsAt = new Date(activeSilence.endsAt);
-              const now = new Date();
-              const remainingMinutes = Math.ceil((endsAt - now) / (60 * 1000));
-              
-              console.log(`[Webhook] Alertmanager Silence 활성화됨: ${serviceName} - 스케일인 웹훅 차단 (${remainingMinutes}분 남음)`);
-              sendJSONResponse(res, 200, {
-                success: false,
-                message: `Alertmanager Silence가 활성화되어 스케일인 alert가 차단됩니다. (${remainingMinutes}분 남음)`,
-                silenceID: activeSilence.id,
-                endsAt: activeSilence.endsAt,
-                note: '최소 VM 수 도달로 인한 Silence입니다. 웹훅이 무시됩니다.'
-              });
-              return;
-            }
-          } catch (error) {
-            console.log(`[Webhook] Silence 확인 실패 (계속 진행):`, error.message);
-            // Silence 확인 실패해도 계속 진행
+            return;
           }
         }
 
@@ -1282,31 +1260,14 @@ const server = http.createServer((req, res) => {
             
             const currentVmCount = targetsResult.targets?.length || 0;
             
+            // 스케일인 스위치 상태 업데이트 (VM 개수에 따라 자동 ON/OFF)
+            const { updateScaleInSwitch } = require('./services/scaleInSwitchService');
+            const switchUpdateResult = updateScaleInSwitch(serviceName, currentVmCount, minVms);
+            
             // 최소 VM 개수 체크 (Prometheus Job에 등록된 개수 기준)
             if (currentVmCount <= minVms) {
               console.log(`[Webhook] 최소 VM 개수 도달: ${serviceName} - 현재 Prometheus Job 등록 개수: ${currentVmCount}, 최소: ${minVms}`);
-              
-              // Alertmanager Silence 생성하여 스케일인 alert 차단 (웹훅 발생 방지)
-              try {
-                const { createScaleInSilence } = require('./services/alertmanagerService');
-                // 30분간 silence 생성 (Alertmanager의 repeat_interval보다 훨씬 길게)
-                const silenceResult = await createScaleInSilence(serviceName, 30);
-                console.log(`[Webhook] Alertmanager Silence 생성 성공: ${serviceName} - ${silenceResult.silenceID} (30분간 스케일인 alert 차단)`);
-              } catch (error) {
-                console.error(`[Webhook] Alertmanager Silence 생성 실패 (경고):`, error.message);
-                // Silence 생성 실패 시 쿨다운으로 대체
-                try {
-                  const { startCooldown, checkCooldown } = require('./services/cooldownService');
-                  const cooldownStatus = await checkCooldown(serviceName, 'scale-in');
-                  if (!cooldownStatus.inCooldown) {
-                    const extendedCooldownPeriod = 600; // 10분
-                    await startCooldown(serviceName, 'scale-in', extendedCooldownPeriod);
-                    console.log(`[Webhook] 쿨다운 시작 (Silence 실패 대체): ${serviceName} (${extendedCooldownPeriod}초)`);
-                  }
-                } catch (cooldownError) {
-                  console.error(`[Webhook] 쿨다운 시작 실패 (경고):`, cooldownError.message);
-                }
-              }
+              console.log(`[Webhook] 스케일인 스위치 OFF: ${serviceName} - 스케일인 비활성화`);
               
               sendJSONResponse(res, 200, {
                 success: false,
@@ -1314,24 +1275,17 @@ const server = http.createServer((req, res) => {
                 currentVmCount: currentVmCount,
                 minVms: minVms,
                 prometheusJobName: prometheusJobName,
-                note: 'Alertmanager Silence가 생성되어 30분간 스케일인 alert가 차단됩니다. 웹훅이 발생하지 않습니다.'
+                switchState: switchUpdateResult.state,
+                note: '스케일인 스위치가 OFF 상태입니다. VM 개수가 최소 개수 이상이 되면 자동으로 ON됩니다.'
               });
               return;
             }
             
-            // 최소 VM 수를 넘어서면 기존 Silence 삭제 (스케일인 가능 상태로 복구)
-            try {
-              const { deleteScaleInSilence } = require('./services/alertmanagerService');
-              const deleteResult = await deleteScaleInSilence(serviceName);
-              if (deleteResult.success && deleteResult.silenceID) {
-                console.log(`[Webhook] Alertmanager Silence 삭제 성공: ${serviceName} - 스케일인 가능 상태로 복구`);
-              }
-            } catch (error) {
-              // Silence 삭제 실패는 무시 (이미 만료되었을 수 있음)
-              console.log(`[Webhook] Silence 삭제 확인: ${serviceName} - ${error.message}`);
-            }
-            
+            // 최소 VM 수를 넘어서면 스위치가 자동으로 ON됨 (updateScaleInSwitch에서 처리)
             console.log(`[Webhook] VM 개수 확인 통과: ${serviceName} - 현재 Prometheus Job 등록 개수: ${currentVmCount}, 최소: ${minVms} (스케일인 가능)`);
+            if (switchUpdateResult.enabled) {
+              console.log(`[Webhook] 스케일인 스위치 ON: ${serviceName} - 스케일인 활성화`);
+            }
             
             // 삭제할 VM 선택 (Jenkins에서도 선택하지만, 백엔드에서도 선택하여 전달)
             try {
