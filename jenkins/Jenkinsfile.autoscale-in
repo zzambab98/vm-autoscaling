@@ -726,10 +726,12 @@ except:
         success {
             script {
                 echo "=== 스케일인 성공 ==="
-                echo "제거된 VM 수: ${env.REMOVE_COUNT}"
-                echo "제거된 VM IP: ${env.VMS_TO_REMOVE}"
-                echo "제거된 VM 이름: ${env.VM_NAMES_TO_REMOVE}"
-                echo "남은 VM 수: ${env.CURRENT_VM_COUNT.toInteger() - env.REMOVE_COUNT.toInteger()}"
+                echo "제거된 VM 수: ${env.REMOVE_COUNT ?: '0'}"
+                echo "제거된 VM IP: ${env.VMS_TO_REMOVE ?: 'N/A'}"
+                echo "제거된 VM 이름: ${env.VM_NAMES_TO_REMOVE ?: 'N/A'}"
+                def currentVmCount = env.CURRENT_VM_COUNT ? env.CURRENT_VM_COUNT.toInteger() : 0
+                def removeCount = env.REMOVE_COUNT ? env.REMOVE_COUNT.toInteger() : 0
+                echo "남은 VM 수: ${currentVmCount - removeCount}"
                 
                 // 백엔드로 VM 삭제 완료 웹훅 전송 (각 VM마다)
                 def serviceName = env.SERVICE_NAME ?: params.SERVICE_NAME
