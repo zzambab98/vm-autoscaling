@@ -30,6 +30,8 @@ export JENKINS_URL="http://10.255.0.103:8080"
 export JENKINS_WEBHOOK_USER="danacloud"
 export JENKINS_WEBHOOK_PASSWORD="!danacloud12"
 export JENKINS_DEFAULT_WEBHOOK_TOKEN="plg-autoscale-token"
+export JENKINS_DEFAULT_WEBHOOK_TOKEN_OUT="plg-autoscale-token"
+export JENKINS_DEFAULT_WEBHOOK_TOKEN_IN="plg-autoscale-in-token"
 
 export BACKEND_API_URL="http://10.255.48.253:6010"
 export FRONTEND_BASE_URL="http://10.255.48.253:5520"

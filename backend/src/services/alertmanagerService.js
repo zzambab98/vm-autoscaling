@@ -169,12 +169,12 @@ async function addRoutingRule(config) {
       serviceName: serviceName,
       scaleOut: {
         webhookUrl: webhookUrlOut,
-        webhookToken: JENKINS_DEFAULT_WEBHOOK_TOKEN_OUT,
+        webhookToken: process.env.JENKINS_DEFAULT_WEBHOOK_TOKEN_OUT || 'plg-autoscale-token',
         jobName: 'plg-autoscale-out'
       },
       scaleIn: {
         webhookUrl: webhookUrlIn,
-        webhookToken: JENKINS_DEFAULT_WEBHOOK_TOKEN_IN,
+        webhookToken: process.env.JENKINS_DEFAULT_WEBHOOK_TOKEN_IN || 'plg-autoscale-in-token',
         jobName: 'plg-autoscale-in'
       },
       message: 'Alertmanager 라우팅 규칙이 추가되었습니다. (스케일아웃 + 스케일인)'
