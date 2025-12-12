@@ -1433,7 +1433,7 @@ const server = http.createServer((req, res) => {
         } else {
           // 스케일아웃: 공통 plg-autoscale-out Job 사용
           jobName = 'plg-autoscale-out';
-          webhookToken = 'plg-autoscale-out-token';
+          webhookToken = 'plg-autoscale-token';
           webhookUrl = `${JENKINS_URL}/generic-webhook-trigger/invoke?token=${webhookToken}`;
         }
         
