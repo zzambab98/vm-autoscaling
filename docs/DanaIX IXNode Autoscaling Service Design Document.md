@@ -538,8 +538,110 @@
   </div>
 
 
+  <!-- Table of Contents -->
+  <div class="box" style="margin-top: 32px; margin-bottom: 48px;">
+    <h2 style="margin-top: 0; padding-bottom: 12px; border-bottom: 2px solid rgba(84, 107, 255, 0.2);">Table of Contents</h2>
+    <ul style="list-style: none; padding-left: 0; margin: 0;">
+      <li style="margin: 8px 0;"><a href="#section-1" style="color: #546bff; text-decoration: none; font-weight: 500;">1. Service Overview</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-1-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">1.1 IXNode Autoscaling Definition</a></li>
+          <li style="margin: 4px 0;"><a href="#section-1-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">1.2 Purpose</a></li>
+          <li style="margin: 4px 0;"><a href="#section-1-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">1.3 Feature Summary</a></li>
+          <li style="margin: 4px 0;"><a href="#section-1-4" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">1.4 Key Components</a></li>
+          <li style="margin: 4px 0;"><a href="#section-1-5" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">1.5 Overall Architecture Diagram</a></li>
+          <li style="margin: 4px 0;"><a href="#section-1-6" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">1.6 Data Flow Diagram</a></li>
+          <li style="margin: 4px 0;"><a href="#section-1-7" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">1.7 Overall Operation Scenario Summary</a></li>
+          <li style="margin: 4px 0;"><a href="#section-1-8" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">1.8 Component Interaction Diagram</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-2" style="color: #546bff; text-decoration: none; font-weight: 500;">2. Prerequisites and Preparation</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-2-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">2.1 Infrastructure Preparation</a></li>
+          <li style="margin: 4px 0;"><a href="#section-2-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">2.2 Server and Network</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-3" style="color: #546bff; text-decoration: none; font-weight: 500;">3. Overall Autoscaling Operation Structure</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-3-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">3.1 Scale-Out Detailed Process</a></li>
+          <li style="margin: 4px 0;"><a href="#section-3-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">3.2 Scale-In Detailed Process</a></li>
+          <li style="margin: 4px 0;"><a href="#section-3-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">3.3 Scale-Out Sequence Diagram</a></li>
+          <li style="margin: 4px 0;"><a href="#section-3-4" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">3.4 Scale-In Sequence Diagram</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-4" style="color: #546bff; text-decoration: none; font-weight: 500;">4. Data Model (TypeScript)</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-4-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">4.1 Template Metadata</a></li>
+          <li style="margin: 4px 0;"><a href="#section-4-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">4.2 Autoscaling Configuration</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-5" style="color: #546bff; text-decoration: none; font-weight: 500;">5. Scale-Out / Scale-In Conditions</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-5-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">5.1 Scale-Out Conditions</a></li>
+          <li style="margin: 4px 0;"><a href="#section-5-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">5.2 Scale-In Conditions</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-6" style="color: #546bff; text-decoration: none; font-weight: 500;">6. Scale-In/Out Count Decision Logic</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-6-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">6.1 Issues Before Changes</a></li>
+          <li style="margin: 4px 0;"><a href="#section-6-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">6.2 Policy After Changes</a></li>
+          <li style="margin: 4px 0;"><a href="#section-6-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">6.3 Decision Logic Flowchart</a></li>
+          <li style="margin: 4px 0;"><a href="#section-6-4" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">6.4 TypeScript Pseudocode</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-7" style="color: #546bff; text-decoration: none; font-weight: 500;">7. Jenkins Autoscaling Pipeline Overview</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-7-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">7.1 Jenkins Job Architecture</a></li>
+          <li style="margin: 4px 0;"><a href="#section-7-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">7.2 Job Configuration</a></li>
+          <li style="margin: 4px 0;"><a href="#section-7-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">7.3 Scale-Out Pipeline Stages</a></li>
+          <li style="margin: 4px 0;"><a href="#section-7-4" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">7.4 Scale-In Pipeline Stages</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-8" style="color: #546bff; text-decoration: none; font-weight: 500;">8. Node Exporter / Promtail Installation Overview</a></li>
+      <li style="margin: 8px 0;"><a href="#section-9" style="color: #546bff; text-decoration: none; font-weight: 500;">9. Monitoring and Dashboard</a></li>
+      <li style="margin: 8px 0;"><a href="#section-10" style="color: #546bff; text-decoration: none; font-weight: 500;">10. Autoscaling Event Management</a></li>
+      <li style="margin: 8px 0;"><a href="#section-11" style="color: #546bff; text-decoration: none; font-weight: 500;">11. Operations Guide</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-11-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">11.1 Initial Setup Procedure</a></li>
+          <li style="margin: 4px 0;"><a href="#section-11-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">11.2 Daily Operations</a></li>
+          <li style="margin: 4px 0;"><a href="#section-11-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">11.3 Troubleshooting</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-12" style="color: #546bff; text-decoration: none; font-weight: 500;">12. Security and Permission Structure</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-12-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">12.1 Authentication and Permission Management</a></li>
+          <li style="margin: 4px 0;"><a href="#section-12-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">12.2 Data Security</a></li>
+          <li style="margin: 4px 0;"><a href="#section-12-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">12.3 Security Best Practices</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-13" style="color: #546bff; text-decoration: none; font-weight: 500;">13. Performance and Scalability</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-13-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">13.1 Performance Considerations</a></li>
+          <li style="margin: 4px 0;"><a href="#section-13-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">13.2 Real Scaling Scenario Example</a></li>
+          <li style="margin: 4px 0;"><a href="#section-13-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">13.3 Scalability</a></li>
+          <li style="margin: 4px 0;"><a href="#section-13-4" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">13.4 Monitoring and Alerts</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-14" style="color: #546bff; text-decoration: none; font-weight: 500;">14. Future Enhancement Directions</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-14-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">14.1 Tenant-Based Permission Separation</a></li>
+          <li style="margin: 4px 0;"><a href="#section-14-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">14.2 Tenant-Dedicated Server/Infrastructure</a></li>
+          <li style="margin: 4px 0;"><a href="#section-14-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">14.3 Advanced Feature Ideas</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-15" style="color: #546bff; text-decoration: none; font-weight: 500;">15. Summary and Key Points</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-15-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">15.1 Core Architecture Principles</a></li>
+          <li style="margin: 4px 0;"><a href="#section-15-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">15.2 Key Features</a></li>
+          <li style="margin: 4px 0;"><a href="#section-15-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">15.3 Performance Metrics</a></li>
+          <li style="margin: 4px 0;"><a href="#section-15-4" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">15.4 Limitations and Considerations</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-16" style="color: #546bff; text-decoration: none; font-weight: 500;">16. References</a></li>
+    </ul>
+  </div>
+
   <!-- 1. Service Overview -->
-  <h2>1. Service Overview</h2>
+  <h2 id="section-1">1. Service Overview</h2>
 
   <h3 id="section-1-1">1.1 IXNode Autoscaling Definition</h3>
   <p>IXNode Autoscaling operates by combining the following elements:</p>
