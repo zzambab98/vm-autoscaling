@@ -541,7 +541,7 @@
   <!-- 1. Service Overview -->
   <h2>1. Service Overview</h2>
 
-  <h3>1.1 IXNode Autoscaling Definition</h3>
+  <h3 id="section-1-1">1.1 IXNode Autoscaling Definition</h3>
   <p>IXNode Autoscaling operates by combining the following elements:</p>
   <ul>
     <li>VM templates and cloning via vSphere (vCenter)</li>
@@ -550,7 +550,7 @@
     <li>Traffic distribution and health checks via F5 LTM Pool/VIP</li>
   </ul>
 
-  <h3>1.2 Purpose</h3>
+  <h3 id="section-1-2">1.2 Purpose</h3>
   <ul>
     <li>Ensure service availability through automatic scaling when load increases</li>
     <li>Optimize costs through automatic reduction when load decreases</li>
@@ -558,7 +558,7 @@
     <li>Non-intrusive architecture that maximizes reuse of existing infrastructure (PLG, F5, Jenkins, vSphere)</li>
   </ul>
 
-  <h3>1.3 Feature Summary</h3>
+  <h3 id="section-1-3">1.3 Feature Summary</h3>
   <ul>
     <li>Template-based automatic VM creation and deletion</li>
     <li>Automatic creation and deletion of Prometheus Jobs / Alert Rules / Alertmanager Routes</li>
@@ -568,7 +568,7 @@
     <li>Scale event logging and notifications</li>
   </ul>
 
-  <h3>1.4 Key Components</h3>
+  <h3 id="section-1-4">1.4 Key Components</h3>
   <ul>
     <li><b>Frontend</b> (React): Template management, autoscaling configuration, Node Exporter/Promtail installation UI</li>
     <li><b>Backend</b> (Node.js / TypeScript): Configuration storage, validation, vCenter/PLG/Jenkins/F5 integration</li>
@@ -578,7 +578,7 @@
     <li><b>vSphere (vCenter + ESXi)</b>: VM and template management</li>
   </ul>
 
-  <h3>1.5 Overall Architecture Diagram</h3>
+  <h3 id="section-1-5">1.5 Overall Architecture Diagram</h3>
   <div class="box">
     <div class="mermaid">flowchart TB
   subgraph UserLayer[User Layer]
@@ -683,7 +683,7 @@
   LOKI -->|Log Collection| VMN</div>
   </div>
 
-  <h3>1.6 Data Flow Diagram</h3>
+  <h3 id="section-1-6">1.6 Data Flow Diagram</h3>
   <div class="box">
     <div class="mermaid">flowchart TD
   START([Config Creation/Activation]) --> CONFIG[Backend: Config Storage]
@@ -737,7 +737,7 @@
   COOLDOWN_START_IN --> END</div>
   </div>
 
-  <h3>1.7 Overall Operation Scenario Summary</h3>
+  <h3 id="section-1-7">1.7 Overall Operation Scenario Summary</h3>
   <ol>
     <li>Operator creates templates and creates/activates autoscaling configuration in the UI.</li>
     <li>Backend automatically creates Prometheus Jobs/Alert Rules, Alertmanager Routes, and Jenkins Jobs.</li>
@@ -748,7 +748,7 @@
     <li>Controls min/max VM count based on the number of VM targets registered in Prometheus Jobs.</li>
   </ol>
 
-  <h3>1.8 Component Interaction Diagram</h3>
+  <h3 id="section-1-8">1.8 Component Interaction Diagram</h3>
   <div class="box">
     <div class="mermaid">graph TB
   subgraph SetupPhase[Setup Phase]
@@ -792,16 +792,16 @@
   </div>
 
   <!-- 2. Prerequisites -->
-  <h2>2. Prerequisites and Preparation</h2>
+  <h2 id="section-2">2. Prerequisites and Preparation</h2>
 
-  <h3>2.1 Infrastructure Preparation</h3>
+  <h3 id="section-2-1">2.1 Infrastructure Preparation</h3>
   <ul>
     <li>vSphere (vCenter) accessible, govc CLI available</li>
     <li>F5 BIG-IP LTM configured with Pool, VIP, and HTTP Health Monitor for target service</li>
     <li>PLG Stack (Prometheus, Alertmanager, Grafana) running</li>
   </ul>
 
-  <h3>2.2 Server and Network</h3>
+  <h3 id="section-2-2">2.2 Server and Network</h3>
   <ul>
     <li>At least 2 initial service VMs running (static IP)</li>
     <li>Node Exporter installed or use Node Exporter installation feature</li>
@@ -813,9 +813,9 @@
   </ul>
 
   <!-- 3. Operation Structure -->
-  <h2>3. Overall Autoscaling Operation Structure</h2>
+  <h2 id="section-3">3. Overall Autoscaling Operation Structure</h2>
 
-  <h3>3.1 Scale-Out Detailed Process</h3>
+  <h3 id="section-3-1">3.1 Scale-Out Detailed Process</h3>
   <div class="box">
     <div class="mermaid">flowchart TD
   START([Alert Triggered]) --> WEBHOOK[Backend Webhook Received]
@@ -841,7 +841,7 @@
   REJECT2 --> END</div>
   </div>
 
-  <h3>3.2 Scale-In Detailed Process</h3>
+  <h3 id="section-3-2">3.2 Scale-In Detailed Process</h3>
   <div class="box">
     <div class="mermaid">flowchart TD
   START([Alert Triggered]) --> WEBHOOK[Backend Webhook Received]
@@ -869,7 +869,7 @@
   REJECT2 --> END</div>
   </div>
 
-  <h3>3.3 Scale-Out Sequence Diagram</h3>
+  <h3 id="section-3-3">3.3 Scale-Out Sequence Diagram</h3>
   <div class="box">
     <div class="mermaid">sequenceDiagram
   participant User as User
@@ -903,7 +903,7 @@
   JN->>PM: Add Target</div>
   </div>
 
-  <h3>3.4 Scale-In Sequence Diagram</h3>
+  <h3 id="section-3-4">3.4 Scale-In Sequence Diagram</h3>
   <div class="box">
     <div class="mermaid">sequenceDiagram
   participant PM as Prometheus
@@ -931,9 +931,9 @@
   </div>
 
   <!-- 4. Data Model -->
-  <h2>4. Data Model (TypeScript)</h2>
+  <h2 id="section-4">4. Data Model (TypeScript)</h2>
 
-  <h3>4.1 Template Metadata</h3>
+  <h3 id="section-4-1">4.1 Template Metadata</h3>
   <pre><code class="language-ts">export interface TemplateMetadata {
   id: string;
   name: string;
@@ -945,7 +945,7 @@
   tags?: string[];
 }</code></pre>
 
-  <h3>4.2 Autoscaling Configuration</h3>
+  <h3 id="section-4-2">4.2 Autoscaling Configuration</h3>
   <pre><code class="language-ts">export interface AutoscalingMonitoringConfig {
   cpuThreshold: number;            // Scale-Out CPU (%)
   memoryThreshold: number;         // Scale-Out Memory (%)
@@ -999,9 +999,9 @@ export interface AutoscalingConfig {
 }</code></pre>
 
   <!-- 5. Scaling Conditions -->
-  <h2>5. Scale-Out / Scale-In Conditions</h2>
+  <h2 id="section-5">5. Scale-Out / Scale-In Conditions</h2>
 
-  <h3>5.1 Scale-Out Conditions</h3>
+  <h3 id="section-5-1">5.1 Scale-Out Conditions</h3>
   <div class="info">
     <p><strong>주의:</strong> Scale-out conditions are triggered when the <strong>maximum value among all instances</strong> exceeds the threshold using the <code>max()</code> function. That is, scale-out occurs if any instance has high usage.</p>
   </div>
@@ -1021,7 +1021,7 @@ export interface AutoscalingConfig {
   ))) * 100
 ) &gt; MEMORY_THRESHOLD</code></pre>
 
-  <h3>5.2 Scale-In Conditions</h3>
+  <h3 id="section-5-2">5.2 Scale-In Conditions</h3>
   <div class="info">
     <p><strong>주의:</strong> Scale-in conditions are triggered when the <strong>maximum value of all instances</strong> is below the threshold using the <code>max()</code> function. That is, scale-in occurs only when all VMs have low usage.</p>
   </div>
@@ -1049,15 +1049,15 @@ AND
   </div>
 
   <!-- 6. Scale-In/Out Decision Logic (Changes) -->
-  <h2>6. Scale-In/Out Count Decision Logic (Including Changes)</h2>
+  <h2 id="section-6">6. Scale-In/Out Count Decision Logic (Including Changes)</h2>
 
-  <h3>6.1 Issues Before Changes</h3>
+  <h3 id="section-6-1">6.1 Issues Before Changes</h3>
   <ul>
     <li>When scaling in, filtering VM lists from multiple sources (vCenter, F5, Prometheus) with complex logic and then comparing counts</li>
     <li>When information from different sources is inconsistent, min/max VM count determination may differ, making the criteria inconsistent</li>
   </ul>
 
-  <h3>6.2 Policy After Changes</h3>
+  <h3 id="section-6-2">6.2 Policy After Changes</h3>
   <ul>
     <li><b>Single Criteria:</b> Both scale-in and scale-out are determined based on the <b>number of VM targets registered in Prometheus Job</b> (currentVmCount)</li>
     <li><b>Scale-Out Block Condition:</b> currentVmCount &gt;= maxVms → Scale-Out Block</li>
@@ -1069,7 +1069,7 @@ AND
     <li><b>Webhook Flow:</b> Alertmanager → Backend (validation) → Jenkins (execution)</li>
   </ul>
 
-  <h3>6.3 Decision Logic Flowchart</h3>
+  <h3 id="section-6-3">6.3 Decision Logic Flowchart</h3>
   <div class="box">
     <div class="mermaid">flowchart TD
   START([Webhook Received]) --> TYPE{Scale Type}
@@ -1099,7 +1099,7 @@ AND
   ALLOW_IN --> END</div>
   </div>
 
-  <h3>6.4 TypeScript Pseudocode</h3>
+  <h3 id="section-6-4">6.4 TypeScript Pseudocode</h3>
   <pre><code class="language-ts">interface CurrentState {
   currentVmCount: number;       // Number of Prometheus Job targets
   lastScaleOutAt?: number;      // epoch ms
@@ -1160,9 +1160,9 @@ export function decideScaleAction(
   </ul>
 
   <!-- 7. Jenkins Pipeline -->
-  <h2>7. Jenkins Autoscaling Pipeline Overview</h2>
+  <h2 id="section-7">7. Jenkins Autoscaling Pipeline Overview</h2>
 
-  <h3>7.1 Jenkins Job Architecture</h3>
+  <h3 id="section-7-1">7.1 Jenkins Job Architecture</h3>
   <div class="box">
     <div class="mermaid">graph TB
   subgraph AlertManager[Alertmanager]
@@ -1228,14 +1228,14 @@ export function decideScaleAction(
   STAGE7_IN --> STAGE8_IN</div>
   </div>
 
-  <h3>7.2 Job Configuration</h3>
+  <h3 id="section-7-2">7.2 Job Configuration</h3>
   <ul>
     <li><code>plg-autoscale-out</code> : Scale-Out dedicated pipeline</li>
     <li><code>plg-autoscale-in</code> : Scale-In dedicated pipeline</li>
     <li>Service name (serviceName) is passed via Alertmanager Webhook labels/parameters to identify target AutoscalingConfig</li>
   </ul>
 
-  <h3>7.3 Scale-Out Pipeline Stages (Summary)</h3>
+  <h3 id="section-7-3">7.3 Scale-Out Pipeline Stages (Summary)</h3>
   <ol>
     <li>Parse webhook payload (serviceName, alert information)</li>
     <li>Retrieve AutoscalingConfig from Backend</li>
@@ -1253,7 +1253,7 @@ export function decideScaleAction(
     </li>
   </ol>
 
-  <h3>7.4 Scale-In Pipeline Stages (Summary)</h3>
+  <h3 id="section-7-4">7.4 Scale-In Pipeline Stages (Summary)</h3>
   <ol>
     <li>Parse webhook payload (serviceName, alert information)</li>
     <li>Retrieve AutoscalingConfig from Backend</li>
@@ -1271,7 +1271,7 @@ export function decideScaleAction(
   </ol>
 
   <!-- 8. Node Exporter / Promtail -->
-  <h2>8. Node Exporter / Promtail Installation Overview</h2>
+  <h2 id="section-8">8. Node Exporter / Promtail Installation Overview</h2>
   <ul>
     <li>Retrieve VM and IP list from vCenter and display in UI</li>
     <li>User selects target VM and SSH settings (user/key)</li>
@@ -1280,7 +1280,7 @@ export function decideScaleAction(
   </ul>
 
   <!-- 9. Monitoring -->
-  <h2>9. Monitoring and Dashboard</h2>
+  <h2 id="section-9">9. Monitoring and Dashboard</h2>
   <ul>
     <li>Grafana Dashboard
       <ul>
@@ -1293,7 +1293,7 @@ export function decideScaleAction(
   </ul>
 
   <!-- 10. Events -->
-  <h2>10. Autoscaling Event Management (Concept)</h2>
+  <h2 id="section-10">10. Autoscaling Event Management (Concept)</h2>
   <ul>
     <li>Scale-Out/Scale-In Execution 시 Backend로 Event 기록 요청</li>
     <li>Expected Fields
@@ -1307,9 +1307,9 @@ export function decideScaleAction(
   </ul>
 
   <!-- 11. Operations -->
-  <h2>11. Operations Guide</h2>
+  <h2 id="section-11">11. Operations Guide</h2>
 
-  <h3>11.1 Initial Setup Procedure</h3>
+  <h3 id="section-11-1">11.1 Initial Setup Procedure</h3>
   <ol>
     <li><b>Prepare Base VMs</b>
       <ul>
@@ -1351,7 +1351,7 @@ export function decideScaleAction(
     </li>
   </ol>
 
-  <h3>11.2 Daily Operations</h3>
+  <h3 id="section-11-2">11.2 Daily Operations</h3>
   <ul>
     <li><b>Check Monitoring Dashboard</b>
       <ul>
@@ -1376,7 +1376,7 @@ export function decideScaleAction(
     </li>
   </ul>
 
-  <h3>11.3 Troubleshooting</h3>
+  <h3 id="section-11-3">11.3 Troubleshooting</h3>
   <div class="box">
     <h4>Issue: Scale-Out Not Occurring</h4>
     <ul>
@@ -1413,9 +1413,9 @@ export function decideScaleAction(
   </div>
 
   <!-- 12. Security -->
-  <h2>12. Security and Permission Structure</h2>
+  <h2 id="section-12">12. Security and Permission Structure</h2>
 
-  <h3>12.1 Authentication and Permission Management</h3>
+  <h3 id="section-12-1">12.1 Authentication and Permission Management</h3>
   <ul>
     <li><b>vCenter Account</b>
       <ul>
@@ -1447,7 +1447,7 @@ export function decideScaleAction(
     </li>
   </ul>
 
-  <h3>12.2 Data Security</h3>
+  <h3 id="section-12-2">12.2 Data Security</h3>
   <ul>
     <li><b>Environment Variable Management</b>
       <ul>
@@ -1472,7 +1472,7 @@ export function decideScaleAction(
     </li>
   </ul>
 
-  <h3>12.3 Security Best Practices</h3>
+  <h3 id="section-12-3">12.3 Security Best Practices</h3>
   <ul>
     <li>Regular security updates and patch application</li>
     <li>Log monitoring and anomaly detection</li>
@@ -1481,9 +1481,9 @@ export function decideScaleAction(
   </ul>
 
   <!-- 13. Performance and Scalability -->
-  <h2>13. Performance and Scalability</h2>
+  <h2 id="section-13">13. Performance and Scalability</h2>
 
-  <h3>13.1 Performance Considerations</h3>
+  <h3 id="section-13-1">13.1 Performance Considerations</h3>
   <ul>
     <li><b>Cooldown Mechanism</b>
       <ul>
@@ -1513,7 +1513,7 @@ export function decideScaleAction(
     </li>
   </ul>
 
-  <h3>13.2 Real Scaling Scenario Example</h3>
+  <h3 id="section-13-2">13.2 Real Scaling Scenario Example</h3>
   <div class="box">
     <h4>Scenario Setup</h4>
     <ul>
@@ -1690,7 +1690,7 @@ export function decideScaleAction(
     </table>
   </div>
 
-  <h3>13.3 Scalability</h3>
+  <h3 id="section-13-3">13.3 Scalability</h3>
   <ul>
     <li><b>Independent Operation per Service</b>
       <ul>
@@ -1715,7 +1715,7 @@ export function decideScaleAction(
     </li>
   </ul>
 
-  <h3>13.4 Monitoring and Alerts</h3>
+  <h3 id="section-13-4">13.4 Monitoring and Alerts</h3>
   <div class="box">
     <h4>Monitoring Items</h4>
     <ul>
@@ -1747,9 +1747,9 @@ export function decideScaleAction(
   </div>
 
   <!-- 14. Future Enhancements -->
-  <h2>14. Future Enhancement Directions</h2>
+  <h2 id="section-14">14. Future Enhancement Directions</h2>
 
-  <h3>14.1 Tenant-Based Permission Separation</h3>
+  <h3 id="section-14-1">14.1 Tenant-Based Permission Separation</h3>
   <ul>
     <li>현재는 관리자만 모든 서비스에 대해 설정 Available</li>
     <li>향후에는 고객사(테넌트) 별로 접근 Available한 서비스와 오토스케일링 설정을 분리</li>
@@ -1760,13 +1760,13 @@ export function decideScaleAction(
     </li>
   </ul>
 
-  <h3>14.2 Tenant-Dedicated Server/Infrastructure</h3>
+  <h3 id="section-14-2">14.2 Tenant-Dedicated Server/Infrastructure</h3>
   <ul>
     <li>For large tenants, provide dedicated instances of Autoscaling Backend/Jenkins/PLG/F5 partitions</li>
     <li>Completely separate operation of min/maxVms, IP pool, VLAN, templates, and monitoring per tenant</li>
   </ul>
 
-  <h3>14.3 Advanced Feature Ideas</h3>
+  <h3 id="section-14-3">14.3 Advanced Feature Ideas</h3>
   <ul>
     <li><b>Predictive Scaling</b>
       <ul>
@@ -1799,9 +1799,9 @@ export function decideScaleAction(
   </ul>
 
   <!-- 15. Summary and Key Points -->
-  <h2>15. Summary and Key Points</h2>
+  <h2 id="section-15">15. Summary and Key Points</h2>
 
-  <h3>15.1 Core Architecture Principles</h3>
+  <h3 id="section-15-1">15.1 Core Architecture Principles</h3>
   <div class="box">
     <ul>
       <li><b>Non-intrusive Design:</b> Maximize reuse of existing infrastructure (PLG Stack, Jenkins, F5, vSphere)</li>
@@ -1812,7 +1812,7 @@ export function decideScaleAction(
     </ul>
   </div>
 
-  <h3>15.2 Key Features</h3>
+  <h3 id="section-15-2">15.2 Key Features</h3>
   <table>
     <tr>
       <th>Item</th>
@@ -1840,7 +1840,7 @@ export function decideScaleAction(
     </tr>
   </table>
 
-  <h3>15.3 Performance Metrics</h3>
+  <h3 id="section-15-3">15.3 Performance Metrics</h3>
   <table>
     <tr>
       <th>Task</th>
@@ -1868,7 +1868,7 @@ export function decideScaleAction(
     </tr>
   </table>
 
-  <h3>15.4 Limitations and Considerations</h3>
+  <h3 id="section-15-4">15.4 Limitations and Considerations</h3>
   <div class="warning">
     <ul>
       <li><b>IP Pool Range:</b> Scale-out will be blocked if IP pool is insufficient. Ensure sufficient IP range.</li>
@@ -1880,7 +1880,7 @@ export function decideScaleAction(
   </div>
 
   <!-- 16. References -->
-  <h2>16. References</h2>
+  <h2 id="section-16">16. References</h2>
   <ul>
     <li><a href="https://prometheus.io/docs/">Prometheus Official Documentation</a></li>
     <li><a href="https://prometheus.io/docs/alerting/latest/alertmanager/">Alertmanager Official Documentation</a></li>

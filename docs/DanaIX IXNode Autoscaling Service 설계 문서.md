@@ -578,11 +578,112 @@
     </div>
   </div>
 
+  <!-- 목차 -->
+  <div class="box" style="margin-top: 32px; margin-bottom: 48px;">
+    <h2 style="margin-top: 0; padding-bottom: 12px; border-bottom: 2px solid rgba(84, 107, 255, 0.2);">목차</h2>
+    <ul style="list-style: none; padding-left: 0; margin: 0;">
+      <li style="margin: 8px 0;"><a href="#section-1" style="color: #546bff; text-decoration: none; font-weight: 500;">1. 서비스 개요</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-1-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">1.1 IXNode Autoscaling 정의</a></li>
+          <li style="margin: 4px 0;"><a href="#section-1-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">1.2 도입 목적</a></li>
+          <li style="margin: 4px 0;"><a href="#section-1-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">1.3 제공 기능 요약</a></li>
+          <li style="margin: 4px 0;"><a href="#section-1-4" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">1.4 주요 구성 요소</a></li>
+          <li style="margin: 4px 0;"><a href="#section-1-5" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">1.5 전체 아키텍처 다이어그램</a></li>
+          <li style="margin: 4px 0;"><a href="#section-1-6" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">1.6 데이터 플로우 다이어그램</a></li>
+          <li style="margin: 4px 0;"><a href="#section-1-7" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">1.7 전체 동작 시나리오 요약</a></li>
+          <li style="margin: 4px 0;"><a href="#section-1-8" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">1.8 컴포넌트 상호작용 다이어그램</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-2" style="color: #546bff; text-decoration: none; font-weight: 500;">2. 전제 조건 및 준비사항</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-2-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">2.1 인프라 준비</a></li>
+          <li style="margin: 4px 0;"><a href="#section-2-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">2.2 서버 및 네트워크</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-3" style="color: #546bff; text-decoration: none; font-weight: 500;">3. Autoscaling 전체 동작 구조</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-3-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">3.1 스케일 아웃 상세 프로세스</a></li>
+          <li style="margin: 4px 0;"><a href="#section-3-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">3.2 스케일 인 상세 프로세스</a></li>
+          <li style="margin: 4px 0;"><a href="#section-3-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">3.3 스케일 아웃 시퀀스 다이어그램</a></li>
+          <li style="margin: 4px 0;"><a href="#section-3-4" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">3.4 스케일 인 시퀀스 다이어그램</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-4" style="color: #546bff; text-decoration: none; font-weight: 500;">4. 데이터 모델 (TypeScript)</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-4-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">4.1 템플릿 메타데이터</a></li>
+          <li style="margin: 4px 0;"><a href="#section-4-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">4.2 오토스케일링 설정</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-5" style="color: #546bff; text-decoration: none; font-weight: 500;">5. 스케일 아웃 / 스케일 인 조건</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-5-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">5.1 스케일 아웃 조건</a></li>
+          <li style="margin: 4px 0;"><a href="#section-5-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">5.2 스케일 인 조건</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-6" style="color: #546bff; text-decoration: none; font-weight: 500;">6. 스케일 인/아웃 개수 판단 로직</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-6-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">6.1 변경 전 문제점</a></li>
+          <li style="margin: 4px 0;"><a href="#section-6-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">6.2 변경 후 정책</a></li>
+          <li style="margin: 4px 0;"><a href="#section-6-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">6.3 판단 로직 플로우차트</a></li>
+          <li style="margin: 4px 0;"><a href="#section-6-4" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">6.4 TypeScript 의사 코드</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-7" style="color: #546bff; text-decoration: none; font-weight: 500;">7. Jenkins Autoscaling 파이프라인 개요</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-7-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">7.1 Jenkins Job 아키텍처</a></li>
+          <li style="margin: 4px 0;"><a href="#section-7-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">7.2 Job 구성</a></li>
+          <li style="margin: 4px 0;"><a href="#section-7-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">7.3 Scale-Out 파이프라인 단계</a></li>
+          <li style="margin: 4px 0;"><a href="#section-7-4" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">7.4 Scale-In 파이프라인 단계</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-8" style="color: #546bff; text-decoration: none; font-weight: 500;">8. Node Exporter / Promtail 설치 개요</a></li>
+      <li style="margin: 8px 0;"><a href="#section-9" style="color: #546bff; text-decoration: none; font-weight: 500;">9. 모니터링 및 대시보드</a></li>
+      <li style="margin: 8px 0;"><a href="#section-10" style="color: #546bff; text-decoration: none; font-weight: 500;">10. Autoscaling 이벤트 관리</a></li>
+      <li style="margin: 8px 0;"><a href="#section-11" style="color: #546bff; text-decoration: none; font-weight: 500;">11. 운영 가이드</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-11-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">11.1 초기 설정 절차</a></li>
+          <li style="margin: 4px 0;"><a href="#section-11-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">11.2 일상 운영</a></li>
+          <li style="margin: 4px 0;"><a href="#section-11-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">11.3 트러블슈팅</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-12" style="color: #546bff; text-decoration: none; font-weight: 500;">12. 보안 및 권한 구조</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-12-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">12.1 인증 및 권한 관리</a></li>
+          <li style="margin: 4px 0;"><a href="#section-12-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">12.2 데이터 보안</a></li>
+          <li style="margin: 4px 0;"><a href="#section-12-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">12.3 보안 모범 사례</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-13" style="color: #546bff; text-decoration: none; font-weight: 500;">13. 성능 및 확장성</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-13-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">13.1 성능 고려사항</a></li>
+          <li style="margin: 4px 0;"><a href="#section-13-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">13.2 실제 스케일링 시나리오 예제</a></li>
+          <li style="margin: 4px 0;"><a href="#section-13-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">13.3 확장성</a></li>
+          <li style="margin: 4px 0;"><a href="#section-13-4" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">13.4 모니터링 및 알림</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-14" style="color: #546bff; text-decoration: none; font-weight: 500;">14. 향후 고도화 방향</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-14-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">14.1 고객사별 권한 분리</a></li>
+          <li style="margin: 4px 0;"><a href="#section-14-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">14.2 고객사 전용 서버/인프라 제공</a></li>
+          <li style="margin: 4px 0;"><a href="#section-14-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">14.3 고급 기능 아이디어</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-15" style="color: #546bff; text-decoration: none; font-weight: 500;">15. 요약 및 핵심 포인트</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-15-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">15.1 핵심 아키텍처 원칙</a></li>
+          <li style="margin: 4px 0;"><a href="#section-15-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">15.2 주요 특징</a></li>
+          <li style="margin: 4px 0;"><a href="#section-15-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">15.3 성능 지표</a></li>
+          <li style="margin: 4px 0;"><a href="#section-15-4" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">15.4 제한사항 및 주의사항</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-16" style="color: #546bff; text-decoration: none; font-weight: 500;">16. 참고 자료</a></li>
+    </ul>
+  </div>
 
   <!-- 1. 서비스 개요 -->
-  <h2>1. 서비스 개요</h2>
+  <h2 id="section-1">1. 서비스 개요</h2>
 
-  <h3>1.1 IXNode Autoscaling 정의</h3>
+  <h3 id="section-1-1">1.1 IXNode Autoscaling 정의</h3>
   <p>IXNode Autoscaling은 다음 요소를 조합해 동작한다.</p>
   <ul>
     <li>vSphere(vCenter)를 통한 VM 템플릿 및 Clone</li>
@@ -591,7 +692,7 @@
     <li>F5 LTM Pool/VIP를 통한 트래픽 분산 및 Health Check</li>
   </ul>
 
-  <h3>1.2 도입 목적</h3>
+  <h3 id="section-1-2">1.2 도입 목적</h3>
   <ul>
     <li>부하 증가 시 자동 증설을 통해 서비스 가용성 확보</li>
     <li>부하 감소 시 자동 축소로 비용 최적화</li>
@@ -599,7 +700,7 @@
     <li>기존 인프라(PLG, F5, Jenkins, vSphere)를 최대한 재활용하는 비침투형 구조</li>
   </ul>
 
-  <h3>1.3 제공 기능 요약</h3>
+  <h3 id="section-1-3">1.3 제공 기능 요약</h3>
   <ul>
     <li>템플릿 기반 VM 자동 생성 및 삭제</li>
     <li>Prometheus Job / Alert Rule / Alertmanager Route 자동 생성·삭제</li>
@@ -609,7 +710,7 @@
     <li>스케일 이벤트 기록 및 알림</li>
   </ul>
 
-  <h3>1.4 주요 구성 요소</h3>
+  <h3 id="section-1-4">1.4 주요 구성 요소</h3>
   <ul>
     <li><b>Frontend</b> (React): 템플릿 관리, 오토스케일링 설정, Node Exporter/Promtail 설치 UI</li>
     <li><b>Backend</b> (Node.js / TypeScript): 설정 저장, 검증, vCenter/PLG/Jenkins/F5 연동</li>
@@ -619,7 +720,7 @@
     <li><b>vSphere (vCenter + ESXi)</b>: VM 및 템플릿 관리</li>
   </ul>
 
-  <h3>1.5 전체 아키텍처 다이어그램</h3>
+  <h3 id="section-1-5">1.5 전체 아키텍처 다이어그램</h3>
   <div class="box">
     <div class="mermaid">flowchart TB
   subgraph UserLayer[사용자 레이어]
@@ -724,7 +825,7 @@
   LOKI -->|로그 수집| VMN</div>
   </div>
 
-  <h3>1.6 데이터 플로우 다이어그램</h3>
+  <h3 id="section-1-6">1.6 데이터 플로우 다이어그램</h3>
   <div class="box">
     <div class="mermaid">flowchart TD
   START([설정 생성/활성화]) --> CONFIG[Backend: Config 저장]
@@ -778,7 +879,7 @@
   COOLDOWN_START_IN --> END</div>
   </div>
 
-  <h3>1.7 전체 동작 시나리오 요약</h3>
+  <h3 id="section-1-7">1.7 전체 동작 시나리오 요약</h3>
   <ol>
     <li>운영자가 UI에서 템플릿 생성 및 오토스케일링 설정을 생성/활성화한다.</li>
     <li>Backend가 Prometheus Job/Alert Rule, Alertmanager Route, Jenkins Job을 자동 생성한다.</li>
@@ -789,7 +890,7 @@
     <li>Prometheus Job에 등록된 VM 타겟 개수를 기준으로 최소/최대 VM 수를 제어한다.</li>
   </ol>
 
-  <h3>1.8 컴포넌트 상호작용 다이어그램</h3>
+  <h3 id="section-1-8">1.8 컴포넌트 상호작용 다이어그램</h3>
   <div class="box">
     <div class="mermaid">graph TB
   subgraph SetupPhase[설정 단계]
@@ -833,16 +934,16 @@
   </div>
 
   <!-- 2. 전제 조건 -->
-  <h2>2. 전제 조건 및 준비사항</h2>
+  <h2 id="section-2">2. 전제 조건 및 준비사항</h2>
 
-  <h3>2.1 인프라 준비</h3>
+  <h3 id="section-2-1">2.1 인프라 준비</h3>
   <ul>
     <li>vSphere(vCenter) 접근 가능, govc CLI 사용 가능</li>
     <li>F5 BIG-IP LTM에 대상 서비스용 Pool, VIP, HTTP Health Monitor 구성 완료</li>
     <li>PLG Stack(Prometheus, Alertmanager, Grafana) 운영 중</li>
   </ul>
 
-  <h3>2.2 서버 및 네트워크</h3>
+  <h3 id="section-2-2">2.2 서버 및 네트워크</h3>
   <ul>
     <li>초기 서비스 VM 최소 2대 이상 운영 (고정 IP)</li>
     <li>Node Exporter 설치 또는 Node Exporter 설치 기능 사용</li>
@@ -854,9 +955,9 @@
   </ul>
 
   <!-- 3. 동작 구조 -->
-  <h2>3. Autoscaling 전체 동작 구조</h2>
+  <h2 id="section-3">3. Autoscaling 전체 동작 구조</h2>
 
-  <h3>3.1 스케일 아웃 상세 프로세스</h3>
+  <h3 id="section-3-1">3.1 스케일 아웃 상세 프로세스</h3>
   <div class="box">
     <div class="mermaid">flowchart TD
   START([Alert 발생]) --> WEBHOOK[Backend Webhook 수신]
@@ -882,7 +983,7 @@
   REJECT2 --> END</div>
   </div>
 
-  <h3>3.2 스케일 인 상세 프로세스</h3>
+  <h3 id="section-3-2">3.2 스케일 인 상세 프로세스</h3>
   <div class="box">
     <div class="mermaid">flowchart TD
   START([Alert 발생]) --> WEBHOOK[Backend Webhook 수신]
@@ -910,7 +1011,7 @@
   REJECT2 --> END</div>
   </div>
 
-  <h3>3.3 스케일 아웃 시퀀스 다이어그램</h3>
+  <h3 id="section-3-3">3.3 스케일 아웃 시퀀스 다이어그램</h3>
   <div class="box">
     <div class="mermaid">sequenceDiagram
   participant User as User
@@ -944,7 +1045,7 @@
   JN->>PM: Target 추가</div>
   </div>
 
-  <h3>3.4 스케일 인 시퀀스 다이어그램</h3>
+  <h3 id="section-3-4">3.4 스케일 인 시퀀스 다이어그램</h3>
   <div class="box">
     <div class="mermaid">sequenceDiagram
   participant PM as Prometheus
@@ -972,9 +1073,9 @@
   </div>
 
   <!-- 4. 데이터 모델 -->
-  <h2>4. 데이터 모델 (TypeScript)</h2>
+  <h2 id="section-4">4. 데이터 모델 (TypeScript)</h2>
 
-  <h3>4.1 템플릿 메타데이터</h3>
+  <h3 id="section-4-1">4.1 템플릿 메타데이터</h3>
   <pre><code class="language-ts">export interface TemplateMetadata {
   id: string;
   name: string;
@@ -986,7 +1087,7 @@
   tags?: string[];
 }</code></pre>
 
-  <h3>4.2 오토스케일링 설정</h3>
+  <h3 id="section-4-2">4.2 오토스케일링 설정</h3>
   <pre><code class="language-ts">export interface AutoscalingMonitoringConfig {
   cpuThreshold: number;            // Scale-Out CPU (%)
   memoryThreshold: number;         // Scale-Out Memory (%)
@@ -1040,9 +1141,9 @@ export interface AutoscalingConfig {
 }</code></pre>
 
   <!-- 5. 스케일 조건 -->
-  <h2>5. 스케일 아웃 / 스케일 인 조건</h2>
+  <h2 id="section-5">5. 스케일 아웃 / 스케일 인 조건</h2>
 
-  <h3>5.1 스케일 아웃 조건</h3>
+  <h3 id="section-5-1">5.1 스케일 아웃 조건</h3>
   <div class="info">
     <p><strong>주의:</strong> 스케일아웃 조건은 <code>max()</code> 함수를 사용하여 <strong>모든 인스턴스 중 최대값</strong>이 임계값을 초과할 때 트리거됩니다. 즉, 하나라도 높은 사용률이면 스케일아웃이 발생합니다.</p>
   </div>
@@ -1062,7 +1163,7 @@ export interface AutoscalingConfig {
   ))) * 100
 ) &gt; MEMORY_THRESHOLD</code></pre>
 
-  <h3>5.2 스케일 인 조건</h3>
+  <h3 id="section-5-2">5.2 스케일 인 조건</h3>
   <div class="info">
     <p><strong>주의:</strong> 스케일인 조건은 <code>max()</code> 함수를 사용하여 <strong>모든 인스턴스의 최대값</strong>이 임계값 이하일 때 트리거됩니다. 즉, 모든 VM이 낮은 사용률일 때만 스케일인이 발생합니다.</p>
   </div>
@@ -1090,15 +1191,15 @@ AND
   </div>
 
   <!-- 6. 스케일 인/아웃 판단 로직(변경 내용) -->
-  <h2>6. 스케일 인/아웃 개수 판단 로직 (변경 내용 포함)</h2>
+  <h2 id="section-6">6. 스케일 인/아웃 개수 판단 로직 (변경 내용 포함)</h2>
 
-  <h3>6.1 변경 전 문제점</h3>
+  <h3 id="section-6-1">6.1 변경 전 문제점</h3>
   <ul>
     <li>스케일 인 시 vCenter, F5, Prometheus 등 여러 소스의 VM 목록을 복잡한 로직으로 필터링한 후 개수를 비교</li>
     <li>소스별 정보 불일치 시 최소/최대 VM 개수 판단이 달라질 수 있어 기준이 일관되지 않음</li>
   </ul>
 
-  <h3>6.2 변경 후 정책</h3>
+  <h3 id="section-6-2">6.2 변경 후 정책</h3>
   <ul>
     <li><b>단일 기준:</b> 스케일 인/아웃 모두 <b>Prometheus Job에 등록된 VM 타겟 개수</b>(currentVmCount)를 기준으로 판단</li>
     <li><b>스케일 아웃 차단 조건:</b> currentVmCount &gt;= maxVms → 스케일 아웃 차단</li>
@@ -1110,7 +1211,7 @@ AND
     <li><b>웹훅 흐름:</b> Alertmanager → Backend (검증) → Jenkins (실행)</li>
   </ul>
 
-  <h3>6.3 판단 로직 플로우차트</h3>
+  <h3 id="section-6-3">6.3 판단 로직 플로우차트</h3>
   <div class="box">
     <div class="mermaid">flowchart TD
   START([웹훅 수신]) --> TYPE{스케일 타입}
@@ -1140,7 +1241,7 @@ AND
   ALLOW_IN --> END</div>
   </div>
 
-  <h3>6.4 TypeScript 의사 코드</h3>
+  <h3 id="section-6-4">6.4 TypeScript 의사 코드</h3>
   <pre><code class="language-ts">interface CurrentState {
   currentVmCount: number;       // Prometheus Job 타겟 수
   lastScaleOutAt?: number;      // epoch ms
@@ -1201,9 +1302,9 @@ export function decideScaleAction(
   </ul>
 
   <!-- 7. Jenkins 파이프라인 -->
-  <h2>7. Jenkins Autoscaling 파이프라인 개요</h2>
+  <h2 id="section-7">7. Jenkins Autoscaling 파이프라인 개요</h2>
 
-  <h3>7.1 Jenkins Job 아키텍처</h3>
+  <h3 id="section-7-1">7.1 Jenkins Job 아키텍처</h3>
   <div class="box">
     <div class="mermaid">graph TB
   subgraph AlertManager[Alertmanager]
@@ -1269,14 +1370,14 @@ export function decideScaleAction(
   STAGE7_IN --> STAGE8_IN</div>
   </div>
 
-  <h3>7.2 Job 구성</h3>
+  <h3 id="section-7-2">7.2 Job 구성</h3>
   <ul>
     <li><code>plg-autoscale-out</code> : 스케일 아웃 전용 파이프라인</li>
     <li><code>plg-autoscale-in</code> : 스케일 인 전용 파이프라인</li>
     <li>Alertmanager Webhook의 라벨/파라미터로 서비스명(serviceName)을 전달하여 대상 AutoscalingConfig를 식별</li>
   </ul>
 
-  <h3>7.2 Scale-Out 파이프라인 단계 (요약)</h3>
+  <h3 id="section-7-3">7.3 Scale-Out 파이프라인 단계 (요약)</h3>
   <ol>
     <li>Webhook payload 파싱 (serviceName, alert 정보)</li>
     <li>Backend에서 AutoscalingConfig 조회</li>
@@ -1294,7 +1395,7 @@ export function decideScaleAction(
     </li>
   </ol>
 
-  <h3>7.3 Scale-In 파이프라인 단계 (요약)</h3>
+  <h3 id="section-7-4">7.4 Scale-In 파이프라인 단계 (요약)</h3>
   <ol>
     <li>Webhook payload 파싱 (serviceName, alert 정보)</li>
     <li>Backend에서 AutoscalingConfig 조회</li>
@@ -1312,7 +1413,7 @@ export function decideScaleAction(
   </ol>
 
   <!-- 8. Node Exporter / Promtail -->
-  <h2>8. Node Exporter / Promtail 설치 개요</h2>
+  <h2 id="section-8">8. Node Exporter / Promtail 설치 개요</h2>
   <ul>
     <li>vCenter에서 VM 및 IP 목록을 조회하여 UI에 표시</li>
     <li>사용자가 설치 대상 VM과 SSH 설정(사용자/키)을 선택</li>
@@ -1321,7 +1422,7 @@ export function decideScaleAction(
   </ul>
 
   <!-- 9. 모니터링 -->
-  <h2>9. 모니터링 및 대시보드</h2>
+  <h2 id="section-9">9. 모니터링 및 대시보드</h2>
   <ul>
     <li>Grafana 대시보드
       <ul>
@@ -1334,7 +1435,7 @@ export function decideScaleAction(
   </ul>
 
   <!-- 10. 이벤트 -->
-  <h2>10. Autoscaling 이벤트 관리 (개념)</h2>
+  <h2 id="section-10">10. Autoscaling 이벤트 관리 (개념)</h2>
   <ul>
     <li>Scale-Out/Scale-In 실행 시 Backend로 이벤트 기록 요청</li>
     <li>예상 필드
@@ -1348,9 +1449,9 @@ export function decideScaleAction(
   </ul>
 
   <!-- 11. 운영 -->
-  <h2>11. 운영 가이드</h2>
+  <h2 id="section-11">11. 운영 가이드</h2>
 
-  <h3>11.1 초기 설정 절차</h3>
+  <h3 id="section-11-1">11.1 초기 설정 절차</h3>
   <ol>
     <li><b>기본 VM 준비</b>
       <ul>
@@ -1392,7 +1493,7 @@ export function decideScaleAction(
     </li>
   </ol>
 
-  <h3>11.2 일상 운영</h3>
+  <h3 id="section-11-2">11.2 일상 운영</h3>
   <ul>
     <li><b>모니터링 대시보드 확인</b>
       <ul>
@@ -1417,7 +1518,7 @@ export function decideScaleAction(
     </li>
   </ul>
 
-  <h3>11.3 트러블슈팅</h3>
+  <h3 id="section-11-3">11.3 트러블슈팅</h3>
   <div class="box">
     <h4>문제: 스케일아웃이 발생하지 않음</h4>
     <ul>
@@ -1454,9 +1555,9 @@ export function decideScaleAction(
   </div>
 
   <!-- 12. 보안 -->
-  <h2>12. 보안 및 권한 구조</h2>
+  <h2 id="section-12">12. 보안 및 권한 구조</h2>
 
-  <h3>12.1 인증 및 권한 관리</h3>
+  <h3 id="section-12-1">12.1 인증 및 권한 관리</h3>
   <ul>
     <li><b>vCenter 계정</b>
       <ul>
@@ -1488,7 +1589,7 @@ export function decideScaleAction(
     </li>
   </ul>
 
-  <h3>12.2 데이터 보안</h3>
+  <h3 id="section-12-2">12.2 데이터 보안</h3>
   <ul>
     <li><b>환경 변수 관리</b>
       <ul>
@@ -1513,7 +1614,7 @@ export function decideScaleAction(
     </li>
   </ul>
 
-  <h3>12.3 보안 모범 사례</h3>
+  <h3 id="section-12-3">12.3 보안 모범 사례</h3>
   <ul>
     <li>정기적인 보안 업데이트 및 패치 적용</li>
     <li>로그 모니터링 및 이상 징후 탐지</li>
@@ -1522,9 +1623,9 @@ export function decideScaleAction(
   </ul>
 
   <!-- 13. 성능 및 확장성 -->
-  <h2>13. 성능 및 확장성</h2>
+  <h2 id="section-13">13. 성능 및 확장성</h2>
 
-  <h3>13.1 성능 고려사항</h3>
+  <h3 id="section-13-1">13.1 성능 고려사항</h3>
   <ul>
     <li><b>쿨다운 메커니즘</b>
       <ul>
@@ -1554,7 +1655,7 @@ export function decideScaleAction(
     </li>
   </ul>
 
-  <h3>13.2 실제 스케일링 시나리오 예제</h3>
+  <h3 id="section-13-2">13.2 실제 스케일링 시나리오 예제</h3>
   <div class="box">
     <h4>시나리오 설정</h4>
     <ul>
@@ -1731,7 +1832,7 @@ export function decideScaleAction(
     </table>
   </div>
 
-  <h3>13.3 확장성</h3>
+  <h3 id="section-13-3">13.3 확장성</h3>
   <ul>
     <li><b>서비스별 독립 운영</b>
       <ul>
@@ -1756,7 +1857,7 @@ export function decideScaleAction(
     </li>
   </ul>
 
-  <h3>13.4 모니터링 및 알림</h3>
+  <h3 id="section-13-4">13.4 모니터링 및 알림</h3>
   <div class="box">
     <h4>모니터링 항목</h4>
     <ul>
@@ -1788,9 +1889,9 @@ export function decideScaleAction(
   </div>
 
   <!-- 14. 향후 고도화 -->
-  <h2>14. 향후 고도화 방향</h2>
+  <h2 id="section-14">14. 향후 고도화 방향</h2>
 
-  <h3>14.1 고객사별 권한 분리</h3>
+  <h3 id="section-14-1">14.1 고객사별 권한 분리</h3>
   <ul>
     <li>현재는 관리자만 모든 서비스에 대해 설정 가능</li>
     <li>향후에는 고객사(테넌트) 별로 접근 가능한 서비스와 오토스케일링 설정을 분리</li>
@@ -1801,13 +1902,13 @@ export function decideScaleAction(
     </li>
   </ul>
 
-  <h3>14.2 고객사 전용 서버/인프라 제공</h3>
+  <h3 id="section-14-2">14.2 고객사 전용 서버/인프라 제공</h3>
   <ul>
     <li>대형 고객사의 요구 시, Autoscaling Backend/Jenkins/PLG/F5 파티션을 전용 인스턴스로 제공</li>
     <li>각 고객사별로 min/maxVms, IP Pool, VLAN, 템플릿 및 모니터링을 완전히 분리 운영</li>
   </ul>
 
-  <h3>14.3 고급 기능 아이디어</h3>
+  <h3 id="section-14-3">14.3 고급 기능 아이디어</h3>
   <ul>
     <li><b>예측 스케일링</b>
       <ul>
@@ -1840,9 +1941,9 @@ export function decideScaleAction(
   </ul>
 
   <!-- 15. 요약 및 핵심 포인트 -->
-  <h2>15. 요약 및 핵심 포인트</h2>
+  <h2 id="section-15">15. 요약 및 핵심 포인트</h2>
 
-  <h3>15.1 핵심 아키텍처 원칙</h3>
+  <h3 id="section-15-1">15.1 핵심 아키텍처 원칙</h3>
   <div class="box">
     <ul>
       <li><b>비침투형 설계:</b> 기존 인프라(PLG Stack, Jenkins, F5, vSphere)를 최대한 재활용</li>
@@ -1853,7 +1954,7 @@ export function decideScaleAction(
     </ul>
   </div>
 
-  <h3>15.2 주요 특징</h3>
+  <h3 id="section-15-2">15.2 주요 특징</h3>
   <table>
     <tr>
       <th>항목</th>
@@ -1881,7 +1982,7 @@ export function decideScaleAction(
     </tr>
   </table>
 
-  <h3>15.3 성능 지표</h3>
+  <h3 id="section-15-3">15.3 성능 지표</h3>
   <table>
     <tr>
       <th>작업</th>
@@ -1909,7 +2010,7 @@ export function decideScaleAction(
     </tr>
   </table>
 
-  <h3>15.4 제한사항 및 주의사항</h3>
+  <h3 id="section-15-4">15.4 제한사항 및 주의사항</h3>
   <div class="warning">
     <ul>
       <li><b>IP Pool 범위:</b> IP Pool이 부족하면 스케일아웃이 차단됩니다. 충분한 IP 범위를 확보하세요.</li>
@@ -1921,7 +2022,7 @@ export function decideScaleAction(
   </div>
 
   <!-- 16. 참고 자료 -->
-  <h2>16. 참고 자료</h2>
+  <h2 id="section-16">16. 참고 자료</h2>
   <ul>
     <li><a href="https://prometheus.io/docs/">Prometheus 공식 문서</a></li>
     <li><a href="https://prometheus.io/docs/alerting/latest/alertmanager/">Alertmanager 공식 문서</a></li>
