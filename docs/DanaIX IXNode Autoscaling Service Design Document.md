@@ -225,7 +225,7 @@
       min-height: 200px;
       backdrop-filter: blur(16px);
     }
-    /* Mermaid 다이어그램이 로드될 때까지 로딩 표시 */
+    /* Loading indicator until Mermaid diagram loads */
     .mermaid:empty::before {
       content: "Loading diagram...";
       color: #666;
@@ -242,7 +242,7 @@
   </style>
 </head>
 <body>
-  <!-- 헤더 섹션 -->
+  <!-- Header Section -->
   <div style="
     position: relative;
     overflow: hidden;
@@ -586,7 +586,7 @@
   <p>IXNode Autoscaling operates by combining the following elements:</p>
   <ul>
     <li>VM templates and cloning via vSphere (vCenter)</li>
-    <li>PLG Stack (Prometheus, Alertmanager, Grafana)을 통한 Metric Collection 및 알림</li>
+    <li>Metric collection and alerting via PLG Stack (Prometheus, Alertmanager, Grafana)</li>
     <li>Automation of VM creation/deletion tasks via Jenkins pipelines</li>
     <li>Traffic distribution and health checks via F5 LTM Pool/VIP</li>
   </ul>
@@ -733,7 +733,7 @@
   CONFIG --> AM_CREATE[Alertmanager: Route/Webhook Creation]
   CONFIG --> JENKINS_CREATE[Jenkins: Job Creation]
 
-  PROM_CREATE --> METRIC[Prometheus: Metric Collection 시작]
+  PROM_CREATE --> METRIC[Prometheus: Start Metric Collection]
   METRIC --> CHECK{Threshold Exceeded?}
   CHECK -->|Yes| ALERT_FIRE[Alert Firing]
   CHECK -->|No| METRIC
@@ -747,7 +747,7 @@
   CHECK_COOLDOWN_OUT -->|In Cooldown| BLOCK_OUT[Block]
   CHECK_COOLDOWN_OUT -->|Available| CHECK_MAX{Max VM Count Check}
   CHECK_MAX -->|Reached| BLOCK_MAX[Block + Start Cooldown]
-  CHECK_MAX -->|미Reached| JENKINS_OUT[Jenkins: Scale-Out Execution]
+  CHECK_MAX -->|Not Reached| JENKINS_OUT[Jenkins: Scale-Out Execution]
 
   WEBHOOK_IN --> CHECK_SWITCH{Scale-In Switch Check}
   CHECK_SWITCH -->|OFF| BLOCK_SWITCH[Block + Create Silence]
@@ -755,7 +755,7 @@
   CHECK_COOLDOWN_IN -->|In Cooldown| BLOCK_IN[Block]
   CHECK_COOLDOWN_IN -->|Available| CHECK_MIN{Min VM Count Check}
   CHECK_MIN -->|Reached| BLOCK_MIN[Block + Switch OFF + Create Silence]
-  CHECK_MIN -->|미Reached| JENKINS_IN[Jenkins: Scale-In Execution]
+  CHECK_MIN -->|Not Reached| JENKINS_IN[Jenkins: Scale-In Execution]
 
   JENKINS_OUT --> VM_CREATE[VM Creation]
   VM_CREATE --> IP_SET[IP Configuration]
@@ -783,9 +783,9 @@
     <li>Operator creates templates and creates/activates autoscaling configuration in the UI.</li>
     <li>Backend automatically creates Prometheus Jobs/Alert Rules, Alertmanager Routes, and Jenkins Jobs.</li>
     <li>Prometheus collects Node Exporter metrics and sends alerts to Alertmanager when thresholds are exceeded.</li>
-    <li>Alertmanager가 백엔드 웹훅을 호출한다 (백엔드에서 쿨다운 및 최소/Max VM Count Check).</li>
+    <li>Alertmanager calls backend webhook (backend checks cooldown and min/max VM count).</li>
     <li>Backend calls Jenkins Webhook when validation passes.</li>
-    <li>Jenkins 파이프라인이 VM Creation/삭제, F5 Pool 등록/제거, Add Prometheus target/삭제를 수행한다.</li>
+    <li>Jenkins pipeline performs VM creation/deletion, F5 pool registration/removal, and Prometheus target addition/removal.</li>
     <li>Controls min/max VM count based on the number of VM targets registered in Prometheus Jobs.</li>
   </ol>
 
@@ -793,10 +793,10 @@
   <div class="box">
     <div class="mermaid">graph TB
   subgraph SetupPhase[Setup Phase]
-    UI1[UI: 설정 생성] --> BE1[Backend: Config Storage]
+    UI1[UI: Config Creation] --> BE1[Backend: Config Storage]
     BE1 --> PM1[Prometheus: Job Creation]
     BE1 --> AR1[Prometheus: Alert Rule Creation]
-    BE1 --> AM1[Alertmanager: Route 생성]
+    BE1 --> AM1[Alertmanager: Route Creation]
     BE1 --> JN1[Jenkins: Job Creation]
   end
 
@@ -808,10 +808,10 @@
 
   subgraph DecisionPhase[Decision Phase]
     AM_M -->|Webhook| BE_D[Backend: Webhook Reception]
-    BE_D --> CD[Cooldown 체크]
-    BE_D --> CNT[VM 개수 체크]
+    BE_D --> CD[Cooldown Check]
+    BE_D --> CNT[VM Count Check]
     CD -->|Pass| CNT
-    CNT -->|Pass| JN_D[Jenkins: 트리거]
+    CNT -->|Pass| JN_D[Jenkins: Trigger]
     CD -->|Block| BLOCK[Block]
     CNT -->|Block| BLOCK
   end
@@ -837,8 +837,8 @@
 
   <h3>2.1 Infrastructure Preparation</h3>
   <ul>
-    <li>vSphere(vCenter) 접근 Available, govc CLI 사용 Available</li>
-    <li>F5 BIG-IP LTM에 대상 서비스용 Pool, VIP, HTTP Health Monitor 구성 Complete</li>
+    <li>vSphere (vCenter) accessible, govc CLI available</li>
+    <li>F5 BIG-IP LTM configured with Pool, VIP, and HTTP Health Monitor for target service</li>
     <li>PLG Stack (Prometheus, Alertmanager, Grafana) running</li>
   </ul>
 
@@ -896,13 +896,13 @@
   GET_CONFIG --> GET_VMS[Prometheus: Target List Retrieval]
   GET_VMS --> FILTER_VMS[vCenter: Filter by VM Prefix]
   FILTER_VMS --> SELECT_VM[Select Oldest VM<br/>LIFO Method]
-  SELECT_VM --> F5_REMOVE[F5: Pool Member 제거]
+  SELECT_VM --> F5_REMOVE[F5: Remove Pool Member]
   F5_REMOVE --> F5_NODE[F5: Node Deletion]
   F5_NODE --> MONITOR_REMOVE[Monitoring Removal<br/>Node Exporter/Promtail]
   MONITOR_REMOVE --> PROM_REMOVE[Prometheus: Remove Target]
   PROM_REMOVE --> VM_POWER_OFF[vCenter: VM Power Off]
   VM_POWER_OFF --> VM_DELETE[vCenter: VM Deletion]
-  VM_DELETE --> WEBHOOK_CALLBACK[Backend: VM Deletion Complete 웹훅]
+  VM_DELETE --> WEBHOOK_CALLBACK[Backend: VM Deletion Complete Webhook]
   WEBHOOK_CALLBACK --> COOLDOWN_START[Start Cooldown]
   COOLDOWN_START --> END([Complete])
   
@@ -932,10 +932,10 @@
   PM-->>AM: Alert (High CPU/Memory)
   AM-->>JN: Webhook Call (scale-out)
 
-  JN->>BE: AutoscalingConfig 조회
+  JN->>BE: Retrieve AutoscalingConfig
   BE-->>JN: Config Returned (minVms, maxVms, etc.)
 
-  JN->>PM: Prometheus Target 조회
+  JN->>PM: Retrieve Prometheus Target
   JN->>JN: Calculate currentVmCount
   JN->>JN: decideScaleAction(config, state, "scale-out")
   JN->>VC: Template Clone &amp; VM Creation
@@ -957,16 +957,16 @@
   PM-->>AM: Alert (Low CPU/Memory)
   AM-->>JN: Webhook Call (scale-in)
 
-  JN->>BE: AutoscalingConfig 조회
-  BE-->>JN: 설정 반환
+  JN->>BE: Retrieve AutoscalingConfig
+  BE-->>JN: Config Returned
 
-  JN->>PM: Prometheus Target 조회
+  JN->>PM: Retrieve Prometheus Target
   JN->>JN: Calculate currentVmCount
   JN->>JN: decideScaleAction(config, state, "scale-in")
 
   JN->>VC: VM List Retrieval by vmPrefix
   JN->>JN: Select Oldest VM
-  JN->>F5: Pool Member 제거
+  JN->>F5: Remove Pool Member
   JN->>PM: Remove Target
   JN->>VC: VM Deletion</div>
   </div>
@@ -1103,7 +1103,7 @@ AND
     <li><b>Single Criteria:</b> Both scale-in and scale-out are determined based on the <b>number of VM targets registered in Prometheus Job</b> (currentVmCount)</li>
     <li><b>Scale-Out Block Condition:</b> currentVmCount &gt;= maxVms → Scale-Out Block</li>
     <li><b>Scale-In Block Condition:</b> currentVmCount &lt;= minVms → Scale-In Block</li>
-    <li><b>스케일인 스위치 방식:</b> 최소 VM 개수 Reached 시 스케일인 Switch OFF, Alertmanager Create Silence하여 웹훅 자체 Block</li>
+    <li><b>스케일인 스위치 방식:</b> 최소 VM 개수 Reached 시 Turn scale-in switch OFF and create Alertmanager Silence to block webhooks</li>
     <li><b>Automatic Switch Recovery:</b> When VM count reaches above minimum, automatically turn switch ON and delete Silence</li>
     <li><b>Start Cooldown:</b> Start cooldown when min/max count is reached to prevent pipeline overload from Alertmanager repeated alerts</li>
     <li><b>Logic Simplification:</b> Remove unnecessary duplicate checks, determine min/max count only from Prometheus Job targets</li>
@@ -1117,16 +1117,16 @@ AND
   TYPE -->|Scale-Out| CHECK_COOLDOWN_OUT{Cooldown Check}
   TYPE -->|Scale-In| CHECK_COOLDOWN_IN{Cooldown Check}
   
-  CHECK_COOLDOWN_OUT -->|In Cooldown| REJECT_COOLDOWN_OUT[Block: 쿨다운]
-  CHECK_COOLDOWN_OUT -->|Available| GET_COUNT_OUT[Prometheus Target 개수 조회]
+  CHECK_COOLDOWN_OUT -->|In Cooldown| REJECT_COOLDOWN_OUT[Block: Cooldown]
+  CHECK_COOLDOWN_OUT -->|Available| GET_COUNT_OUT[Retrieve Prometheus Target Count]
   GET_COUNT_OUT --> CHECK_MAX{currentVmCount >= maxVms?}
   CHECK_MAX -->|Yes| REJECT_MAX[Block: Max Count Reached<br/>Start Cooldown]
   CHECK_MAX -->|No| ALLOW_OUT[Allow: Scale-Out Execution]
   
-  CHECK_COOLDOWN_IN -->|In Cooldown| REJECT_COOLDOWN_IN[Block: 쿨다운]
+  CHECK_COOLDOWN_IN -->|In Cooldown| REJECT_COOLDOWN_IN[Block: Cooldown]
   CHECK_COOLDOWN_IN -->|Available| CHECK_SWITCH_IN{Scale-In Switch Check}
   CHECK_SWITCH_IN -->|OFF| REJECT_SWITCH[Block: Switch OFF<br/>Create Silence]
-  CHECK_SWITCH_IN -->|ON| GET_COUNT_IN[Prometheus Target 개수 조회]
+  CHECK_SWITCH_IN -->|ON| GET_COUNT_IN[Retrieve Prometheus Target Count]
   GET_COUNT_IN --> CHECK_MIN{currentVmCount <= minVms?}
   CHECK_MIN -->|Yes| REJECT_MIN[Block: Min Count Reached<br/>Switch OFF + Create Silence]
   CHECK_MIN -->|No| ALLOW_IN[Allow: Scale-In Execution]
@@ -1167,7 +1167,7 @@ export function decideScaleAction(
 
   if (alertType === "scale-out") {
     if (currentVmCount &gt;= maxVms) {
-      // Max Count Reached → 스케일 아웃 Block + Start Cooldown
+      // Max count reached → Scale-Out Block + Start Cooldown
       return "BLOCK_MAX";
     }
     if (isInCooldown(now, lastScaleOutAt, monitoring.cooldownSeconds)) {
@@ -1178,7 +1178,7 @@ export function decideScaleAction(
 
   if (alertType === "scale-in") {
     if (currentVmCount &lt;= minVms) {
-      // Min Count Reached → 스케일 인 Block + Start Cooldown
+      // Min count reached → Scale-In Block + Start Cooldown
       return "BLOCK_MIN";
     }
     if (isInCooldown(now, lastScaleInAt, monitoring.cooldownSeconds)) {
@@ -1193,7 +1193,7 @@ export function decideScaleAction(
   <p><b>요약:</b> Now, scale-in/out min/max count determination is performed only based on the number of VMs registered in Prometheus Job,</p>
   <ul>
     <li>Scale-Out: currentVmCount &gt;= maxVms → Block</li>
-    <li>스케일 인: currentVmCount &lt;= minVms → Block + Switch OFF + Create Silence</li>
+    <li>Scale-In: currentVmCount &lt;= minVms → Block + Switch OFF + Create Silence</li>
     <li>Scale-In Switch: OFF when minimum VM count is reached, block webhooks via Alertmanager Silence</li>
     <li>Automatic Switch Recovery: Automatically ON when VM count increases, delete Silence</li>
     <li>Start cooldown when min/max is reached to prevent unnecessary execution from repeated alert notifications.</li>
@@ -1229,7 +1229,7 @@ export function decideScaleAction(
     STAGE5_OUT[5. IP Configuration]
     STAGE6_OUT[6. F5 Registration]
     STAGE7_OUT[7. Prometheus Registration]
-    STAGE8_OUT[8. Complete 웹훅]
+    STAGE8_OUT[8. Complete Webhook]
   end
   
   subgraph PipelineIn[Scale-In Pipeline]
@@ -1240,13 +1240,13 @@ export function decideScaleAction(
     STAGE5_IN[5. Monitoring Removal]
     STAGE6_IN[6. Prometheus Removal]
     STAGE7_IN[7. VM Deletion]
-    STAGE8_IN[8. Complete 웹훅]
+    STAGE8_IN[8. Complete Webhook]
   end
   
   AM -->|Webhook| WEBHOOK
   WEBHOOK --> CHECK[Validation: Switch/Cooldown/VM Count]
   CHECK -->|Pass| JENKINS_TRIGGER
-  CHECK -->|Block| BLOCK[Block: 웹훅 무시]
+  CHECK -->|Block| BLOCK[Block: Ignore Webhook]
   JENKINS_TRIGGER -->|Scale-Out| JOB_OUT
   JENKINS_TRIGGER -->|Scale-In| JOB_IN
   
@@ -1280,13 +1280,13 @@ export function decideScaleAction(
   <ol>
     <li>Parse webhook payload (serviceName, alert information)</li>
     <li>Retrieve AutoscalingConfig from Backend</li>
-    <li>Prometheus Job 타겟 조회 → Calculate currentVmCount</li>
-    <li><code>decideScaleAction(config, state, "scale-out")</code> 호출 → 실행 Available 여부 판단</li>
+    <li>Retrieve Prometheus Job targets → Calculate currentVmCount</li>
+    <li><code>decideScaleAction(config, state, "scale-out")</code> Call → Determine if execution is available</li>
     <li>If allowed
       <ul>
-        <li>IP Pool에서 사용 Available한 IP 확보</li>
+        <li>Acquire available IP from IP Pool</li>
         <li>Clone VM from template using govc (name: <code>&lt;vmPrefix&gt;-YYYYMMDDHHmmss</code>)</li>
-        <li>VM 부팅 후 SSH 접속 및 Netplan으로 IP Configuration</li>
+        <li>After VM boot, SSH access and configure IP using Netplan</li>
         <li>Install Node Exporter / Promtail if needed</li>
         <li>F5 Add Pool Member</li>
         <li>Add Prometheus target</li>
@@ -1298,15 +1298,15 @@ export function decideScaleAction(
   <ol>
     <li>Parse webhook payload (serviceName, alert information)</li>
     <li>Retrieve AutoscalingConfig from Backend</li>
-    <li>Prometheus Job 타겟 조회 → Calculate currentVmCount</li>
-    <li><code>decideScaleAction(config, state, "scale-in")</code> 호출 → 실행 Available 여부 판단</li>
+    <li>Retrieve Prometheus Job targets → Calculate currentVmCount</li>
+    <li><code>decideScaleAction(config, state, "scale-in")</code> Call → Determine if execution is available</li>
     <li>If allowed
       <ul>
         <li>Retrieve VM list from vCenter by vmPrefix</li>
         <li>Select Oldest VM</li>
         <li>Remove F5 Pool Member</li>
         <li>Remove Prometheus target</li>
-        <li>VM OS End 후 vCenter에서 VM Deletion</li>
+        <li>Shut down VM OS and delete VM from vCenter</li>
       </ul>
     </li>
   </ol>
@@ -1354,15 +1354,15 @@ export function decideScaleAction(
   <ol>
     <li><b>Prepare Base VMs</b>
       <ul>
-        <li>최소 2대 이상의 서비스 VM Creation (고정 IP)</li>
+        <li>Create at least 2 service VMs (static IP)</li>
         <li>Install Node Exporter and register to Prometheus Job</li>
         <li>Register base VMs to F5 Pool and verify Health Check</li>
       </ul>
     </li>
     <li><b>Create Template</b>
       <ul>
-        <li>UI에서 Create Template 메뉴 선택</li>
-        <li>소스 VM Selection 및 템플릿 이름 지정</li>
+        <li>Select Create Template menu in UI</li>
+        <li>Select source VM and specify template name</li>
         <li>vCenter에서 Create Template Complete 확인</li>
       </ul>
     </li>
@@ -1394,9 +1394,9 @@ export function decideScaleAction(
 
   <h3>11.2 Daily Operations</h3>
   <ul>
-    <li><b>Monitoring Dashboard 확인</b>
+    <li><b>Check Monitoring Dashboard</b>
       <ul>
-        <li>CPU/Memory Usage 그래프 모니터링</li>
+        <li>Monitor CPU/Memory usage graphs</li>
         <li>Current VM Count 및 Check Scale Events</li>
         <li>Check alert status</li>
       </ul>
@@ -1438,10 +1438,10 @@ export function decideScaleAction(
 
     <h4>Issue: VM Not Registered to F5 After Creation</h4>
     <ul>
-      <li>Jenkins 빌드 로그에서 F5 Registration 단계 확인</li>
+      <li>Check F5 registration step in Jenkins build logs</li>
       <li>Check F5 Pool name and VIP configuration</li>
       <li>Check F5 credentials</li>
-      <li>Network 연결 확인</li>
+      <li>Check network connectivity</li>
     </ul>
 
     <h4>Issue: Target Not Added to Prometheus</h4>
@@ -1474,7 +1474,7 @@ export function decideScaleAction(
     </li>
     <li><b>F5 Account</b>
       <ul>
-        <li>Add Pool Member/제거 권한만 부여</li>
+        <li>Grant only pool member add/remove permissions</li>
         <li>Administrator privileges not required</li>
         <li>Manage using Jenkins Credentials</li>
       </ul>
