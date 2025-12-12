@@ -1674,7 +1674,7 @@ export function decideScaleAction(
     </tr>
     <tr>
       <td>웹훅 기반</td>
-      <td>Alertmanager → Backend → Jenkins 웹훅 체인</td>
+      <td>Alertmanager → Backend (검증: 스위치/쿨다운/VM개수) → Jenkins 웹훅 체인</td>
     </tr>
     <tr>
       <td>자동 등록</td>
