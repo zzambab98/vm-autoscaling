@@ -1165,15 +1165,17 @@ AND
 
   <h3 id="section-6-2">6.2 변경 후 정책</h3>
   <ul>
-    <li><b>단일 기준:</b> 스케일 인/아웃 모두 <b>Prometheus Job에 등록된 VM 타겟 개수</b>(currentVmCount)를 기준으로 판단</li>
+    <li><b>단일 기준:</b> 스케일 인/아웃 모두 <b>F5 Pool Member 개수</b>(currentVmCount)를 기준으로 판단</li>
+    <li><b>VM 개수 계산 기준:</b> 실제 서비스에 등록된 VM만 카운트하기 위해 F5 Pool Member를 사용 (스케일인/아웃 모두 일관성 유지)</li>
+    <li><b>Fallback:</b> F5 Pool 이름이 없거나 조회 실패 시 Prometheus Target으로 대체</li>
     <li><b>스케일 아웃 차단 조건:</b> currentVmCount &gt;= maxVms → 스케일 아웃 차단</li>
     <li><b>스케일 인 차단 조건:</b> currentVmCount &lt;= minVms → 스케일 인 차단</li>
     <li><b>스케일인 스위치 방식:</b> 최소 VM 개수 도달 시 스케일인 스위치 OFF, Alertmanager Silence 생성하여 웹훅 자체 차단</li>
     <li><b>VM 삭제 완료 시 Silence 생성:</b> VM 삭제 완료 웹훅 수신 시 현재 VM 개수를 확인하여 최소 개수 도달 시 스위치 OFF 및 Silence 생성 (웹훅 발생 원천 차단)</li>
     <li><b>스위치 자동 복구:</b> VM 개수가 최소 개수 이상이 되면 스위치 자동 ON, Silence 삭제</li>
     <li><b>쿨다운 시작:</b> 최소/최대 개수에 도달한 시점에 쿨다운을 시작하여 Alertmanager 반복 알림에 의한 파이프라인 폭주 방지</li>
-    <li><b>로직 단순화:</b> 불필요한 중복 체크 제거, Prometheus Job 타겟만으로 최소/최대 개수 판단</li>
-    <li><b>웹훅 흐름:</b> Alertmanager → Backend (검증) → Jenkins (실행)</li>
+    <li><b>로직 단순화:</b> 불필요한 중복 체크 제거, F5 Pool Member 기준으로 최소/최대 개수 판단</li>
+    <li><b>웹훅 흐름:</b> Alertmanager → Backend (검증: 스위치, 쿨다운, VM 개수) → Jenkins (실행)</li>
   </ul>
 
   <h3 id="section-6-3">6.3 판단 로직 플로우차트</h3>
@@ -1184,7 +1186,7 @@ AND
   TYPE -->|Scale-In| CHECK_COOLDOWN_IN{쿨다운 체크}
   
   CHECK_COOLDOWN_OUT -->|쿨다운 중| REJECT_COOLDOWN_OUT[차단: 쿨다운]
-  CHECK_COOLDOWN_OUT -->|가능| GET_COUNT_OUT[Prometheus Target 개수 조회]
+  CHECK_COOLDOWN_OUT -->|가능| GET_COUNT_OUT[F5 Pool Member 개수 조회]
   GET_COUNT_OUT --> CHECK_MAX{currentVmCount >= maxVms?}
   CHECK_MAX -->|Yes| REJECT_MAX[차단: 최대 개수 도달<br/>쿨다운 시작]
   CHECK_MAX -->|No| ALLOW_OUT[허용: 스케일아웃 실행]
@@ -1192,7 +1194,7 @@ AND
   CHECK_COOLDOWN_IN -->|쿨다운 중| REJECT_COOLDOWN_IN[차단: 쿨다운]
   CHECK_COOLDOWN_IN -->|가능| CHECK_SWITCH_IN{스케일인 스위치 체크}
   CHECK_SWITCH_IN -->|OFF| REJECT_SWITCH[차단: 스위치 OFF<br/>Silence 생성]
-  CHECK_SWITCH_IN -->|ON| GET_COUNT_IN[Prometheus Target 개수 조회]
+  CHECK_SWITCH_IN -->|ON| GET_COUNT_IN[F5 Pool Member 개수 조회]
   GET_COUNT_IN --> CHECK_MIN{currentVmCount <= minVms?}
   CHECK_MIN -->|Yes| REJECT_MIN[차단: 최소 개수 도달<br/>스위치 OFF + Silence 생성]
   CHECK_MIN -->|No| ALLOW_IN[허용: 스케일인 실행]
@@ -1208,7 +1210,7 @@ AND
 
   <h3 id="section-6-4">6.4 TypeScript 의사 코드</h3>
   <pre><code class="language-ts">interface CurrentState {
-  currentVmCount: number;       // Prometheus Job 타겟 수
+  currentVmCount: number;       // F5 Pool Member 개수 (실제 서비스에 등록된 VM 수)
   lastScaleOutAt?: number;      // epoch ms
   lastScaleInAt?: number;       // epoch ms
 }
@@ -1256,12 +1258,14 @@ export function decideScaleAction(
   return "ALLOW";
 }</code></pre>
 
-  <p><b>요약:</b> 이제 스케일 인/아웃 최소·최대 개수 판단은 Prometheus Job에 등록된 VM 개수만으로 수행하며,</p>
+  <p><b>요약:</b> 이제 스케일 인/아웃 최소·최대 개수 판단은 F5 Pool Member 개수를 기준으로 수행하며,</p>
   <ul>
+    <li><b>VM 개수 계산:</b> 실제 서비스에 등록된 VM만 카운트하기 위해 F5 Pool Member 사용 (스케일인/아웃 모두 일관성 유지)</li>
+    <li><b>Fallback:</b> F5 Pool 이름이 없거나 조회 실패 시 Prometheus Target으로 대체</li>
     <li>스케일 아웃: currentVmCount &gt;= maxVms → 차단</li>
     <li>스케일 인: currentVmCount &lt;= minVms → 차단 + 스위치 OFF + Silence 생성</li>
     <li>스케일인 스위치: 최소 VM 개수 도달 시 OFF, Alertmanager Silence로 웹훅 자체 차단</li>
-    <li>VM 삭제 완료 시: VM 삭제 완료 웹훅 수신 시 VM 개수 확인하여 최소 개수 도달 시 스위치 OFF 및 Silence 생성 (이중 방어)</li>
+    <li>VM 삭제 완료 시: VM 삭제 완료 웹훅 수신 시 F5 Pool Member 기준으로 VM 개수 확인하여 최소 개수 도달 시 스위치 OFF 및 Silence 생성 (이중 방어)</li>
     <li>스위치 자동 복구: VM 개수 증가 시 자동 ON, Silence 삭제</li>
     <li>최소/최대 도달 시 쿨다운을 시작해 Alert 반복 알림에 의한 불필요한 실행을 막는다.</li>
     <li>웹훅 흐름: Alertmanager → Backend (검증: 스위치, 쿨다운, VM 개수) → Jenkins</li>
@@ -1735,15 +1739,20 @@ export function decideScaleAction(
           <li>Jenkins 파이프라인 실행: 가장 최신 VM(4번) 선택, F5 제거, Prometheus 제거, VM 삭제 (약 2분 소요)</li>
           <li>VM 4번 삭제 완료</li>
           <li>쿨다운 시작 (5분)</li>
+          <li><strong>실제 테스트 결과:</strong> CPU 30% 이하 진입 후 약 7분 후 4번째 VM 삭제 완료</li>
         </ul>
       </li>
       <li><strong>VM 3번 삭제:</strong>
         <ul>
           <li>부하가 여전히 낮아 CPU 30% 이하 지속</li>
           <li>쿨다운 종료 대기 (5분)</li>
-          <li>Alertmanager가 5분 후 재전송 (repeat_interval)</li>
-          <li>쿨다운 종료 확인 후 VM 3번 삭제 (약 2분 소요)</li>
+          <li>쿨다운 종료 후 Alertmanager의 repeat_interval(5분)과 시점이 맞지 않아 추가 대기 발생 (0~5분)</li>
+          <li>Alertmanager가 재전송하면 Backend에서 쿨다운 체크 통과 → Jenkins 파이프라인 실행</li>
+          <li>VM 3번 삭제 (약 2분 소요)</li>
           <li>VM 3번 삭제 완료</li>
+          <li>현재 VM 개수 확인 (F5 Pool Member 기준): 2개 = 최소 2개</li>
+          <li>스케일인 스위치 OFF + Alertmanager Silence 생성 (30분간)</li>
+          <li><strong>실제 테스트 결과:</strong> 4번째 VM 삭제 완료 후 약 5~10분 후 3번째 VM 삭제 시작 (일반적으로 약 7~8분 후)</li>
         </ul>
       </li>
       <li><strong>최소 개수 유지:</strong>
@@ -1789,13 +1798,18 @@ export function decideScaleAction(
       </tr>
       <tr>
         <td>스케일인: 4번 삭제</td>
-        <td>약 10분 후</td>
-        <td>스케일인 조건 지속(5분) + Alert 발생 + 처리(2분) = 약 10분 후</td>
+        <td>약 7분 후</td>
+        <td>스케일인 조건 지속(5분) + Alert 발생 + 처리(2분) = 약 7분 후<br/><strong>실제 테스트:</strong> CPU 30% 이하 진입 후 약 7분 후 4번째 VM 삭제 완료</td>
       </tr>
       <tr>
         <td>스케일인: 3번 삭제</td>
-        <td>약 10분 후</td>
-        <td>쿨다운(5분) + Alert 재전송(5분) + 처리(2분) = 약 10분 후</td>
+        <td>약 5~10분 후</td>
+        <td>쿨다운(5분) + Alertmanager 재전송 대기(0~5분) + 처리(2분) = 약 7~12분 후<br/><strong>실제 테스트:</strong> 4번째 VM 삭제 완료 후 약 5~10분 후 3번째 VM 삭제 시작<br/>일반적으로 쿨다운 종료 후 약 2~3분 대기하여 약 7~8분 후 삭제 시작<br/>쿨다운 종료 시점과 Alertmanager의 repeat_interval 시점이 맞지 않아 추가 대기 발생</td>
+      </tr>
+      <tr>
+        <td>스케일인: 최소 개수 도달</td>
+        <td>즉시</td>
+        <td>3번째 VM 삭제 완료 시점에 최소 VM 개수(2개) 도달<br/>스케일인 스위치 OFF + Alertmanager Silence 생성 (30분간)<br/>이후 더 이상 스케일인 웹훅 발생하지 않음</td>
       </tr>
     </table>
   </div>
@@ -1922,7 +1936,7 @@ export function decideScaleAction(
   <div class="box">
     <ul>
       <li><b>비침투형 설계:</b> 기존 인프라(PLG Stack, Jenkins, F5, vSphere)를 최대한 재활용</li>
-      <li><b>단일 기준 원칙:</b> Prometheus Job에 등록된 VM 개수만으로 최소/최대 개수 판단</li>
+      <li><b>단일 기준 원칙:</b> F5 Pool Member 개수만으로 최소/최대 개수 판단 (실제 서비스에 등록된 VM만 카운트)</li>
       <li><b>쿨다운 메커니즘:</b> 반복 알림 방지 및 리소스 보호</li>
       <li><b>서비스 독립성:</b> 각 서비스는 독립적으로 운영되며 서로 영향 없음</li>
       <li><b>자동화:</b> 설정부터 실행까지 전체 프로세스 자동화</li>
