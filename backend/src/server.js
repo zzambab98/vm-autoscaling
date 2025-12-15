@@ -1174,39 +1174,82 @@ const server = http.createServer((req, res) => {
           console.log(`[Webhook] 쿨다운 시작: ${serviceName} - ${scaleAction} (${cooldownPeriod}초)`);
         }
 
-        // 스케일아웃인 경우 최대 VM 개수 체크 (Prometheus Job에 등록된 개수 기준)
+        // 스케일아웃인 경우 최대 VM 개수 체크 (F5 Pool Member 기준)
         if (isScaleOut) {
           try {
             const maxVms = config.scaling?.maxVms || 10;
-            const prometheusJobName = config.monitoring?.prometheusJobName;
+            const f5PoolName = config.f5?.poolName;
             
-            if (!prometheusJobName) {
-              console.warn(`[Webhook] Prometheus Job 이름이 설정되지 않았습니다: ${serviceName}`);
-              sendJSONResponse(res, 400, {
-                success: false,
-                message: 'Prometheus Job 이름이 설정되지 않았습니다.'
-              });
-              return;
+            let currentVmCount = 0;
+            
+            // F5 Pool Member에서 VM 개수 확인
+            if (!f5PoolName) {
+              console.warn(`[Webhook] F5 Pool 이름이 설정되지 않았습니다. Prometheus target으로 대체합니다: ${serviceName}`);
+              // F5 Pool 이름이 없으면 Prometheus target 사용 (fallback)
+              const prometheusJobName = config.monitoring?.prometheusJobName;
+              if (!prometheusJobName) {
+                console.warn(`[Webhook] Prometheus Job 이름도 설정되지 않았습니다: ${serviceName}`);
+                sendJSONResponse(res, 400, {
+                  success: false,
+                  message: 'F5 Pool 이름 또는 Prometheus Job 이름이 설정되지 않았습니다.'
+                });
+                return;
+              }
+              const { getPrometheusTargets } = require('./services/prometheusMonitoringService');
+              const targetsResult = await getPrometheusTargets(prometheusJobName);
+              if (!targetsResult.success) {
+                console.error(`[Webhook] Prometheus Job 조회 실패: ${serviceName} - ${prometheusJobName}`);
+                sendJSONResponse(res, 500, {
+                  success: false,
+                  message: `Prometheus Job 조회 실패: ${prometheusJobName}`
+                });
+                return;
+              }
+              currentVmCount = targetsResult.targets?.length || 0;
+              console.log(`[Webhook] VM 개수 확인 (Prometheus fallback): ${serviceName} - ${currentVmCount}개`);
+            } else {
+              // F5 Pool Member 목록 조회
+              const { getF5PoolMembers } = require('./services/f5Service');
+              const membersResult = await getF5PoolMembers(f5PoolName);
+              
+              if (!membersResult.success) {
+                console.warn(`[Webhook] F5 Pool Member 조회 실패. Prometheus target으로 대체합니다: ${serviceName} - ${membersResult.error}`);
+                // F5 Pool 조회 실패 시 Prometheus target으로 fallback
+                const prometheusJobName = config.monitoring?.prometheusJobName;
+                if (prometheusJobName) {
+                  try {
+                    const { getPrometheusTargets } = require('./services/prometheusMonitoringService');
+                    const targetsResult = await getPrometheusTargets(prometheusJobName);
+                    if (targetsResult.success) {
+                      currentVmCount = targetsResult.targets?.length || 0;
+                      console.log(`[Webhook] VM 개수 확인 실패로 Prometheus target으로 대체: ${currentVmCount}개`);
+                    } else {
+                      throw new Error('Prometheus target 조회 실패');
+                    }
+                  } catch (fallbackError) {
+                    console.error(`[Webhook] Prometheus target 확인도 실패:`, fallbackError.message);
+                    sendJSONResponse(res, 500, {
+                      success: false,
+                      message: `VM 개수 확인 실패: F5 Pool 조회 실패 (${membersResult.error}), Prometheus target 조회도 실패`
+                    });
+                    return;
+                  }
+                } else {
+                  sendJSONResponse(res, 500, {
+                    success: false,
+                    message: `VM 개수 확인 실패: F5 Pool 조회 실패 (${membersResult.error}), Prometheus Job 이름도 없음`
+                  });
+                  return;
+                }
+              } else {
+                currentVmCount = membersResult.members?.length || 0;
+                console.log(`[Webhook] VM 개수 확인 (F5 Pool): ${serviceName} - ${currentVmCount}개 (Pool: ${f5PoolName})`);
+              }
             }
             
-            // Prometheus Job에 등록된 현재 VM 개수 확인
-            const { getPrometheusTargets } = require('./services/prometheusMonitoringService');
-            const targetsResult = await getPrometheusTargets(prometheusJobName);
-            
-            if (!targetsResult.success) {
-              console.error(`[Webhook] Prometheus Job 조회 실패: ${serviceName} - ${prometheusJobName}`);
-              sendJSONResponse(res, 500, {
-                success: false,
-                message: `Prometheus Job 조회 실패: ${prometheusJobName}`
-              });
-              return;
-            }
-            
-            const currentVmCount = targetsResult.targets?.length || 0;
-            
-            // 최대 VM 개수 체크 (Prometheus Job에 등록된 개수 기준)
+            // 최대 VM 개수 체크 (F5 Pool Member 기준)
             if (currentVmCount >= maxVms) {
-              console.log(`[Webhook] 최대 VM 개수 도달: ${serviceName} - 현재 Prometheus Job 등록 개수: ${currentVmCount}, 최대: ${maxVms}`);
+              console.log(`[Webhook] 최대 VM 개수 도달: ${serviceName} - 현재 F5 Pool Member 개수: ${currentVmCount}, 최대: ${maxVms}`);
               
               // 쿨다운 시작하여 반복 시도 방지
               try {
@@ -1220,15 +1263,15 @@ const server = http.createServer((req, res) => {
               
               sendJSONResponse(res, 200, {
                 success: false,
-                message: `최대 VM 개수(${maxVms})에 도달하여 스케일아웃할 수 없습니다. (현재 Prometheus Job 등록 개수: ${currentVmCount}개)`,
+                message: `최대 VM 개수(${maxVms})에 도달하여 스케일아웃할 수 없습니다. (현재 F5 Pool Member 개수: ${currentVmCount}개)`,
                 currentVmCount: currentVmCount,
                 maxVms: maxVms,
-                prometheusJobName: prometheusJobName
+                f5PoolName: f5PoolName
               });
               return;
             }
             
-            console.log(`[Webhook] VM 개수 확인 통과: ${serviceName} - 현재 Prometheus Job 등록 개수: ${currentVmCount}, 최대: ${maxVms} (스케일아웃 가능)`);
+            console.log(`[Webhook] VM 개수 확인 통과: ${serviceName} - 현재 F5 Pool Member 개수: ${currentVmCount}, 최대: ${maxVms} (스케일아웃 가능)`);
           } catch (error) {
             console.error(`[Webhook] 최대 VM 개수 확인 실패:`, error.message);
             sendJSONResponse(res, 500, {
