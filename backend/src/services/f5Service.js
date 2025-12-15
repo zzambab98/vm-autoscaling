@@ -389,9 +389,86 @@ async function removeF5PoolMember(poolName, memberIp, memberPort = '80', partiti
   }
 }
 
+/**
+ * F5 Pool의 멤버 목록 조회
+ * @param {string} poolName - Pool 이름
+ * @param {string} partition - Partition (기본값: Common)
+ * @returns {Promise<object>} 멤버 목록
+ */
+async function getF5PoolMembers(poolName, partition = F5_PARTITION) {
+  try {
+    // 환경 변수 확인
+    if (!F5_SERVERS || F5_SERVERS.length === 0 || !F5_SERVERS[0]) {
+      return {
+        success: false,
+        members: [],
+        error: 'F5_SERVERS 환경 변수가 설정되지 않았습니다.'
+      };
+    }
+    if (!F5_USER || !F5_PASSWORD) {
+      return {
+        success: false,
+        members: [],
+        error: 'F5_USER 또는 F5_PASSWORD 환경 변수가 설정되지 않았습니다.'
+      };
+    }
+
+    const f5Server = F5_SERVERS[0];
+    const token = await authenticate(f5Server);
+
+    // Pool 멤버 경로 구성
+    const membersPath = `/mgmt/tm/ltm/pool/~${partition}~${poolName}/members`;
+
+    // 멤버 목록 조회
+    const response = await f5ApiCall(f5Server, token, 'GET', membersPath);
+
+    // 멤버 목록 파싱
+    const members = (response.items || []).map(member => {
+      // member.name 형식: "/Common/10.255.48.201:80" 또는 "10.255.48.201:80"
+      const memberName = member.name || '';
+      const parts = memberName.split('/').pop().split(':');
+      const ip = parts[0];
+      const port = parts[1] || '80';
+
+      return {
+        name: member.name,
+        ip: ip,
+        port: port,
+        state: member.state || 'unknown',
+        enabled: member.enabled !== false, // 기본값 true
+        session: member.session || 'user-enabled'
+      };
+    });
+
+    return {
+      success: true,
+      poolName: poolName,
+      members: members,
+      count: members.length
+    };
+  } catch (error) {
+    console.error(`[F5 Service] Pool 멤버 조회 실패:`, error.message);
+    // 404 에러는 pool이 없거나 멤버가 없는 경우
+    if (error.message.includes('404')) {
+      return {
+        success: true,
+        poolName: poolName,
+        members: [],
+        count: 0
+      };
+    }
+    return {
+      success: false,
+      members: [],
+      error: error.message
+    };
+  }
+}
+
 module.exports = {
   getF5Pools,
   getF5VirtualServers,
-  removeF5PoolMember
+  removeF5PoolMember,
+  getF5PoolMembers
 };
 

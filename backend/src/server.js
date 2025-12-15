@@ -1499,30 +1499,54 @@ const server = http.createServer((req, res) => {
 
         console.log(`[Webhook] VM 삭제 완료 수신: ${serviceName} - ${vmName} (${vmIp})`);
 
-        // 1. 현재 VM 개수를 먼저 확인 (Prometheus target 제거 전에 확인)
-        // Jenkins가 이미 Prometheus에서 target을 제거했을 수 있으므로, 제거 전 개수를 계산
+        // 1. 현재 VM 개수를 F5 Pool Member에서 확인
+        // Jenkins가 이미 F5에서 member를 제거했을 수 있으므로, 제거 전 개수를 계산
         let currentVmCount = 0;
         try {
-          const { getPrometheusTargets } = require('./services/prometheusMonitoringService');
-          const targetsResult = await getPrometheusTargets(prometheusJobName);
-          const currentTargets = targetsResult.targets || [];
+          const { getF5PoolMembers } = require('./services/f5Service');
+          const { getConfigs } = require('./services/autoscalingService');
           
-          // 삭제된 VM의 target이 아직 남아있으면 그대로 사용, 없으면 +1
-          const deletedTarget = `${vmIp}:${process.env.NODE_EXPORTER_PORT || '9100'}`;
-          const targetExists = currentTargets.some(t => t.instance === deletedTarget);
+          // 설정에서 F5 Pool 이름 가져오기
+          const configs = await getConfigs();
+          const config = configs.find(c => c.serviceName === serviceName);
+          const poolName = f5PoolName || config?.f5?.poolName;
           
-          if (targetExists) {
-            // target이 아직 있으면 현재 개수 사용 (Jenkins가 아직 제거하지 않음)
-            currentVmCount = currentTargets.length;
+          if (!poolName) {
+            console.warn(`[Webhook] F5 Pool 이름을 찾을 수 없습니다. Prometheus target으로 대체합니다.`);
+            // F5 Pool 이름이 없으면 Prometheus target 사용 (fallback)
+            const { getPrometheusTargets } = require('./services/prometheusMonitoringService');
+            const targetsResult = await getPrometheusTargets(prometheusJobName);
+            currentVmCount = (targetsResult.targets || []).length;
           } else {
-            // target이 없으면 현재 개수 + 1 (Jenkins가 이미 제거함)
-            currentVmCount = currentTargets.length + 1;
+            // F5 Pool Member 목록 조회
+            const membersResult = await getF5PoolMembers(poolName);
+            const currentMembers = membersResult.members || [];
+            
+            // 삭제된 VM의 IP가 pool member에 있는지 확인
+            const memberExists = currentMembers.some(m => m.ip === vmIp);
+            
+            if (memberExists) {
+              // member가 아직 있으면 현재 개수 사용 (Jenkins가 아직 제거하지 않음)
+              currentVmCount = currentMembers.length;
+            } else {
+              // member가 없으면 현재 개수 + 1 (Jenkins가 이미 제거함)
+              currentVmCount = currentMembers.length + 1;
+            }
+            
+            console.log(`[Webhook] VM 삭제 완료 후 현재 VM 개수 계산 (F5 Pool): ${currentVmCount}개 (F5 Pool Member 존재: ${memberExists}, Pool: ${poolName})`);
           }
-          
-          console.log(`[Webhook] VM 삭제 완료 후 현재 VM 개수 계산: ${currentVmCount}개 (Prometheus target 존재: ${targetExists})`);
         } catch (error) {
           console.warn(`[Webhook] VM 개수 확인 실패 (경고):`, error.message);
-          // VM 개수 확인 실패 시 기본값 사용
+          // VM 개수 확인 실패 시 Prometheus target으로 fallback
+          try {
+            const { getPrometheusTargets } = require('./services/prometheusMonitoringService');
+            const targetsResult = await getPrometheusTargets(prometheusJobName);
+            currentVmCount = (targetsResult.targets || []).length;
+            console.log(`[Webhook] VM 개수 확인 실패로 Prometheus target으로 대체: ${currentVmCount}개`);
+          } catch (fallbackError) {
+            console.warn(`[Webhook] Prometheus target 확인도 실패:`, fallbackError.message);
+            // 기본값 사용
+          }
         }
 
         // 2. Prometheus Job에서 target 제거 (Jenkins가 이미 제거했을 수 있음)
