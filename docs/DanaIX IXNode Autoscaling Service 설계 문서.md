@@ -620,14 +620,26 @@
           <li style="margin: 4px 0;"><a href="#section-13-4" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">13.4 모니터링 및 알림</a></li>
         </ul>
       </li>
-      <li style="margin: 8px 0;"><a href="#section-14" style="color: #546bff; text-decoration: none; font-weight: 500;">14. 향후 고도화 방향</a>
+      <li style="margin: 8px 0;"><a href="#section-14" style="color: #546bff; text-decoration: none; font-weight: 500;">14. Stateful 애플리케이션 지원 방안</a>
         <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
-          <li style="margin: 4px 0;"><a href="#section-14-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">14.1 고객사별 권한 분리</a></li>
-          <li style="margin: 4px 0;"><a href="#section-14-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">14.2 고객사 전용 서버/인프라 제공</a></li>
-          <li style="margin: 4px 0;"><a href="#section-14-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">14.3 고급 기능 아이디어</a></li>
+          <li style="margin: 4px 0;"><a href="#section-14-0" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">14.0 개요</a></li>
+          <li style="margin: 4px 0;"><a href="#section-14-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">14.1 F5 Session Affinity (Sticky Session)</a></li>
+          <li style="margin: 4px 0;"><a href="#section-14-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">14.2 공유 스토리지 (Shared Storage)</a></li>
+          <li style="margin: 4px 0;"><a href="#section-14-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">14.3 상태 외부화 (State Externalization)</a></li>
+          <li style="margin: 4px 0;"><a href="#section-14-4" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">14.4 하이브리드 접근법</a></li>
+          <li style="margin: 4px 0;"><a href="#section-14-5" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">14.5 솔루션 선택 가이드</a></li>
+          <li style="margin: 4px 0;"><a href="#section-14-6" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">14.6 현재 시스템에서의 적용 방법</a></li>
+          <li style="margin: 4px 0;"><a href="#section-14-7" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">14.7 제한사항 및 고려사항</a></li>
         </ul>
       </li>
-      <li style="margin: 8px 0;"><a href="#section-15" style="color: #546bff; text-decoration: none; font-weight: 500;">15. 요약 및 핵심 포인트</a>
+      <li style="margin: 8px 0;"><a href="#section-15" style="color: #546bff; text-decoration: none; font-weight: 500;">15. 향후 고도화 방향</a>
+        <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
+          <li style="margin: 4px 0;"><a href="#section-15-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">15.1 고객사별 권한 분리</a></li>
+          <li style="margin: 4px 0;"><a href="#section-15-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">15.2 고객사 전용 서버/인프라 제공</a></li>
+          <li style="margin: 4px 0;"><a href="#section-15-3" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">15.3 고급 기능 아이디어</a></li>
+        </ul>
+      </li>
+      <li style="margin: 8px 0;"><a href="#section-16" style="color: #546bff; text-decoration: none; font-weight: 500;">16. 요약 및 핵심 포인트</a>
         <ul style="list-style: none; padding-left: 24px; margin-top: 4px;">
           <li style="margin: 4px 0;"><a href="#section-15-1" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">15.1 핵심 아키텍처 원칙</a></li>
           <li style="margin: 4px 0;"><a href="#section-15-2" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">15.2 주요 특징</a></li>
@@ -635,7 +647,7 @@
           <li style="margin: 4px 0;"><a href="#section-15-4" style="color: rgba(13, 21, 56, 0.7); text-decoration: none; font-size: 14px;">15.4 제한사항 및 주의사항</a></li>
         </ul>
       </li>
-      <li style="margin: 8px 0;"><a href="#section-16" style="color: #546bff; text-decoration: none; font-weight: 500;">16. 참고 자료</a></li>
+      <li style="margin: 8px 0;"><a href="#section-17" style="color: #546bff; text-decoration: none; font-weight: 500;">17. 참고 자료</a></li>
     </ul>
   </div>
 
@@ -1870,10 +1882,334 @@ export function decideScaleAction(
     </ul>
   </div>
 
-  <!-- 14. 향후 고도화 -->
-  <h2 id="section-14">14. 향후 고도화 방향</h2>
+  <!-- 14. Stateful 애플리케이션 지원 -->
+  <h2 id="section-14">14. Stateful 애플리케이션 지원 방안</h2>
 
-  <h3 id="section-14-1">14.1 개인 서비스 제공을 위한 고도화</h3>
+  <h3 id="section-14-0">14.0 개요</h3>
+  <div class="info">
+    <p><strong>Stateful 애플리케이션:</strong> 세션 상태, 로컬 파일 시스템, 인메모리 캐시 등 상태를 유지해야 하는 애플리케이션을 의미합니다. 현재 시스템은 기본적으로 Stateless 애플리케이션을 가정하고 설계되었지만, 아래 솔루션을 통해 Stateful 애플리케이션도 지원할 수 있습니다.</p>
+  </div>
+
+  <h3 id="section-14-1">14.1 F5 Session Affinity (Sticky Session)</h3>
+  <div class="box">
+    <h4>해결 방법</h4>
+    <p>F5 BIG-IP LTM의 <b>Session Persistence</b> 기능을 활용하여 동일한 클라이언트의 요청을 항상 같은 VM으로 라우팅합니다.</p>
+    
+    <h4>구현 방법</h4>
+    <ul>
+      <li><b>Source IP 기반 (Source Address Affinity)</b>
+        <ul>
+          <li>클라이언트의 Source IP를 기반으로 동일한 VM으로 라우팅</li>
+          <li>가장 간단하고 빠르게 적용 가능</li>
+          <li>NAT 환경에서는 효과가 제한적일 수 있음</li>
+        </ul>
+      </li>
+      <li><b>Cookie 기반 (HTTP Cookie Insertion)</b>
+        <ul>
+          <li>F5가 자동으로 쿠키를 삽입하여 세션 유지</li>
+          <li>애플리케이션 수정 불필요</li>
+          <li>가장 일반적이고 효과적인 방법</li>
+        </ul>
+      </li>
+      <li><b>SSL Session ID 기반</b>
+        <ul>
+          <li>HTTPS 환경에서 SSL 세션 ID를 활용</li>
+          <li>보안이 중요한 환경에 적합</li>
+        </ul>
+      </li>
+    </ul>
+
+    <h4>장점</h4>
+    <ul>
+      <li>애플리케이션 코드 수정 불필요</li>
+      <li>F5 설정만으로 구현 가능</li>
+      <li>기존 오토스케일링 시스템과 완벽 호환</li>
+      <li>VM 삭제 시 해당 VM의 세션만 손실 (다른 VM 세션 보호)</li>
+    </ul>
+
+    <h4>단점 및 주의사항</h4>
+    <ul>
+      <li><b>VM 삭제 시 세션 손실:</b> 스케일인으로 VM이 삭제되면 해당 VM의 세션은 손실됨</li>
+      <li><b>부하 분산 불균형:</b> 세션 유지로 인해 부하가 고르게 분산되지 않을 수 있음</li>
+      <li><b>고가용성:</b> VM 장애 시 세션 복구 메커니즘 필요</li>
+    </ul>
+
+    <h4>권장 사용 사례</h4>
+    <ul>
+      <li>세션 데이터가 중요하지 않거나 재로그인 가능한 애플리케이션</li>
+      <li>쇼핑몰 장바구니 (일시적 데이터)</li>
+      <li>사용자 설정 저장이 필요 없는 웹 애플리케이션</li>
+    </ul>
+  </div>
+
+  <h3 id="section-14-2">14.2 공유 스토리지 (Shared Storage)</h3>
+  <div class="box">
+    <h4>해결 방법</h4>
+    <p>모든 VM이 공유 스토리지(NFS, CIFS, vSAN 등)를 마운트하여 상태 데이터를 공유합니다.</p>
+    
+    <h4>구현 방법</h4>
+    <ul>
+      <li><b>NFS (Network File System)</b>
+        <ul>
+          <li>vSphere에서 NFS Datastore 제공</li>
+          <li>VM 생성 시 자동으로 NFS 마운트 스크립트 실행</li>
+          <li>세션 파일, 업로드 파일 등을 공유 스토리지에 저장</li>
+        </ul>
+      </li>
+      <li><b>CIFS/SMB</b>
+        <ul>
+          <li>Windows 환경에서 사용</li>
+          <li>공유 폴더를 네트워크 드라이브로 마운트</li>
+        </ul>
+      </li>
+      <li><b>vSAN 또는 vSphere Datastore</b>
+        <ul>
+          <li>vSphere 환경에서 제공하는 공유 스토리지</li>
+          <li>VM 템플릿에 공유 스토리지 마운트 설정 포함</li>
+        </ul>
+      </li>
+    </ul>
+
+    <h4>Jenkins 파이프라인 수정 사항</h4>
+    <ul>
+      <li>VM 생성 후 공유 스토리지 마운트 스크립트 실행</li>
+      <li>애플리케이션 설정에서 공유 스토리지 경로 사용</li>
+      <li>VM 삭제 전 공유 스토리지에서 해당 VM 전용 데이터 정리 (선택사항)</li>
+    </ul>
+
+    <h4>장점</h4>
+    <ul>
+      <li>VM 간 상태 데이터 공유 가능</li>
+      <li>VM 삭제 시에도 데이터 보존</li>
+      <li>파일 기반 상태 관리에 적합</li>
+    </ul>
+
+    <h4>단점 및 주의사항</h4>
+    <ul>
+      <li><b>성능:</b> 네트워크 스토리지로 인한 지연 가능</li>
+      <li><b>동시성:</b> 파일 잠금 메커니즘 필요</li>
+      <li><b>단일 장애점:</b> 공유 스토리지 장애 시 전체 서비스 영향</li>
+      <li><b>설정 복잡도:</b> 템플릿 및 파이프라인 수정 필요</li>
+    </ul>
+
+    <h4>권장 사용 사례</h4>
+    <ul>
+      <li>파일 업로드/다운로드 서비스</li>
+      <li>공유 문서 저장소</li>
+      <li>로그 파일 중앙 집중 저장</li>
+    </ul>
+  </div>
+
+  <h3 id="section-14-3">14.3 상태 외부화 (State Externalization)</h3>
+  <div class="box">
+    <h4>해결 방법</h4>
+    <p>세션 상태를 외부 저장소(Redis, Memcached, 데이터베이스)에 저장하여 모든 VM이 접근 가능하도록 합니다.</p>
+    
+    <h4>구현 방법</h4>
+    <ul>
+      <li><b>Redis 기반 세션 스토어</b>
+        <ul>
+          <li>Redis를 세션 저장소로 사용</li>
+          <li>애플리케이션에서 Redis에 세션 저장/조회</li>
+          <li>고성능 인메모리 저장소</li>
+          <li>Redis Cluster로 고가용성 확보 가능</li>
+        </ul>
+      </li>
+      <li><b>Memcached</b>
+        <ul>
+          <li>간단한 키-값 저장소</li>
+          <li>세션 데이터 저장에 적합</li>
+          <li>Redis보다 단순하지만 기능 제한적</li>
+        </ul>
+      </li>
+      <li><b>데이터베이스 기반 세션</b>
+        <ul>
+          <li>MySQL, PostgreSQL 등에 세션 테이블 생성</li>
+          <li>영구 저장 필요 시 적합</li>
+          <li>성능은 Redis/Memcached보다 낮을 수 있음</li>
+        </ul>
+      </li>
+    </ul>
+
+    <h4>애플리케이션 수정 사항</h4>
+    <ul>
+      <li>세션 저장소를 로컬에서 외부 저장소로 변경</li>
+      <li>Redis/Memcached 클라이언트 라이브러리 추가</li>
+      <li>세션 만료 및 정리 로직 구현</li>
+    </ul>
+
+    <h4>장점</h4>
+    <ul>
+      <li><b>완전한 Stateless:</b> VM 간 상태 공유로 완전한 Stateless 구조</li>
+      <li><b>VM 삭제 안전:</b> VM 삭제 시에도 세션 보존</li>
+      <li><b>부하 분산:</b> F5의 부하 분산 효과 극대화</li>
+      <li><b>확장성:</b> 수평 확장에 가장 적합</li>
+    </ul>
+
+    <h4>단점 및 주의사항</h4>
+    <ul>
+      <li><b>애플리케이션 수정 필요:</b> 코드 변경 및 재배포 필요</li>
+      <li><b>인프라 추가:</b> Redis/Memcached 서버 구축 및 운영 필요</li>
+      <li><b>네트워크 의존성:</b> 외부 저장소 연결 실패 시 영향</li>
+      <li><b>지연 시간:</b> 네트워크 왕복으로 인한 약간의 지연</li>
+    </ul>
+
+    <h4>권장 사용 사례</h4>
+    <ul>
+      <li>대규모 웹 애플리케이션</li>
+      <li>마이크로서비스 아키텍처</li>
+      <li>세션 데이터가 중요한 애플리케이션</li>
+      <li>고가용성이 중요한 프로덕션 환경</li>
+    </ul>
+  </div>
+
+  <h3 id="section-14-4">14.4 하이브리드 접근법</h3>
+  <div class="box">
+    <h4>해결 방법</h4>
+    <p>위 방법들을 조합하여 사용합니다. 예를 들어, F5 Session Affinity로 기본 라우팅하고, 중요한 상태는 Redis에 저장합니다.</p>
+    
+    <h4>구현 예시</h4>
+    <ul>
+      <li><b>F5 Session Affinity + Redis:</b>
+        <ul>
+          <li>F5로 기본 세션 유지 (성능 최적화)</li>
+          <li>중요한 상태는 Redis에 저장 (VM 삭제 시 보호)</li>
+          <li>VM 장애 시에도 상태 복구 가능</li>
+        </ul>
+      </li>
+      <li><b>공유 스토리지 + Redis:</b>
+        <ul>
+          <li>파일은 공유 스토리지에 저장</li>
+          <li>세션은 Redis에 저장</li>
+          <li>각각의 장점 활용</li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+
+  <h3 id="section-14-5">14.5 솔루션 선택 가이드</h3>
+  <table>
+    <tr>
+      <th>요구사항</th>
+      <th>권장 솔루션</th>
+      <th>구현 난이도</th>
+      <th>애플리케이션 수정</th>
+    </tr>
+    <tr>
+      <td>세션 손실 허용 가능<br/>(재로그인 가능)</td>
+      <td>F5 Session Affinity</td>
+      <td>낮음 (F5 설정만)</td>
+      <td>불필요</td>
+    </tr>
+    <tr>
+      <td>파일 기반 상태 관리</td>
+      <td>공유 스토리지 (NFS)</td>
+      <td>중간 (템플릿/파이프라인 수정)</td>
+      <td>경로 설정 변경</td>
+    </tr>
+    <tr>
+      <td>세션 보존 필수<br/>(VM 삭제 시에도 유지)</td>
+      <td>상태 외부화 (Redis)</td>
+      <td>높음 (인프라 + 코드 수정)</td>
+      <td>필요 (세션 스토어 변경)</td>
+    </tr>
+    <tr>
+      <td>고가용성 + 성능</td>
+      <td>하이브리드 (F5 + Redis)</td>
+      <td>높음</td>
+      <td>부분 수정</td>
+    </tr>
+  </table>
+
+  <h3 id="section-14-6">14.6 현재 시스템에서의 적용 방법</h3>
+  <div class="box">
+    <h4>F5 Session Affinity 적용 (가장 빠른 방법)</h4>
+    <ol>
+      <li><b>F5 Pool 설정 수정:</b>
+        <ul>
+          <li>F5 BIG-IP 관리 콘솔 접속</li>
+          <li>해당 Pool 선택 → Profiles → Persistence</li>
+          <li>Cookie Insert 또는 Source Address Affinity 선택</li>
+          <li>타임아웃 설정 (예: 30분)</li>
+        </ul>
+      </li>
+      <li><b>애플리케이션 수정:</b> 불필요 (F5가 자동 처리)</li>
+      <li><b>오토스케일링 시스템:</b> 변경 불필요 (기존 시스템 그대로 사용)</li>
+    </ol>
+
+    <h4>Redis 기반 세션 스토어 적용</h4>
+    <ol>
+      <li><b>Redis 인프라 구축:</b>
+        <ul>
+          <li>Redis 서버 설치 및 운영 (별도 VM 또는 기존 인프라 활용)</li>
+          <li>Redis Cluster 구성 (고가용성 필요 시)</li>
+        </ul>
+      </li>
+      <li><b>VM 템플릿 수정:</b>
+        <ul>
+          <li>Redis 클라이언트 라이브러리 포함</li>
+          <li>애플리케이션 설정에 Redis 연결 정보 추가</li>
+        </ul>
+      </li>
+      <li><b>애플리케이션 코드 수정:</b>
+        <ul>
+          <li>세션 저장소를 Redis로 변경</li>
+          <li>세션 만료 및 정리 로직 구현</li>
+        </ul>
+      </li>
+      <li><b>오토스케일링 시스템:</b> 변경 불필요 (기존 시스템 그대로 사용)</li>
+    </ol>
+
+    <h4>공유 스토리지 적용</h4>
+    <ol>
+      <li><b>NFS 서버 구축:</b>
+        <ul>
+          <li>NFS 서버 설치 및 공유 디렉토리 생성</li>
+          <li>vSphere에서 NFS Datastore로 마운트 (선택사항)</li>
+        </ul>
+      </li>
+      <li><b>VM 템플릿 수정:</b>
+        <ul>
+          <li>NFS 마운트 스크립트 추가</li>
+          <li>애플리케이션 설정에 공유 스토리지 경로 추가</li>
+        </ul>
+      </li>
+      <li><b>Jenkins 파이프라인 수정:</b>
+        <ul>
+          <li>VM 생성 후 NFS 마운트 스크립트 실행 단계 추가</li>
+          <li>VM 삭제 전 공유 스토리지 정리 단계 추가 (선택사항)</li>
+        </ul>
+      </li>
+      <li><b>애플리케이션 수정:</b>
+        <ul>
+          <li>파일 저장 경로를 공유 스토리지로 변경</li>
+        </ul>
+      </li>
+    </ol>
+  </div>
+
+  <h3 id="section-14-7">14.7 제한사항 및 고려사항</h3>
+  <div class="warning">
+    <h4>현재 시스템의 제한사항</h4>
+    <ul>
+      <li><b>VM 삭제 시 세션 손실:</b> F5 Session Affinity만 사용 시, 스케일인으로 VM이 삭제되면 해당 VM의 세션이 손실됩니다.</li>
+      <li><b>부하 분산 불균형:</b> Session Affinity로 인해 부하가 고르게 분산되지 않을 수 있습니다.</li>
+      <li><b>애플리케이션 수정 필요:</b> 상태 외부화나 공유 스토리지 사용 시 애플리케이션 코드 수정이 필요합니다.</li>
+    </ul>
+
+    <h4>권장 사항</h4>
+    <ul>
+      <li><b>Stateless로 전환:</b> 가능한 경우 애플리케이션을 Stateless로 설계하는 것이 가장 이상적입니다.</li>
+      <li><b>점진적 적용:</b> F5 Session Affinity부터 시작하여 필요 시 Redis나 공유 스토리지로 확장</li>
+      <li><b>모니터링:</b> 세션 손실률, 부하 분산 상태 등을 모니터링하여 최적의 솔루션 선택</li>
+      <li><b>테스트:</b> 프로덕션 적용 전 충분한 테스트 수행</li>
+    </ul>
+  </div>
+
+  <!-- 15. 향후 고도화 -->
+  <h2 id="section-15">15. 향후 고도화 방향</h2>
+
+  <h3 id="section-15-1">15.1 개인 서비스 제공을 위한 고도화</h3>
   <ul>
     <li><b>현재 상태:</b> 현재 완료된 버전은 다나클라우드 운영자 또는 관리자만이 요청을 받아 구성을 할 수 있는 구조입니다.</li>
     <li><b>DB 연동:</b> 향후 데이터베이스 연동을 통한 설정 및 이력 관리</li>
@@ -1891,13 +2227,13 @@ export function decideScaleAction(
     <li><b>개인 서비스 제공:</b> 위 고도화 작업 완료 후 각 담당자에게 개인 서비스 제공 가능</li>
   </ul>
 
-  <h3 id="section-14-2">14.2 고객사 전용 서버/인프라 제공</h3>
+  <h3 id="section-15-2">15.2 고객사 전용 서버/인프라 제공</h3>
   <ul>
     <li>대형 고객사의 요구 시, Autoscaling Backend/Jenkins/PLG/F5 파티션을 전용 인스턴스로 제공</li>
     <li>각 고객사별로 min/maxVms, IP Pool, VLAN, 템플릿 및 모니터링을 완전히 분리 운영</li>
   </ul>
 
-  <h3 id="section-14-3">14.3 고급 기능 아이디어</h3>
+  <h3 id="section-15-3">15.3 고급 기능 아이디어</h3>
   <ul>
     <li><b>예측 스케일링</b>
       <ul>
@@ -1929,10 +2265,10 @@ export function decideScaleAction(
     </li>
   </ul>
 
-  <!-- 15. 요약 및 핵심 포인트 -->
-  <h2 id="section-15">15. 요약 및 핵심 포인트</h2>
+  <!-- 16. 요약 및 핵심 포인트 -->
+  <h2 id="section-16">16. 요약 및 핵심 포인트</h2>
 
-  <h3 id="section-15-1">15.1 핵심 아키텍처 원칙</h3>
+  <h3 id="section-16-1">16.1 핵심 아키텍처 원칙</h3>
   <div class="box">
     <ul>
       <li><b>비침투형 설계:</b> 기존 인프라(PLG Stack, Jenkins, F5, vSphere)를 최대한 재활용</li>
@@ -1943,7 +2279,7 @@ export function decideScaleAction(
     </ul>
   </div>
 
-  <h3 id="section-15-2">15.2 주요 특징</h3>
+  <h3 id="section-16-2">16.2 주요 특징</h3>
   <table>
     <tr>
       <th>항목</th>
@@ -1971,7 +2307,7 @@ export function decideScaleAction(
     </tr>
   </table>
 
-  <h3 id="section-15-3">15.3 성능 지표</h3>
+  <h3 id="section-16-3">16.3 성능 지표</h3>
   <table>
     <tr>
       <th>작업</th>
@@ -1999,7 +2335,7 @@ export function decideScaleAction(
     </tr>
   </table>
 
-  <h3 id="section-15-4">15.4 제한사항 및 주의사항</h3>
+  <h3 id="section-16-4">16.4 제한사항 및 주의사항</h3>
   <div class="warning">
     <h4>서비스 제공 상태</h4>
     <ul>
@@ -2017,8 +2353,8 @@ export function decideScaleAction(
     </ul>
   </div>
 
-  <!-- 16. 참고 자료 -->
-  <h2 id="section-16">16. 참고 자료</h2>
+  <!-- 17. 참고 자료 -->
+  <h2 id="section-17">17. 참고 자료</h2>
   <ul>
     <li><a href="https://prometheus.io/docs/">Prometheus 공식 문서</a></li>
     <li><a href="https://prometheus.io/docs/alerting/latest/alertmanager/">Alertmanager 공식 문서</a></li>
